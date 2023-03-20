@@ -115,6 +115,7 @@ class LSLRGradientDescentLearningRule(nn.Module):
 
             for idx, (key, param) in enumerate(names_weights_dict.items()):
 
+                # TODO: 두 분기문은 왜 나뉜거지?
                 if self.random_init:
                 # per-param weight decay for random init
                     self.names_beta_dict_per_param[key.replace(".", "-")] = nn.Parameter(
@@ -134,9 +135,11 @@ class LSLRGradientDescentLearningRule(nn.Module):
                 원래 MAML++에서는 위에 코드가 없고, 아래 코드와 같았다.
                 self.init_learning_rate를 곱해주는 이유는 무엇일까?
                 코드를 잘못봤다.. torch one으로 1로 이루어진 벡터를 만든 후에 초기 lr을 곱해주는 것이구나..
-                
-                근데 이걸 왜하는 거냐?
                 """
+                # TODO: 근데 이걸 왜하는 거냐?
+                ## learning rate를 학습한다고? MAML에서는 learnig rate를 학습하지 않는다 (parameter initialization만을 학습하는데..?)
+                ## MAML++에서 stable한 훈련을 위해서 학습하기 위해서 무언가를 하나??
+
                 # per-step per-layer meta-learnable learning rate bias term (for more stable training and better performance by 2~3%)
                 self.names_alpha_dict[key.replace(".", "-")] = nn.Parameter(
                     data=torch.ones(self.total_num_inner_loop_steps + 1) * self.init_learning_rate,

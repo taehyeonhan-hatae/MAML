@@ -52,6 +52,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         self.task_learning_rate = args.init_inner_loop_learning_rate
 
+        # Inner loop의 모든 것이 이루어지는 공간이구나
         self.inner_loop_optimizer = LSLRGradientDescentLearningRule(device=device,
                                                                     init_learning_rate=self.task_learning_rate,
                                                                     init_weight_decay=args.init_inner_loop_weight_decay,
@@ -60,8 +61,10 @@ class MAMLFewShotClassifier(nn.Module):
                                                                     use_learnable_learning_rates=self.args.alfa,
                                                                     alfa=self.args.alfa, random_init=self.args.random_init)
 
+        # requires_grad가 true인 parameter만 복제해 놓는다
         names_weights_copy = self.get_inner_loop_parameter_dict(self.classifier.named_parameters())
 
+        # TODO: 도대체  attenuate 얘는 뭐냐
         if self.args.attenuate:
             num_layers = len(names_weights_copy)
             self.attenuator = nn.Sequential(
@@ -71,9 +74,11 @@ class MAMLFewShotClassifier(nn.Module):
                 nn.Sigmoid()
             ).to(device=self.device)
 
+        # 각 paramter에 해당하는 alpha, beta 초기값을 세팅해 loop만큼 놓는다
         self.inner_loop_optimizer.initialise(
             names_weights_dict=names_weights_copy)
 
+        # Inner loop를 확인한다
         print("Inner Loop parameters")
         for key, value in self.inner_loop_optimizer.named_parameters():
             print(key, value.shape)
@@ -83,7 +88,7 @@ class MAMLFewShotClassifier(nn.Module):
         self.args = args
         self.to(device)
 
-
+        # outer loop를 확인한다
         print("Outer Loop parameters")
         for name, param in self.named_parameters():
             if param.requires_grad:
@@ -91,6 +96,8 @@ class MAMLFewShotClassifier(nn.Module):
 
         # ALFA
         if self.args.alfa:
+            # input의 차원이 names_weights_copy 길이 x 2?
+            ## 이 것은 무엇을 하려고 하는 것일까? -> alpha와 beta를 위한 것이다
             num_layers = len(names_weights_copy)
             input_dim = num_layers*2
             self.regularizer = nn.Sequential(
@@ -130,6 +137,8 @@ class MAMLFewShotClassifier(nn.Module):
                     {'params': self.classifier.parameters()},
                 ], lr=args.meta_learning_rate, amsgrad=False)
 
+        # lr_scheduler.CosineAnnealingLR => Cosine 그래프를 그리면서 learning rate가 진동하는 방식.
+        ## learning rate가 단순히 감소하기 보다는 진동하면서 최적점을 찾아감
         self.scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer, T_max=self.args.total_epochs,
                                                               eta_min=self.args.min_learning_rate)
 
