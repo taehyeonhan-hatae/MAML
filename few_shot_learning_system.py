@@ -65,6 +65,7 @@ class MAMLFewShotClassifier(nn.Module):
         names_weights_copy = self.get_inner_loop_parameter_dict(self.classifier.named_parameters())
 
         # TODO: 도대체  attenuate 얘는 뭐냐
+        ## L2F에서 채택한 기법이다
         if self.args.attenuate:
             num_layers = len(names_weights_copy)
             self.attenuator = nn.Sequential(
@@ -236,7 +237,9 @@ class MAMLFewShotClassifier(nn.Module):
         Applies an inner loop update given current step's loss, the weights to update, a flag indicating whether to use
         second order derivatives and the current step's index.
         :param loss: Current step's loss with respect to the support set.
+
         :param names_weights_copy: A dictionary with names to parameters to update.
+
         :param use_second_order: A boolean flag of whether to use second order derivatives.
         :param current_step_idx: Current step's index.
         :return: A dictionary with the updated weights (name, param)
@@ -310,6 +313,7 @@ class MAMLFewShotClassifier(nn.Module):
             self.classifier.module.zero_grad()
         else:
             self.classifier.zero_grad()
+
         for task_id, (x_support_set_task, y_support_set_task, x_target_set_task, y_target_set_task) in \
                 enumerate(zip(x_support_set,
                               y_support_set,
@@ -320,6 +324,8 @@ class MAMLFewShotClassifier(nn.Module):
             per_step_support_accuracy = []
             per_step_target_accuracy = []
             per_step_loss_importance_vectors = self.get_per_step_loss_importance_vector()
+
+            # names_weights_copy 변수가 상당히 많이 보인다.. 왜 그러는 걸까?
             names_weights_copy = self.get_inner_loop_parameter_dict(self.classifier.named_parameters())
 
             num_devices = torch.cuda.device_count() if torch.cuda.is_available() else 1
