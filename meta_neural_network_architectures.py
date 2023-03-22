@@ -360,6 +360,7 @@ class MetaConv2dLayer(nn.Module):
         self.use_bias = use_bias
         self.groups = int(groups)
         self.weight = nn.Parameter(torch.empty(num_filters, in_channels, kernel_size, kernel_size))
+
         nn.init.xavier_uniform_(self.weight)
 
         if self.use_bias:
@@ -879,6 +880,7 @@ class VGGReLUNormNetwork(nn.Module):
         self.meta_classifier = meta_classifier
 
         self.build_network()
+
         print("meta network params")
         for name, param in self.named_parameters():
             print(name, param.shape)
@@ -949,6 +951,7 @@ class VGGReLUNormNetwork(nn.Module):
 
         out = x
 
+        ## 코드를 짜는 아이디어가 너무 좋다..
         for i in range(self.num_stages):
             out = self.layer_dict['conv{}'.format(i)](out, params=param_dict['conv{}'.format(i)], training=training,
                                                       backup_running_statistics=backup_running_statistics,

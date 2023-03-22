@@ -200,10 +200,12 @@ class MAMLFewShotClassifier(nn.Module):
         :return: A tensor to be used to compute the weighted average of the loss, useful for
         the MSL (Multi Step Loss) mechanism.
         """
-        loss_weights = np.ones(shape=(self.args.number_of_training_steps_per_iter)) * (
-                1.0 / self.args.number_of_training_steps_per_iter)
+        loss_weights = np.ones(shape=(self.args.number_of_training_steps_per_iter)) * (1.0 / self.args.number_of_training_steps_per_iter)
+
         decay_rate = 1.0 / self.args.number_of_training_steps_per_iter / self.args.multi_step_loss_num_epochs
+
         min_value_for_non_final_losses = 0.03 / self.args.number_of_training_steps_per_iter
+
         for i in range(len(loss_weights) - 1):
             curr_value = np.maximum(loss_weights[i] - (self.current_epoch * decay_rate), min_value_for_non_final_losses)
             loss_weights[i] = curr_value
@@ -211,8 +213,11 @@ class MAMLFewShotClassifier(nn.Module):
         curr_value = np.minimum(
             loss_weights[-1] + (self.current_epoch * (self.args.number_of_training_steps_per_iter - 1) * decay_rate),
             1.0 - ((self.args.number_of_training_steps_per_iter - 1) * min_value_for_non_final_losses))
+
         loss_weights[-1] = curr_value
+
         loss_weights = torch.Tensor(loss_weights).to(device=self.device)
+
         return loss_weights
 
     def get_inner_loop_parameter_dict(self, params):
@@ -323,6 +328,8 @@ class MAMLFewShotClassifier(nn.Module):
             task_accuracies = []
             per_step_support_accuracy = []
             per_step_target_accuracy = []
+
+            # 이건 또 뭐지?
             per_step_loss_importance_vectors = self.get_per_step_loss_importance_vector()
 
             # names_weights_copy 변수가 상당히 많이 보인다.. 왜 그러는 걸까?
@@ -353,9 +360,10 @@ class MAMLFewShotClassifier(nn.Module):
                 names_weights_copy = self.attenuate_init(task_embeddings=task_embeddings,
                                                          names_weights_copy=names_weights_copy)
 
-
+            # MAML Outer-loop
             for num_step in range(num_steps):
 
+                ## MAML Inner-loop
                 support_loss, support_preds = self.net_forward(x=x_support_set_task,
                                                                y=y_support_set_task,
                                                                weights=names_weights_copy,
