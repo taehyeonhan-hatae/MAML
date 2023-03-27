@@ -52,7 +52,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         self.task_learning_rate = args.init_inner_loop_learning_rate
 
-        # Inner loop의 모든 것이 이루어지는 공간이구나
+        # Inner loop에서 최적화할 parameter를 설정
         self.inner_loop_optimizer = LSLRGradientDescentLearningRule(device=device,
                                                                     init_learning_rate=self.task_learning_rate,
                                                                     init_weight_decay=args.init_inner_loop_weight_decay,
@@ -61,25 +61,31 @@ class MAMLFewShotClassifier(nn.Module):
                                                                     use_learnable_learning_rates=self.args.alfa,
                                                                     alfa=self.args.alfa, random_init=self.args.random_init)
 
-        # requires_grad가 true인 parameter만 복제해 놓는다
+        # inner loop optimization process에 사용할 파라미터를 딕셔너리로 만든다
         names_weights_copy = self.get_inner_loop_parameter_dict(self.classifier.named_parameters())
 
-        # TODO: 도대체  attenuate 얘는 뭐냐
-        ## L2F에서 채택한 기법이다
+        # L2F 논문
+        ## 각 task를 수행하는 동안, task-conditioned network 를 통해 각 layer에 대 attenuation parameter()를 생성하여 Conflict를 상쇄
         if self.args.attenuate:
             num_layers = len(names_weights_copy)
+            # 각 layer에 대 attenuation parameter()를 생성하기 위해서 input의 차원을 layer의 수만큼 둔다
             self.attenuator = nn.Sequential(
                 nn.Linear(num_layers, num_layers),
                 nn.ReLU(inplace=True),
                 nn.Linear(num_layers, num_layers),
-                nn.Sigmoid()
+                nn.Sigmoid() # 근데 attenuator의 output이 Sigmoid가 맞아?
             ).to(device=self.device)
 
-        # 각 paramter에 해당하는 alpha, beta 초기값을 세팅해 loop만큼 놓는다
-        self.inner_loop_optimizer.initialise(
-            names_weights_dict=names_weights_copy)
+        # 각 paramter에 해당하는 alpha(learning rate), beta 초기값을 세팅해 loop만큼 놓는다
+        self.inner_loop_optimizer.initialise(names_weights_dict=names_weights_copy)
 
-        # Inner loop를 확인한다
+        # Inner loop에서 최적화할 파라미터를 확인한다
+        ## 근데 alpha, beta 뿐이네? 가 아니라
+        ## names_alpha_dict와 names_beta_dict에 각각 self.classifier의 파라미터를 배치했다.(norm_layer를 제외하고..)
+        ## alpha에는 learning rate가 들어가고, beta에는 weight decay * learning rate로 초기화 되어있다
+        # TODO: 초기화가 아닌가?
+        ## 왜 names_alpha_dict와 names_beta_dict를 굳이 두었을까?
+        ## ALFA에서는 Inner loop interation동안 주어진 task에 적응할 수 있게 하는 Hyper Parmeter(learning rate, weight decay)를 생성한다
         print("Inner Loop parameters")
         for key, value in self.inner_loop_optimizer.named_parameters():
             print(key, value.shape)
@@ -90,15 +96,24 @@ class MAMLFewShotClassifier(nn.Module):
         self.to(device)
 
         # outer loop를 확인한다
+        ## nn.Linear()등으로 정의한 파라미터 접근은 parameter(), named_parameters()으로 가능
+        ## 즉, 본 코드에서 활용한 named_parameters()는 (name, parameter) 조합의 tuple iterator를 return한다
+        ### 그렇다면 이것을 Outer loop라고 할 수 있을까?, 계속 코드를 읽은 후 다시 확인하자
         print("Outer Loop parameters")
         for name, param in self.named_parameters():
             if param.requires_grad:
                 print(name, param.shape, param.device, param.requires_grad)
 
+        # TODO: Inner Loop와 Outer Loop를 확인해보니,
+        ## 마치, Inner loop에서는 self.classifier에 파라미터를 update하지 않는 것처럼 보인다
+        ## 그러나 MAML에서는 분명히 하지 않나?
+        ## 본 코드의 backbon격인 MAML++도 names_learning_rates_dict이라는 변수에 learning rate를 담았다. 지켜볼 필요가 있다
+
         # ALFA
         if self.args.alfa:
             # input의 차원이 names_weights_copy 길이 x 2?
             ## 이 것은 무엇을 하려고 하는 것일까? -> alpha와 beta를 위한 것이다
+            ## ALFA에서는 Inner loop interation동안 주어진 task에 적응할 수 있게 하는 Hyper Parmeter(learning rate, weight decay)를 생성한다
             num_layers = len(names_weights_copy)
             input_dim = num_layers*2
             self.regularizer = nn.Sequential(

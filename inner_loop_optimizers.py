@@ -102,9 +102,7 @@ class LSLRGradientDescentLearningRule(nn.Module):
 
     def initialise(self, names_weights_dict):
         """
-        매개 변수 ames_weights_dict는
-        few_shot_learning_system.py의 inner loop에서 optiization을 하기 위한 파라미터인
-        self.classifier.named_parameters()를 딕셔너리로 만든 것이다
+        매개 변수 names_weights_dict는
         """
         if self.alfa:
             if self.random_init:
@@ -114,6 +112,10 @@ class LSLRGradientDescentLearningRule(nn.Module):
             self.names_beta_dict = nn.ParameterDict()
 
             for idx, (key, param) in enumerate(names_weights_dict.items()):
+
+                print("== LSLRGradientDescentLearningRule initialise ==")
+                print("key ==", key)
+                # print("param == ", param)
 
                 # TODO: 두 분기문은 왜 나뉜거지?
                 if self.random_init:
@@ -139,11 +141,15 @@ class LSLRGradientDescentLearningRule(nn.Module):
                 # TODO: 근데 이걸 왜하는 거냐?
                 ## learning rate를 학습한다고? MAML에서는 learnig rate를 학습하지 않는다 (parameter initialization만을 학습하는데..?)
                 ## MAML++에서 stable한 훈련을 위해서 학습하기 위해서 무언가를 하나??
-
+                ## if self.alfa 일때만 왜 이 코드가 동작하게 만들어놨을까? 오타인가?
                 # per-step per-layer meta-learnable learning rate bias term (for more stable training and better performance by 2~3%)
                 self.names_alpha_dict[key.replace(".", "-")] = nn.Parameter(
                     data=torch.ones(self.total_num_inner_loop_steps + 1) * self.init_learning_rate,
                     requires_grad=self.use_learnable_learning_rates)
+                # self.names_alpha_dict에 넣을 때, key 값을 replace한 이유는 뭘까?
+                # torch.ones(self.total_num_inner_loop_steps + 1) * self.init_learning_rate
+                # torch.ones(5 + 1) * 0.01
+                # tensor([0.0100, 0.0100, 0.0100, 0.0100, 0.0100, 0.0100])
  
     def update_params(self, names_weights_dict, names_grads_wrt_params_dict, generated_alpha_params, generated_beta_params, num_step, tau=0.1):
         """Applies a single gradient descent update to all parameters.

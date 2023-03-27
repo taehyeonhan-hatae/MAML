@@ -423,6 +423,9 @@ class MetaLinearLayer(nn.Module):
         Otherwise the external are used.
         :return: The result of the linear function.
         """
+
+        print("MetaLinearLayer forward") # forward는 무조건 호출
+
         if params is not None:
             params = extract_top_level_dict(current_dict=params)
             if self.use_bias:
@@ -687,7 +690,7 @@ class MetaConvNormLayerReLU(nn.Module):
 
         out = F.leaky_relu(out)
 
-        print(out.shape)
+        print("(MetaConvNormLayerReLU build_block) out.shape== ", out.shape)
 
     def forward(self, x, num_step, params=None, training=False, backup_running_statistics=False):
         """
@@ -702,6 +705,9 @@ class MetaConvNormLayerReLU(nn.Module):
             at evaluation time, when after the pass is complete we want to throw away the collected validation stats.
             :return: The result of the batch norm operation.
         """
+
+        # print("MetaConvNormLayerReLU forward") # forward는 무조건 호출
+
         batch_norm_params = None
         conv_params = None
         activation_function_pre_params = None
@@ -922,7 +928,9 @@ class VGGReLUNormNetwork(nn.Module):
                                                     num_filters=self.num_output_classes, use_bias=True)
 
         out = self.layer_dict['linear'](out)
-        print("VGGNetwork build", out.shape)
+
+        print("VGGNetwork build out.shape === ", out.shape)
+        print("VGGNetwork build out === ", out)
 
     def forward(self, x, num_step, params=None, training=False, backup_running_statistics=False):
         """
