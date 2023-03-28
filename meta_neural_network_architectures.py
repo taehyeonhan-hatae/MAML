@@ -424,8 +424,6 @@ class MetaLinearLayer(nn.Module):
         :return: The result of the linear function.
         """
 
-        print("MetaLinearLayer forward") # forward는 무조건 호출
-
         if params is not None:
             params = extract_top_level_dict(current_dict=params)
             if self.use_bias:

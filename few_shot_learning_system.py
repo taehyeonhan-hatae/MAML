@@ -53,6 +53,8 @@ class MAMLFewShotClassifier(nn.Module):
         self.task_learning_rate = args.init_inner_loop_learning_rate
 
         # Inner loop에서 최적화할 parameter를 설정
+        # TODO: names_alpha_dict과 names_beta_dict..
+        ## 근데 names_alpha_dict과 names_beta_dict에 대해서 감이 잘 오지 않는다. 오로지 ALFA를 위한 변수일까?
         self.inner_loop_optimizer = LSLRGradientDescentLearningRule(device=device,
                                                                     init_learning_rate=self.task_learning_rate,
                                                                     init_weight_decay=args.init_inner_loop_weight_decay,
@@ -65,7 +67,7 @@ class MAMLFewShotClassifier(nn.Module):
         names_weights_copy = self.get_inner_loop_parameter_dict(self.classifier.named_parameters())
 
         # L2F 논문
-        ## 각 task를 수행하는 동안, task-conditioned network 를 통해 각 layer에 대 attenuation parameter()를 생성하여 Conflict를 상쇄
+        ## 각 task를 수행하는 동안, task-conditioned network 를 통해 각 layer에 대한 attenuation parameter()를 생성하여 Conflict를 상쇄
         if self.args.attenuate:
             num_layers = len(names_weights_copy)
             # 각 layer에 대 attenuation parameter()를 생성하기 위해서 input의 차원을 layer의 수만큼 둔다

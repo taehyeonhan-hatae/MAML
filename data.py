@@ -168,7 +168,7 @@ class FewShotLearningDatasetParallel(Dataset):
         self.data_length = {name: np.sum([len(self.datasets[name][key])
                                           for key in self.datasets[name]]) for name in self.datasets.keys()}
 
-        print("data", self.data_length)
+        print("data_length == ", self.data_length)
         self.observed_seed_set = None
 
     def load_dataset(self):
@@ -187,11 +187,19 @@ class FewShotLearningDatasetParallel(Dataset):
                 key = self.get_label_from_index(index=key)
                 bits = key.split("/")
                 set_name = bits[0]
+                # print("set_name == ", set_name)
+                # Dataset 중에 train, test, val로 사전에 나눈 것들이있다
                 class_label = bits[1]
+                # print("load_dataset == ", set_name, class_label)
+                # 여기서 Meta-train, Meta-val, Meta-test로 나눠진다(?)
+                ## 뭔가 이상한데.. task가 아니라 그냥 그저 Class로 나눈거 아닌가?
+                ## 아래 get_set 함수에서 task를 나눈다.
                 if set_name not in dataset_splits:
                     dataset_splits[set_name] = {class_label: value}
                 else:
                     dataset_splits[set_name][class_label] = value
+
+
         else:
             data_image_paths, index_to_label_name_dict_file, label_to_index = self.load_datapaths()
             total_label_types = len(data_image_paths)
@@ -206,13 +214,20 @@ class FewShotLearningDatasetParallel(Dataset):
             x_train_id, x_val_id, x_test_id = int(self.train_val_test_split[0] * total_label_types), \
                                               int(np.sum(self.train_val_test_split[:2]) * total_label_types), \
                                               int(total_label_types)
-            print(x_train_id, x_val_id, x_test_id)
+
+            print("load_dataset === ", x_train_id, x_val_id, x_test_id)
+
             x_train_classes = (class_key for class_key in list(data_image_paths.keys())[:x_train_id])
             x_val_classes = (class_key for class_key in list(data_image_paths.keys())[x_train_id:x_val_id])
             x_test_classes = (class_key for class_key in list(data_image_paths.keys())[x_val_id:x_test_id])
+
+            # 여기서 Meta-train, Meta-val, Meta-test로 나눠진다(?)
+            ## 뭔가 이상한데.. task가 아니라 그냥 그저 Class로 나눈거 아닌가?
+            ## 아래 get_set 함수에서 task를 나눈다.
             x_train, x_val, x_test = {class_key: data_image_paths[class_key] for class_key in x_train_classes}, \
                                      {class_key: data_image_paths[class_key] for class_key in x_val_classes}, \
                                      {class_key: data_image_paths[class_key] for class_key in x_test_classes},
+
             dataset_splits = {"train": x_train, "val":x_val , "test": x_test}
 
         if self.args.load_into_memory is True:
@@ -483,13 +498,22 @@ class FewShotLearningDatasetParallel(Dataset):
     def get_set(self, dataset_name, seed, augment_images=False):
         """
         Generates a task-set to be used for training or evaluation
-        :param set_name: The name of the set to use, e.g. "train", "val" etc.
+        :param dataset_name: The name of the set to use, e.g. "train", "val" etc.
         :return: A task-set containing an image and label support set, and an image and label target set.
         """
+
+        # print("get_set의 dataset_name ===  " , dataset_name)
+        # dataset_name -> train, val 인지 구분한다
+
         #seed = seed % self.args.total_unique_tasks
         rng = np.random.RandomState(seed)
+
+        # 미리 설정한 Task 당 class 수만큼으로 Task 하나를 구성한다
         selected_classes = rng.choice(list(self.dataset_size_dict[dataset_name].keys()),
                                       size=self.num_classes_per_set, replace=False)
+
+        # TODO: 이건뭐냐?
+        ##
         rng.shuffle(selected_classes)
         k_list = rng.randint(0, 4, size=self.num_classes_per_set)
         k_dict = {selected_class: k_item for (selected_class, k_item) in zip(selected_classes, k_list)}

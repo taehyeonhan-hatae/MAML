@@ -80,12 +80,7 @@ def get_args():
         elif str(args_dict[key]).lower() == "false":
             args_dict[key] = False
         if key == "dataset_path":
-            # 종민 수정
-            #args_dict[key] = os.path.join(os.environ['DATASET_DIR'], args_dict[key])
-
             args_dict[key] = os.path.join(os.getcwd(), "datasets",  args_dict[key])
-
-            #print(key, os.path.join(os.environ['DATASET_DIR'], args_dict[key]))
 
         print(key, args_dict[key], type(args_dict[key]))
 

@@ -108,6 +108,8 @@ class LSLRGradientDescentLearningRule(nn.Module):
             if self.random_init:
                 self.names_beta_dict_per_param = nn.ParameterDict()
 
+            # TODO: names_alpha_dict과 names_beta_dict은 무엇일까?
+            ## ALFA 논문에서 언급한 alpha와 beta인가?
             self.names_alpha_dict = nn.ParameterDict()
             self.names_beta_dict = nn.ParameterDict()
 
@@ -142,10 +144,12 @@ class LSLRGradientDescentLearningRule(nn.Module):
                 ## learning rate를 학습한다고? MAML에서는 learnig rate를 학습하지 않는다 (parameter initialization만을 학습하는데..?)
                 ## MAML++에서 stable한 훈련을 위해서 학습하기 위해서 무언가를 하나??
                 ## if self.alfa 일때만 왜 이 코드가 동작하게 만들어놨을까? 오타인가?
+
                 # per-step per-layer meta-learnable learning rate bias term (for more stable training and better performance by 2~3%)
                 self.names_alpha_dict[key.replace(".", "-")] = nn.Parameter(
                     data=torch.ones(self.total_num_inner_loop_steps + 1) * self.init_learning_rate,
                     requires_grad=self.use_learnable_learning_rates)
+
                 # self.names_alpha_dict에 넣을 때, key 값을 replace한 이유는 뭘까?
                 # torch.ones(self.total_num_inner_loop_steps + 1) * self.init_learning_rate
                 # torch.ones(5 + 1) * 0.01
