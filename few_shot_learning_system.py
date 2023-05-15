@@ -68,6 +68,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         # L2F 논문
         ## 각 task를 수행하는 동안, task-conditioned network 를 통해 각 layer에 대한 attenuation parameter()를 생성하여 Conflict를 상쇄
+        ## 나의 아이이디어를 적용할법하다
         if self.args.attenuate:
             num_layers = len(names_weights_copy)
             # 각 layer에 대 attenuation parameter()를 생성하기 위해서 input의 차원을 layer의 수만큼 둔다
@@ -82,15 +83,19 @@ class MAMLFewShotClassifier(nn.Module):
         self.inner_loop_optimizer.initialise(names_weights_dict=names_weights_copy)
 
         # Inner loop에서 최적화할 파라미터를 확인한다
-        ## 근데 alpha, beta 뿐이네? 가 아니라
-        ## names_alpha_dict와 names_beta_dict에 각각 self.classifier의 파라미터를 배치했다.(norm_layer를 제외하고..)
-        ## alpha에는 learning rate가 들어가고, beta에는 weight decay * learning rate로 초기화 되어있다
-        # TODO: 초기화가 아닌가?
-        ## 왜 names_alpha_dict와 names_beta_dict를 굳이 두었을까?
-        ## ALFA에서는 Inner loop interation동안 주어진 task에 적응할 수 있게 하는 Hyper Parmeter(learning rate, weight decay)를 생성한다
         print("Inner Loop parameters")
         for key, value in self.inner_loop_optimizer.named_parameters():
             print(key, value.shape)
+            ## 근데 alpha, beta 뿐이네? 가 아니라
+            ## names_alpha_dict와 names_beta_dict에 각각 self.classifier의 파라미터를 배치했다.(norm_layer를 제외하고..)
+            ## alpha에는 learning rate가 들어가고, beta에는 weight decay * learning rate로 초기화 되어있다
+
+            # TODO: 아무리 그래도 CNN의 파라미터도 같이 있어야하는거 아닌가? Outer Loop parameters 처럼?
+            ## 그리고 왜 inner_loop_optimizer에는 파라미터가 생성될까?
+
+            # TODO: 초기화가 아닌가?
+            ## 왜 names_alpha_dict와 names_beta_dict를 굳이 두었을까?
+            ## ALFA에서는 Inner loop interation동안 주어진 task에 적응할 수 있게 하는 학습가능한 Hyper Parmeter(learning rate, weight decay)를 생성한다
 
         self.use_cuda = args.use_cuda
         self.device = device
@@ -98,18 +103,21 @@ class MAMLFewShotClassifier(nn.Module):
         self.to(device)
 
         # outer loop를 확인한다
-        ## nn.Linear()등으로 정의한 파라미터 접근은 parameter(), named_parameters()으로 가능
-        ## 즉, 본 코드에서 활용한 named_parameters()는 (name, parameter) 조합의 tuple iterator를 return한다
-        ### 그렇다면 이것을 Outer loop라고 할 수 있을까?, 계속 코드를 읽은 후 다시 확인하자
         print("Outer Loop parameters")
         for name, param in self.named_parameters():
+            ## nn.Linear()등으로 정의한 파라미터 접근은 parameter(), named_parameters()으로 가능
+            ## 즉, 본 코드에서 활용한 named_parameters()는 (name, parameter) 조합의 tuple iterator를 return한다
+            ### 그렇다면 이것을 Outer loop라고 할 수 있을까?, 계속 코드를 읽은 후 다시 확인하자
             if param.requires_grad:
                 print(name, param.shape, param.device, param.requires_grad)
 
+
         # TODO: Inner Loop와 Outer Loop를 확인해보니,
+        ## Inner Loop의 parameter는 LSLRGradientDescentLearningRule에서 정의를 하고
+        ## outer Loop의 Paramter는 여기 MAMLFewShotClassifier에서 정의를 했다
         ## 마치, Inner loop에서는 self.classifier에 파라미터를 update하지 않는 것처럼 보인다
         ## 그러나 MAML에서는 분명히 하지 않나?
-        ## 본 코드의 backbon격인 MAML++도 names_learning_rates_dict이라는 변수에 learning rate를 담았다. 지켜볼 필요가 있다
+        ## 본 코드의 backbone격인 MAML++도 names_learning_rates_dict이라는 변수에 learning rate를 담았다. 지켜볼 필요가 있다
 
         # ALFA
         if self.args.alfa:
@@ -313,8 +321,7 @@ class MAMLFewShotClassifier(nn.Module):
         :param data_batch: A data batch containing the support and target sets.
         :param epoch: Current epoch's index
         :param use_second_order: A boolean saying whether to use second order derivatives.
-        :param use_multi_step_loss_optimization: Whether to optimize on the outer loop using just the last step's
-        target loss (True) or whether to use multi step loss which improves the stability of the system (False)
+        :param use_multi_step_loss_optimization: Whether to optimize on the outer loop using just the last step's target loss (True) or whether to use multi step loss which improves the stability of the system (False)
         :param num_steps: Number of inner loop steps.
         :param training_phase: Whether this is a training phase (True) or an evaluation phase (False)
         :return: A dictionary with the collected losses of the current outer forward propagation.
@@ -370,6 +377,7 @@ class MAMLFewShotClassifier(nn.Module):
             # Attenuate the initialization for L2F
             if self.args.attenuate:
                 # Obtain gradients from support set for task embedding
+                ## 자세히는 모르겠지만, gradient를 받고 있다. 내 연구에 활용할 수 있을거 같다.
                 task_embeddings = self.get_task_embeddings(x_support_set_task=x_support_set_task,
                                                            y_support_set_task=y_support_set_task,
                                                            names_weights_copy=names_weights_copy)
@@ -457,6 +465,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         return losses, per_task_target_preds
 
+    # inner-loop
     def net_forward(self, x, y, weights, backup_running_statistics, training, num_step):
         """
         A base model forward pass on some data points x. Using the parameters in the weights dictionary. Also requires

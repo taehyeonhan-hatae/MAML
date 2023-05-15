@@ -89,12 +89,13 @@ class LSLRGradientDescentLearningRule(nn.Module):
         self.init_pspl_weight_decay = torch.ones(1)
         self.init_pspl_weight_decay.to(device)
 
+        ## MAML++ 코드
         self.init_learning_rate = torch.ones(1) * init_learning_rate
         self.init_learning_rate.to(device)
-
         self.total_num_inner_loop_steps = total_num_inner_loop_steps
-
         self.use_learnable_learning_rates = use_learnable_learning_rates
+        #######
+
         self.use_learnable_weight_decay = use_learnable_weight_decay
 
         self.init_weight_decay = torch.ones(1) * init_weight_decay
@@ -135,11 +136,6 @@ class LSLRGradientDescentLearningRule(nn.Module):
                         data=torch.ones(self.total_num_inner_loop_steps + 1) * self.init_weight_decay * self.init_learning_rate,
                         requires_grad=self.use_learnable_learning_rates)
 
-                """
-                원래 MAML++에서는 위에 코드가 없고, 아래 코드와 같았다.
-                self.init_learning_rate를 곱해주는 이유는 무엇일까?
-                코드를 잘못봤다.. torch one으로 1로 이루어진 벡터를 만든 후에 초기 lr을 곱해주는 것이구나..
-                """
                 # TODO: 근데 이걸 왜하는 거냐?
                 ## learning rate를 학습한다고? MAML에서는 learnig rate를 학습하지 않는다 (parameter initialization만을 학습하는데..?)
                 ## MAML++에서 stable한 훈련을 위해서 학습하기 위해서 무언가를 하나??
