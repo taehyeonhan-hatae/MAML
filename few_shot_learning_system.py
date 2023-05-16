@@ -336,6 +336,8 @@ class MAMLFewShotClassifier(nn.Module):
         total_accuracies = []
         total_support_accuracies = [[] for i in range(num_steps)]
         total_target_accuracies = [[] for i in range(num_steps)]
+
+        # 이것은 무엇일까?
         per_task_target_preds = [[] for i in range(len(x_target_set))]
 
         if torch.cuda.device_count() > 1:
@@ -420,6 +422,7 @@ class MAMLFewShotClassifier(nn.Module):
                         generated_beta_params[key] = generated_beta[g]
                         g+=1
 
+                # Inner loop의 loss 값과 pred 값으로 apply_inner_loop_update로 parameter를 update한다
                 names_weights_copy = self.apply_inner_loop_update(loss=support_loss,
                                                                   names_weights_copy=names_weights_copy,
                                                                   generated_beta_params=generated_beta_params,
@@ -427,6 +430,7 @@ class MAMLFewShotClassifier(nn.Module):
                                                                   use_second_order=use_second_order,
                                                                   current_step_idx=num_step)
 
+                ## MAML++에서는 use_multi_step_loss_optimization이 true다
                 if use_multi_step_loss_optimization and training_phase and epoch < self.args.multi_step_loss_num_epochs:
                     target_loss, target_preds = self.net_forward(x=x_target_set_task,
                                                                  y=y_target_set_task, weights=names_weights_copy,
@@ -435,6 +439,8 @@ class MAMLFewShotClassifier(nn.Module):
                     
                     task_losses.append(per_step_loss_importance_vectors[num_step] * target_loss)
 
+                # TODO: 내가 무언가를 잘못알고 있는건가?
+                ## x_target_set_task이 것이 Query data같은데.. inner loop에서 수행된다고?
                 else:
                     if num_step == (self.args.number_of_training_steps_per_iter - 1):
                         target_loss, target_preds = self.net_forward(x=x_target_set_task,
@@ -442,6 +448,8 @@ class MAMLFewShotClassifier(nn.Module):
                                                                      backup_running_statistics=False, training=True,
                                                                      num_step=num_step)
                         task_losses.append(target_loss)
+
+                ### MAML inner-loop End
 
             per_task_target_preds[task_id] = target_preds.detach().cpu().numpy()
             _, predicted = torch.max(target_preds.data, 1)
@@ -465,7 +473,6 @@ class MAMLFewShotClassifier(nn.Module):
 
         return losses, per_task_target_preds
 
-    # inner-loop를 위해서!
     def net_forward(self, x, y, weights, backup_running_statistics, training, num_step):
         """
         A base model forward pass on some data points x. Using the parameters in the weights dictionary. Also requires
@@ -481,6 +488,9 @@ class MAMLFewShotClassifier(nn.Module):
         :param num_step: An integer indicating the number of the step in the inner loop.
         :return: the crossentropy losses with respect to the given y, the predictions of the base model.
         """
+
+        # inner-loop를 위해서 net_forward를 따로두었다!
+
         preds = self.classifier.forward(x=x, params=weights,
                                         training=training,
                                         backup_running_statistics=backup_running_statistics, num_step=num_step)
@@ -568,7 +578,9 @@ class MAMLFewShotClassifier(nn.Module):
 
         losses, per_task_target_preds = self.train_forward_prop(data_batch=data_batch, epoch=epoch)
 
+        # meta-parameter(outer loop)를 update한다.
         self.meta_update(loss=losses['loss'])
+
         losses['learning_rate'] = self.scheduler.get_lr()[0]
         self.optimizer.zero_grad()
         self.zero_grad()

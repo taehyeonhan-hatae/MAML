@@ -10,8 +10,7 @@ import torch
 class ExperimentBuilder(object):
     def __init__(self, args, data, model, device):
         """
-        Initializes an experiment builder using a named tuple (args), a data provider (data), a meta learning system
-        (model) and a device (e.g. gpu/cpu/n)
+        Initializes an experiment builder using a named tuple (args), a data provider (data), a meta learning system(model) and a device (e.g. gpu/cpu/n)
         :param args: A namedtuple containing all experiment hyperparameters
         :param data: A data provider of instance MetaLearningSystemDataLoader
         :param model: A meta learning system instance
@@ -39,39 +38,49 @@ class ExperimentBuilder(object):
         os.makedirs(log_base_dir, exist_ok=True)
 
         log_dir = os.path.join(log_base_dir, exp_name)
-        print(log_dir)
+        print("log_dir === ", log_dir)
 
-        if self.args.continue_from_epoch == 'from_scratch':
+        if self.args.continue_from_epoch == 'from_scratch': # "Scratch"는 딥러닝에서 모델을 처음부터 새로 만들어 학습하는 것을 의미
             self.create_summary_csv = True
 
-        elif self.args.continue_from_epoch == 'latest':
+        elif self.args.continue_from_epoch == 'latest':     # 기존에 훈련 중이던 모델을 학습
             checkpoint = os.path.join(self.saved_models_filepath, "train_model_latest")
             print("attempting to find existing checkpoint", )
-            if os.path.exists(checkpoint):
+            if os.path.exists(checkpoint):                  # 기존에 학습 중이던 모델 존재 여부를 확인
                 self.state = \
-                    self.model.load_model(model_save_dir=self.saved_models_filepath, model_name="train_model",
-                                          model_idx='latest')
+                    self.model.load_model(model_save_dir=self.saved_models_filepath, model_name="train_model",model_idx='latest')
                 self.start_epoch = int(self.state['current_iter'] / self.args.total_iter_per_epoch)
 
             else:
                 self.args.continue_from_epoch = 'from_scratch'
                 self.create_summary_csv = True
+
         elif int(self.args.continue_from_epoch) >= 0:
             self.state = \
-                self.model.load_model(model_save_dir=self.saved_models_filepath, model_name="train_model",
-                                      model_idx=self.args.continue_from_epoch)
-            self.start_epoch = int(self.state['current_iter'] / self.args.total_iter_per_epoch)
+                self.model.load_model(model_save_dir=self.saved_models_filepath, model_name="train_model", model_idx=self.args.continue_from_epoch)
 
+            self.start_epoch = int(self.state['current_iter'] / self.args.total_iter_per_epoch)
+            # TODO: 굳이 이렇게 할 필요가 있나?
+            ## 그냥 epoch++ 로 학습을 진행하면 안되나? 아니다..
+            ## start_epoch을 통해 학습을 이어서 진행하고자한다.
+            ## 현재 interation / 총 epoch = 현재 epoch
+
+        ## Data 구성
+        ## current_iter에 주목해야할것 같다.
+        ## data.py를 분석할 때 심도있게 진행해보자
         self.data = data(args=args, current_iter=self.state['current_iter'])
 
-        print("train_seed {}, val_seed: {}, at start time".format(self.data.dataset.seed["train"],
-                                                                  self.data.dataset.seed["val"]))
+        print("train_seed {}, val_seed: {}, at start time".format(self.data.dataset.seed["train"], self.data.dataset.seed["val"]))
+
         self.total_epochs_before_pause = self.args.total_epochs_before_pause
         self.state['best_epoch'] = int(self.state['best_val_iter'] / self.args.total_iter_per_epoch)
+
         self.epoch = int(self.state['current_iter'] / self.args.total_iter_per_epoch)
+
         self.augment_flag = True if 'omniglot' in self.args.dataset_name.lower() else False
         self.start_time = time.time()
         self.epochs_done_in_this_run = 0
+
         print(self.state['current_iter'], int(self.args.total_iter_per_epoch * self.args.total_epochs))
 
     def build_summary_dict(self, total_losses, phase, summary_losses=None):
@@ -129,6 +138,8 @@ class ExperimentBuilder(object):
             print("shape of data", x_support_set.shape, x_target_set.shape, y_support_set.shape,
                   y_target_set.shape)
 
+        # 지정한 크기의 data_batch만큼 iteration을 돌린다.
+        # MAMLFewShotClassifier을 통해서..
         losses, _ = self.model.run_train_iter(data_batch=data_batch, epoch=epoch_idx)
 
         for key, value in zip(list(losses.keys()), list(losses.values())):
@@ -143,6 +154,7 @@ class ExperimentBuilder(object):
         pbar_train.update(1)
         pbar_train.set_description("training phase {} -> {}".format(self.epoch, train_output_update))
 
+        # iteration 크기 증가
         current_iter += 1
 
         return train_losses, total_losses, current_iter
@@ -316,17 +328,23 @@ class ExperimentBuilder(object):
         Runs a full training experiment with evaluations of the model on the val set at every epoch. Furthermore,
         will return the test set evaluation results on the best performing validation model.
         """
-        with tqdm.tqdm(initial=self.state['current_iter'],
-                       total=int(self.args.total_iter_per_epoch * self.args.total_epochs)) as pbar_train:
+        with tqdm.tqdm(initial=self.state['current_iter'], total=int(self.args.total_iter_per_epoch * self.args.total_epochs)) as pbar_train:
 
             while (self.state['current_iter'] < (self.args.total_epochs * self.args.total_iter_per_epoch)) and (self.args.evaluate_on_test_set_only == False):
+                # TODO: epoch 당 iteration이 끝나면 iteration이 초기화 되지 않나?
+                ## 아니지..
 
                 for train_sample_idx, train_sample in enumerate(
                         self.data.get_train_batches(total_batches=int(self.args.total_iter_per_epoch *
                                                                       self.args.total_epochs) - self.state[
                                                                       'current_iter'],
                                                     augment_images=self.augment_flag)):
+
                     # print(self.state['current_iter'], (self.args.total_epochs * self.args.total_iter_per_epoch))
+
+                    # TODO: 학습을 진행하는 부분
+                    ## 일반적으로 딥러닝 모델을 구현할 때, epoch 수를 늘려가면서 학습을 진행하지 않나?
+                    ## 메타러닝에서 이렇게 한 뭔가의 이유가 있을 것이다.
                     train_losses, total_losses, self.state['current_iter'] = self.train_iteration(
                         train_sample=train_sample,
                         total_losses=self.total_losses,
@@ -344,19 +362,23 @@ class ExperimentBuilder(object):
                             for _, val_sample in enumerate(
                                     self.data.get_val_batches(total_batches=int(self.args.num_evaluation_tasks / self.args.batch_size),
                                                               augment_images=False)):
+
+                                # val_sample로 평가를 진행하는 부분
                                 val_losses, total_losses = self.evaluation_iteration(val_sample=val_sample,
                                                                                      total_losses=total_losses,
                                                                                      pbar_val=pbar_val, phase='val')
 
                             if val_losses["val_accuracy_mean"] > self.state['best_val_acc']:
                                 print("Best validation accuracy", val_losses["val_accuracy_mean"])
+
                                 self.state['best_val_acc'] = val_losses["val_accuracy_mean"]
                                 self.state['best_val_iter'] = self.state['current_iter']
-                                self.state['best_epoch'] = int(
-                                    self.state['best_val_iter'] / self.args.total_iter_per_epoch)
+                                self.state['best_epoch'] = int(self.state['best_val_iter'] / self.args.total_iter_per_epoch)
 
-
+                        # epoch 증가
+                        ## 굳이 epoch을 증가시키는 이유가 있을까?
                         self.epoch += 1
+
                         self.state = self.merge_two_dicts(first_dict=self.merge_two_dicts(first_dict=self.state,
                                                                                           second_dict=train_losses),
                                                           second_dict=val_losses)
@@ -373,11 +395,11 @@ class ExperimentBuilder(object):
 
                         self.epochs_done_in_this_run += 1
 
-                        save_to_json(filename=os.path.join(self.logs_filepath, "summary_statistics.json"),
-                                     dict_to_store=self.state['per_epoch_statistics'])
+                        save_to_json(filename=os.path.join(self.logs_filepath, "summary_statistics.json"), dict_to_store=self.state['per_epoch_statistics'])
 
                         if self.epochs_done_in_this_run >= self.total_epochs_before_pause:
                             print("train_seed {}, val_seed: {}, at pause time".format(self.data.dataset.seed["train"],
                                                                                       self.data.dataset.seed["val"]))
                             sys.exit()
+
             self.evaluated_test_set_using_the_best_models(top_n_models=5)
