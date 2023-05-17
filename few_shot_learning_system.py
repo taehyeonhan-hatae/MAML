@@ -275,13 +275,20 @@ class MAMLFewShotClassifier(nn.Module):
         :return: A dictionary with the updated weights (name, param)
         """
         num_gpus = torch.cuda.device_count()
+
+        # 보통 딥러닝에서는 미니배치+루프 조합을 사용해서 parameter들을 업데이트하는데, 한 루프에서 업데이트를 위해 loss.backward()를 호출하면 각 파라미터들의 .grad 값에 변화도가 저장된다
+        # 이후 다음 루프에서 zero_grad()를 하지않고 역전파를 시키면 이전 루프에서 .grad에 저장된 값이 다음 루프의 업데이트에도 간섭을 해서 원하는 방향으로 학습이 되지 않음
+        # 따라서 루프가 한번 돌고나서 역전파를 하기전에 반드시 zero_grad()로 .grad 값들을 0으로 초기화시킨 후 학습을 진행
         if num_gpus > 1:
             self.classifier.module.zero_grad(params=names_weights_copy)
         else:
             self.classifier.zero_grad(params=names_weights_copy)
 
-        grads = torch.autograd.grad(loss, names_weights_copy.values(),
-                                    create_graph=use_second_order, allow_unused=True)
+        # TODO: Outer loop 처럼 loss.backward 하지 않는다.
+        ## ex) loss = (prediction - labels).sum()
+        ## loss.backward() # 역전파 단계(backward pass)
+        ## meta-modal과 base-model이 같은 구조이기 때문이다. (아니면, inner-loop에서 gradient값을 사용하려고 하기 때문인가?)
+        grads = torch.autograd.grad(loss, names_weights_copy.values(), create_graph=use_second_order, allow_unused=True)
         names_grads_copy = dict(zip(names_weights_copy.keys(), grads))
 
         names_weights_copy = {key: value[0] for key, value in names_weights_copy.items()}

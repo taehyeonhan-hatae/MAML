@@ -171,6 +171,7 @@ class LSLRGradientDescentLearningRule(nn.Module):
                 else:
                     updated_names_weights_dict[key] = (1 - generated_beta_params[key] * self.names_beta_dict[key.replace(".", "-")][num_step]) * names_weights_dict[key] - generated_alpha_params[key] * self.names_alpha_dict[key.replace(".", "-")][num_step] * names_grads_wrt_params_dict[key]
             else:
+                # Gradient decent를 통한 가중치 update 과정 (일반적인 딥러닝과 같다)
                 updated_names_weights_dict[key] = names_weights_dict[key] - self.init_lr_val * names_grads_wrt_params_dict[key]
 
         return updated_names_weights_dict
