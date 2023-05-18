@@ -64,6 +64,7 @@ class MAMLFewShotClassifier(nn.Module):
                                                                     alfa=self.args.alfa, random_init=self.args.random_init)
 
         # inner loop optimization process에 사용할 파라미터를 딕셔너리로 만든다
+        ## 코드가 중복된다
         names_weights_copy = self.get_inner_loop_parameter_dict(self.classifier.named_parameters())
 
         # L2F 논문
@@ -180,6 +181,8 @@ class MAMLFewShotClassifier(nn.Module):
             self.device = torch.cuda.current_device()
 
     def get_task_embeddings(self, x_support_set_task, y_support_set_task, names_weights_copy):
+
+        # Layer 별로 gradient 값을 받는다.
         # Use gradients as task embeddings
         support_loss, support_preds = self.net_forward(x=x_support_set_task,
                                                        y=y_support_set_task,
@@ -192,7 +195,6 @@ class MAMLFewShotClassifier(nn.Module):
         else:
             self.classifier.zero_grad(names_weights_copy)
         grads = torch.autograd.grad(support_loss, names_weights_copy.values(), create_graph=True)
-
 
         layerwise_mean_grads = []
 
@@ -306,11 +308,16 @@ class MAMLFewShotClassifier(nn.Module):
                                                                      num_step=current_step_idx)
 
         num_devices = torch.cuda.device_count() if torch.cuda.is_available() else 1
+
+
+
+        # TODO: 변한게 없는데..이게 뭐하는걸까?
+        # print("apply_inner_loop_update before names_weights_copy == ", names_weights_copy.items())
         names_weights_copy = {
             name.replace('module.', ''): value.unsqueeze(0).repeat(
                 [num_devices] + [1 for i in range(len(value.shape))]) for
             name, value in names_weights_copy.items()}
-
+        # print("apply_inner_loop_update after names_weights_copy == ", names_weights_copy.items())
 
         return names_weights_copy
 
@@ -365,11 +372,13 @@ class MAMLFewShotClassifier(nn.Module):
             # 이건 또 뭐지?
             per_step_loss_importance_vectors = self.get_per_step_loss_importance_vector()
 
-            # names_weights_copy 변수가 상당히 많이 보인다.. 왜 그러는 걸까?
+            # inner loop optimization process에 사용할 파라미터를 딕셔너리로 만든다
             names_weights_copy = self.get_inner_loop_parameter_dict(self.classifier.named_parameters())
 
             num_devices = torch.cuda.device_count() if torch.cuda.is_available() else 1
 
+            # TODO: 변한게 없는데..이게 뭐하는걸까?
+            ## 아래 코드가 종종 보인다.. 뭘까?
             names_weights_copy = {
                 name.replace('module.', ''): value.unsqueeze(0).repeat(
                     [num_devices] + [1 for i in range(len(value.shape))]) for
