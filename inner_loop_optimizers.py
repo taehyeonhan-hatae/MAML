@@ -126,12 +126,18 @@ class LSLRGradientDescentLearningRule(nn.Module):
                 self.names_alpha_dict[key.replace(".", "-")] = nn.Parameter(
                     data=torch.ones(self.total_num_inner_loop_steps + 1) * self.init_learning_rate,
                     requires_grad=self.use_learnable_learning_rates)
+
+                # self.names_alpha_dict에 넣을 때, key 값을 replace한 이유는 뭘까?
+                # torch.ones(self.total_num_inner_loop_steps + 1) * self.init_learning_rate
+                # torch.ones(5 + 1) * 0.01
+                # tensor([0.0100, 0.0100, 0.0100, 0.0100, 0.0100, 0.0100])
         else:
             self.names_learning_rates_dict = nn.ParameterDict()
             for idx, (key, param) in enumerate(names_weights_dict.items()):
                 self.names_learning_rates_dict[key.replace(".", "-")] = nn.Parameter(
                     data=torch.ones(self.total_num_inner_loop_steps + 1) * self.init_learning_rate,
                     requires_grad=self.use_learnable_learning_rates)
+
 
 
     def update_params(self, names_weights_dict, names_grads_wrt_params_dict, generated_alpha_params, generated_beta_params, num_step, tau=0.1):
@@ -158,8 +164,6 @@ class LSLRGradientDescentLearningRule(nn.Module):
                 for key in names_grads_wrt_params_dict.keys():
                     updated_names_weights_dict[key] = names_weights_dict[key] - \
                                                       self.names_learning_rates_dict[key.replace(".", "-")][num_step] * names_grads_wrt_params_dict[key]
-
-
 
         return updated_names_weights_dict
 

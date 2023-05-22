@@ -60,21 +60,29 @@ class MAMLFewShotClassifier(nn.Module):
                                                                     init_weight_decay=args.init_inner_loop_weight_decay,
                                                                     total_num_inner_loop_steps=self.args.number_of_training_steps_per_iter,
                                                                     use_learnable_weight_decay=self.args.alfa,
-                                                                    use_learnable_learning_rates=(
-                                                                                self.args.learnable_per_layer_per_step_inner_loop_learning_rate or self.args.alfa),
+                                                                    use_learnable_learning_rates=(self.args.learnable_per_layer_per_step_inner_loop_learning_rate or self.args.alfa),
                                                                     alfa=self.args.alfa,
                                                                     random_init=self.args.random_init)
 
         # inner loop optimization process에 사용할 파라미터를 딕셔너리로 만든다
+        ## outer loop optimization과 구별하기 위해서
         ## 코드가 중복된다
         names_weights_copy = self.get_inner_loop_parameter_dict(self.classifier.named_parameters())
 
+        # ALFA와 비교했을 때, meta_loss가 생겼다
         if self.args.meta_loss:
+
             base_learner_num_layers = len(names_weights_copy)
 
             support_meta_loss_num_dim = base_learner_num_layers + 2 * self.args.num_classes_per_set + 1
             support_adapter_num_dim = base_learner_num_layers + 1
             query_num_dim = base_learner_num_layers + 1 + self.args.num_classes_per_set
+
+            # TODO: Task status
+            ## 1) support set loss의 평균(i-th itearation) 2) base learner의 weight의 layer-wise 평균 3) base-learner output value의 example wise 평균
+            ## base learner f가 L-layer이고 output이 N차원이라면
+            ## task state의 차원은 L+N+1
+            ## 근데 왜 Meta_loss와 query_loss가 따로 있을까?
 
             self.meta_loss = MetaLossNetwork(support_meta_loss_num_dim, args=args, device=device).to(device=self.device)
             self.meta_query_loss = MetaLossNetwork(query_num_dim, args=args, device=device).to(device=self.device)
@@ -96,24 +104,22 @@ class MAMLFewShotClassifier(nn.Module):
             ## names_alpha_dict와 names_beta_dict에 각각 self.classifier의 파라미터를 배치했다.(norm_layer를 제외하고..)
             ## alpha에는 learning rate가 들어가고, beta에는 weight decay * learning rate로 초기화 되어있다
 
-            # TODO: 아무리 그래도 CNN의 파라미터도 같이 있어야하는거 아닌가? Outer Loop parameters 처럼?
-            ## 그리고 왜 inner_loop_optimizer에는 파라미터가 생성될까?
-
-            # TODO: 초기화가 아닌가?
-            ## 왜 names_alpha_dict와 names_beta_dict를 굳이 두었을까?
-            ## ALFA에서는 Inner loop interation동안 주어진 task에 적응할 수 있게 하는 학습가능한 Hyper Parmeter(learning rate, weight decay)를 생성한다
+            # TODO: 왜? Conv Layer는 없을까?
+            ## Classifier(CNN)의 파라미터도 같이 있어야하는거 아닌가? Outer-Loop parameters 처럼?
+            ## MAMLFewShotClassifier에서 names_weights_copy를 가지고 있기 때문이다.
+            ## 그저 print로 출력이 안되는 것일 뿐이다
+            ## inner-loops는 net_forward로 loss, pred를 구한 후(순전파)
+            ## apply_inner_loop_update에서 가중치가 업데이트 된다.
 
         self.use_cuda = args.use_cuda
         self.device = device
         self.args = args
         self.to(device)
 
-        # outer loop�� Ȯ���Ѵ�
+        # outer loop를 확인한다
         print("Outer Loop parameters")
         for name, param in self.named_parameters():
-            ## nn.Linear()등으로 정의한 파라미터 접근은 parameter(), named_parameters()으로 가능
-            ## 즉, 본 코드에서 활용한 named_parameters()는 (name, parameter) 조합의 tuple iterator를 return한다
-            ### 그렇다면 이것을 Outer loop라고 할 수 있을까?, 계속 코드를 읽은 후 다시 확인하자
+
             if param.requires_grad:
                 print(name, param.shape, param.device, param.requires_grad)
 
@@ -330,8 +336,10 @@ class MAMLFewShotClassifier(nn.Module):
             x_target_set_task = x_target_set_task.view(-1, c, h, w)
             y_target_set_task = y_target_set_task.view(-1)
 
+            # MAML Outer-loop
             for num_step in range(num_steps):
 
+                ## MAML Inner-loop
                 meta_loss, support_preds, support_loss = self.net_forward(x=x_support_set_task,
                                                                           y=y_support_set_task,
                                                                           weights=names_weights_copy,

@@ -41,13 +41,13 @@ class ExperimentBuilder(object):
         log_dir = os.path.join(log_base_dir, exp_name)
         print("log_dir === ", log_dir)
 
-        if self.args.continue_from_epoch == 'from_scratch':  # "Scratch"�� �����׿��� ���� ó������ ���� ����� �н��ϴ� ���� �ǹ�
+        if self.args.continue_from_epoch == 'from_scratch':  # "Scratch"는 딥러닝에서 모델을 처음부터 새로 만들어 학습하는 것을 의미
             self.create_summary_csv = True
 
-        elif self.args.continue_from_epoch == 'latest':  # ������ �Ʒ� ���̴� ���� �н�
+        elif self.args.continue_from_epoch == 'latest':  # 기존에 훈련 중이던 모델을 학습
             checkpoint = os.path.join(self.saved_models_filepath, "train_model_latest")
             print("attempting to find existing checkpoint", )
-            if os.path.exists(checkpoint):  # ������ �н� ���̴� �� ���� ���θ� Ȯ��
+            if os.path.exists(checkpoint):  # 기존에 학습 중이던 모델 존재 여부를 확인
                 self.state = \
                     self.model.load_model(model_save_dir=self.saved_models_filepath, model_name="train_model",
                                           model_idx='latest')
@@ -367,7 +367,8 @@ class ExperimentBuilder(object):
                                     self.data.get_val_batches(
                                         total_batches=int(self.args.num_evaluation_tasks / self.args.batch_size),
                                         augment_images=False)):
-                                # val_sample�� �򰡸� �����ϴ� �κ�
+
+                                # val_sample로 평가를 진행하는 부분
                                 val_losses, total_losses = self.evaluation_iteration(val_sample=val_sample,
                                                                                      total_losses=total_losses,
                                                                                      pbar_val=pbar_val, phase='val')
@@ -407,4 +408,5 @@ class ExperimentBuilder(object):
                             print("train_seed {}, val_seed: {}, at pause time".format(self.data.dataset.seed["train"],
                                                                                       self.data.dataset.seed["val"]))
                             sys.exit()
+
             self.evaluated_test_set_using_the_best_models(top_n_models=5)

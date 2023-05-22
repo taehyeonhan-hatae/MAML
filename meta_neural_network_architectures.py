@@ -15,12 +15,18 @@ def extract_top_level_dict(current_dict):
     :param key_exists: If none then assume new dict, else load existing dict and add new key->value pairs to it.
     :return: A dictionary graph of the params already added to the graph.
     """
+
+    # print("current_dict == ", current_dict)
+
     output_dict = dict()
     for key in current_dict.keys():
         name = key.replace("layer_dict.", "")
         name = name.replace("layer_dict.", "")
         name = name.replace("block_dict.", "")
         name = name.replace("module-", "")
+
+        # print("extract_top_level_dict  name == ", name)
+
         top_level = name.split(".")[0]
         sub_level = ".".join(name.split(".")[1:])
 
@@ -34,7 +40,12 @@ def extract_top_level_dict(current_dict):
             new_item[sub_level] = current_dict[key]
             output_dict[top_level] = new_item
 
-    # print(current_dict.keys(), output_dict.keys())
+    # print("extract_top_level_dict === ", current_dict.keys(), output_dict.keys())
+
+    # current_dict = {"layer_dict.step3.linear1.weights'" : 1, 'layer_dict.step3.linear1.bias': 2}
+    # output_dict = {'step3': {"linear1.weights'": 1, 'linear1.bias': 2}}
+    # step1, step2.. 등등으로 나누는데.. 이걸 왜 하는 걸까..?
+
     return output_dict
 
 
@@ -377,7 +388,8 @@ class MetaConv2dLayer(nn.Module):
                 (weight) = params["weight"]
                 bias = None
         else:
-            # print("No inner loop params")
+            # 이쪽으로 들어온다..
+            print("No inner loop params")
             if self.use_bias:
                 weight, bias = self.weight, self.bias
             else:
@@ -871,7 +883,7 @@ class VGGReLUNormNetwork(nn.Module):
         self.meta_classifier = meta_classifier
 
         self.build_network()
-        print("meta network params")
+        print("(VGGReLUNormNetwork) meta network params")
         for name, param in self.named_parameters():
             print(name, param.shape)
 
@@ -942,7 +954,7 @@ class VGGReLUNormNetwork(nn.Module):
 
         out = x
 
-        ## �ڵ带 ¥�� ���̵� �ʹ� ����..
+        ## 코드를 짜는 아이디어가 너무 좋다..
         for i in range(self.num_stages):
             out = self.layer_dict['conv{}'.format(i)](out, params=param_dict['conv{}'.format(i)], training=training,
                                                       backup_running_statistics=backup_running_statistics,
@@ -1021,7 +1033,7 @@ class ResNet12(nn.Module):
         self.meta_classifier = meta_classifier
 
         self.build_network()
-        print("meta network params")
+        print("(ResNet12) meta network params")
         for name, param in self.named_parameters():
             print(name, param.shape)
 
@@ -1141,7 +1153,7 @@ class MetaStepLossNetwork(nn.Module):
         self.input_shape = (1, input_dim)
 
         self.build_network()
-        print("meta network params")
+        print("(MetaStepLossNetwork) meta network params")
         for name, param in self.named_parameters():
             print(name, param.shape)
 
@@ -1241,7 +1253,7 @@ class MetaLossNetwork(nn.Module):
         self.num_steps = args.number_of_training_steps_per_iter  # number of inner-loop steps
 
         self.build_network()
-        print("meta network params")
+        print("(MetaLossNetwork) meta network params")
         for name, param in self.named_parameters():
             print(name, param.shape)
 
