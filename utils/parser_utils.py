@@ -68,6 +68,8 @@ def get_args():
     parser.add_argument('--alfa', type=str, default="False", help='Whether to perform adaptive inner-loop optimization')
     parser.add_argument('--random_init', type=str, default="False", help='Whether to use random initialization')
 
+    parser.add_argument('--meta_loss', type=str, default="False", help='Whether to use meta loss')
+
     args = parser.parse_args()
     args_dict = vars(args)
     if args.name_of_args_json_file is not "None":
@@ -80,7 +82,8 @@ def get_args():
         elif str(args_dict[key]).lower() == "false":
             args_dict[key] = False
         if key == "dataset_path":
-            args_dict[key] = os.path.join(os.getcwd(), "datasets",  args_dict[key])
+            args_dict[key] = os.path.join(os.environ['DATASET_DIR'], args_dict[key])
+            print(key, os.path.join(os.environ['DATASET_DIR'], args_dict[key]))
 
         print(key, args_dict[key], type(args_dict[key]))
 

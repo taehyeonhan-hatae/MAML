@@ -89,38 +89,24 @@ class LSLRGradientDescentLearningRule(nn.Module):
         self.init_pspl_weight_decay = torch.ones(1)
         self.init_pspl_weight_decay.to(device)
 
-        ## MAML++ 코드
         self.init_learning_rate = torch.ones(1) * init_learning_rate
         self.init_learning_rate.to(device)
         self.total_num_inner_loop_steps = total_num_inner_loop_steps
         self.use_learnable_learning_rates = use_learnable_learning_rates
-        #######
-
         self.use_learnable_weight_decay = use_learnable_weight_decay
-
         self.init_weight_decay = torch.ones(1) * init_weight_decay
-        self.init_bias_decay = torch.ones(1) 
+        self.init_bias_decay = torch.ones(1)
 
     def initialise(self, names_weights_dict):
-        """
-        매개 변수 names_weights_dict는
-        """
         if self.alfa:
             if self.random_init:
                 self.names_beta_dict_per_param = nn.ParameterDict()
 
-            # TODO: names_alpha_dict과 names_beta_dict은 무엇일까?
-            ## ALFA 논문에서 언급한 alpha와 beta인가?
             self.names_alpha_dict = nn.ParameterDict()
             self.names_beta_dict = nn.ParameterDict()
 
             for idx, (key, param) in enumerate(names_weights_dict.items()):
 
-                print("== LSLRGradientDescentLearningRule initialise ==")
-                print("key ==", key)
-                # print("param == ", param)
-
-                # TODO: 두 분기문은 왜 나뉜거지?
                 if self.random_init:
                 # per-param weight decay for random init
                     self.names_beta_dict_per_param[key.replace(".", "-")] = nn.Parameter(
@@ -136,21 +122,18 @@ class LSLRGradientDescentLearningRule(nn.Module):
                         data=torch.ones(self.total_num_inner_loop_steps + 1) * self.init_weight_decay * self.init_learning_rate,
                         requires_grad=self.use_learnable_learning_rates)
 
-                # TODO: 근데 이걸 왜하는 거냐?
-                ## learning rate를 학습한다고? MAML에서는 learnig rate를 학습하지 않는다 (parameter initialization만을 학습하는데..?)
-                ## MAML++에서 stable한 훈련을 위해서 학습하기 위해서 무언가를 하나??
-                ## if self.alfa 일때만 왜 이 코드가 동작하게 만들어놨을까? 오타인가?
-
                 # per-step per-layer meta-learnable learning rate bias term (for more stable training and better performance by 2~3%)
                 self.names_alpha_dict[key.replace(".", "-")] = nn.Parameter(
                     data=torch.ones(self.total_num_inner_loop_steps + 1) * self.init_learning_rate,
                     requires_grad=self.use_learnable_learning_rates)
+        else:
+            self.names_learning_rates_dict = nn.ParameterDict()
+            for idx, (key, param) in enumerate(names_weights_dict.items()):
+                self.names_learning_rates_dict[key.replace(".", "-")] = nn.Parameter(
+                    data=torch.ones(self.total_num_inner_loop_steps + 1) * self.init_learning_rate,
+                    requires_grad=self.use_learnable_learning_rates)
 
-                # self.names_alpha_dict에 넣을 때, key 값을 replace한 이유는 뭘까?
-                # torch.ones(self.total_num_inner_loop_steps + 1) * self.init_learning_rate
-                # torch.ones(5 + 1) * 0.01
-                # tensor([0.0100, 0.0100, 0.0100, 0.0100, 0.0100, 0.0100])
- 
+
     def update_params(self, names_weights_dict, names_grads_wrt_params_dict, generated_alpha_params, generated_beta_params, num_step, tau=0.1):
         """Applies a single gradient descent update to all parameters.
         All parameter updates are performed using in-place operations and so
@@ -171,8 +154,13 @@ class LSLRGradientDescentLearningRule(nn.Module):
                 else:
                     updated_names_weights_dict[key] = (1 - generated_beta_params[key] * self.names_beta_dict[key.replace(".", "-")][num_step]) * names_weights_dict[key] - generated_alpha_params[key] * self.names_alpha_dict[key.replace(".", "-")][num_step] * names_grads_wrt_params_dict[key]
             else:
-                # Gradient decent를 통한 가중치 update 과정 (일반적인 딥러닝과 같다)
-                updated_names_weights_dict[key] = names_weights_dict[key] - self.init_lr_val * names_grads_wrt_params_dict[key]
+                #updated_names_weights_dict[key] = names_weights_dict[key] - self.init_lr_val * names_grads_wrt_params_dict[key]
+                for key in names_grads_wrt_params_dict.keys():
+                    updated_names_weights_dict[key] = names_weights_dict[key] - \
+                                                      self.names_learning_rates_dict[key.replace(".", "-")][num_step] * names_grads_wrt_params_dict[key]
+
+
 
         return updated_names_weights_dict
+
 
