@@ -898,6 +898,7 @@ class VGGReLUNormNetwork(nn.Module):
         self.layer_dict = nn.ModuleDict()
         self.upscale_shapes.append(x.shape)
 
+        ## num_stages를 늘려가면, Conv4 -> Conv5 -> Conv6 -> Conv7을 구현할 수 있겠다
         for i in range(self.num_stages):
             self.layer_dict['conv{}'.format(i)] = MetaConvNormLayerReLU(input_shape=out.shape,
                                                                         num_filters=self.cnn_filters,
@@ -908,6 +909,10 @@ class VGGReLUNormNetwork(nn.Module):
                                                                         meta_layer=self.meta_classifier,
                                                                         no_bn_learnable_params=False,
                                                                         device=self.device)
+
+            # TODO: out에 out을 넣는데... 왜 forward를 실행시킬까?
+            ## forward는 정확히 언제 실행되는 것인가?
+            ## 그리고 이 코드는 왜 forward에서 중복될까?
             out = self.layer_dict['conv{}'.format(i)](out, training=True, num_step=0)
 
             if self.args.max_pooling:
@@ -924,6 +929,7 @@ class VGGReLUNormNetwork(nn.Module):
 
         out = self.layer_dict['linear'](out)
 
+        print("VGGNetwork self.layer_dict === ", self.layer_dict)
         print("VGGNetwork build out.shape === ", out.shape)
         print("VGGNetwork build out === ", out)
 
