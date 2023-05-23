@@ -381,6 +381,7 @@ class MetaConv2dLayer(nn.Module):
         :return: The output of a convolutional function.
         """
         if params is not None:
+            print("inner loop params!")
             params = extract_top_level_dict(current_dict=params)
             if self.use_bias:
                 (weight, bias) = params["weight"], params["bias"]
@@ -388,7 +389,6 @@ class MetaConv2dLayer(nn.Module):
                 (weight) = params["weight"]
                 bias = None
         else:
-            # 이쪽으로 들어온다..
             print("No inner loop params")
             if self.use_bias:
                 weight, bias = self.weight, self.bias
@@ -910,9 +910,7 @@ class VGGReLUNormNetwork(nn.Module):
                                                                         no_bn_learnable_params=False,
                                                                         device=self.device)
 
-            # TODO: out에 out을 넣는데... 왜 forward를 실행시킬까?
-            ## forward는 정확히 언제 실행되는 것인가?
-            ## 그리고 이 코드는 왜 forward에서 중복될까?
+            # out에 out을 넣는다.
             out = self.layer_dict['conv{}'.format(i)](out, training=True, num_step=0)
 
             if self.args.max_pooling:
@@ -960,8 +958,9 @@ class VGGReLUNormNetwork(nn.Module):
 
         out = x
 
-        ## 코드를 짜는 아이디어가 너무 좋다..
         for i in range(self.num_stages):
+            # 각 Layer의 forward를 호출한다
+            ## 그래서 build_block에 유사한 코드가 있었던거다
             out = self.layer_dict['conv{}'.format(i)](out, params=param_dict['conv{}'.format(i)], training=training,
                                                       backup_running_statistics=backup_running_statistics,
                                                       num_step=num_step)
