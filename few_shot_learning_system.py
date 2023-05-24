@@ -45,7 +45,7 @@ class MAMLFewShotClassifier(nn.Module):
             self.classifier = ResNet12(im_shape=self.im_shape, num_output_classes=self.args.
                                        num_classes_per_set,
                                        args=args, device=device, meta_classifier=True).to(device=self.device)
-        else:
+        else: # Conv-4
             self.classifier = VGGReLUNormNetwork(im_shape=self.im_shape, num_output_classes=self.args.
                                                  num_classes_per_set,
                                                  args=args, device=device, meta_classifier=True).to(device=self.device)

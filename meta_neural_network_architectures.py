@@ -663,10 +663,16 @@ class MetaConvNormLayerReLU(nn.Module):
         self.meta_layer = meta_layer
         self.no_bn_learnable_params = no_bn_learnable_params
         self.device = device
+
+        # 코드가 동작하는데 전혀 필요없는 부분으로 보여짐. 이것 때문에 헷갈려하지말자
         self.layer_dict = nn.ModuleDict()
+
         self.build_block()
 
     def build_block(self):
+        """
+        build_block에서 마치 forward와 유사하게 코드를 구성한 이유는 오직 out의 shape 때문이다
+        """
 
         x = torch.zeros(self.input_shape)
 
@@ -925,6 +931,7 @@ class VGGReLUNormNetwork(nn.Module):
         self.layer_dict['linear'] = MetaLinearLayer(input_shape=(out.shape[0], np.prod(out.shape[1:])),
                                                     num_filters=self.num_output_classes, use_bias=True)
 
+        # forward 호출
         out = self.layer_dict['linear'](out)
 
         print("VGGNetwork self.layer_dict === ", self.layer_dict)
