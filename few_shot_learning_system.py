@@ -163,6 +163,9 @@ class MAMLFewShotClassifier(nn.Module):
 
             self.device = torch.cuda.current_device() ##
 
+        ## ===== __init__() end =====
+
+
     def get_per_step_loss_importance_vector(self):
         """
         Generates a tensor of dimensionality (num_inner_loop_steps) indicating the importance of each step's target
