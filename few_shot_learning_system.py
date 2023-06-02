@@ -340,6 +340,7 @@ class MAMLFewShotClassifier(nn.Module):
             for num_step in range(num_steps):
 
                 ## MAML Inner-loop
+                ### 기존 alfa에서는 meta_loss가 없었다..
                 meta_loss, support_preds, support_loss = self.net_forward(x=x_support_set_task,
                                                                           y=y_support_set_task,
                                                                           weights=names_weights_copy,
@@ -411,6 +412,7 @@ class MAMLFewShotClassifier(nn.Module):
                         task_losses.append(target_loss)
 
                 ### MAML inner-loop End
+                ###
 
             per_task_target_preds[task_id] = target_preds.detach().cpu().numpy()
             _, predicted = torch.max(target_preds.data, 1)
