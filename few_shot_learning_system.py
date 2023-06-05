@@ -53,8 +53,7 @@ class MAMLFewShotClassifier(nn.Module):
         self.task_learning_rate = args.init_inner_loop_learning_rate
 
         # Inner loop에서 최적화할 parameter를 설정
-        # TODO: names_alpha_dict과 names_beta_dict..
-        ## 근데 names_alpha_dict과 names_beta_dict에 대해서 감이 잘 오지 않는다. 오로지 ALFA를 위한 변수일까?
+        # TODO: names_alpha_dict과 names_beta_dict에 대해서 감이 잘 오지 않는다. 오로지 ALFA를 위한 변수일까?
         self.inner_loop_optimizer = LSLRGradientDescentLearningRule(device=device,
                                                                     init_learning_rate=self.task_learning_rate,
                                                                     init_weight_decay=args.init_inner_loop_weight_decay,
