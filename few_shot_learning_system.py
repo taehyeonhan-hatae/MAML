@@ -337,10 +337,11 @@ class MAMLFewShotClassifier(nn.Module):
             y_target_set_task = y_target_set_task.view(-1)
 
             # MAML Outer-loop
+            ## num_steps=args.number_of_training_steps_per_iter
             for num_step in range(num_steps):
 
-                ## MAML Inner-loop
-                ### 기존 alfa에서는 meta_loss가 없었다..
+                # MAML Inner-loop
+                ## 기존 alfa에서는 meta_loss가 없었다..
                 meta_loss, support_preds, support_loss = self.net_forward(x=x_support_set_task,
                                                                           y=y_support_set_task,
                                                                           weights=names_weights_copy,
@@ -350,6 +351,10 @@ class MAMLFewShotClassifier(nn.Module):
                                                                           x_t=x_target_set_task,
                                                                           meta_loss_weights=names_loss_weights_copy,
                                                                           meta_query_loss_weights=names_query_loss_weights_copy)
+                ## self.net_forward의 return 값 순서 : loss, preds, support_loss
+                ### self.meta_loss가 None인 경우 (names_loss_weights_copy == None)이면
+                ### loss와 support_loss가 같다
+
                 generated_alpha_params = {}
                 generated_beta_params = {}
 
@@ -458,6 +463,8 @@ class MAMLFewShotClassifier(nn.Module):
         support_preds = tmp_preds[:-x_t.size(0)]
         query_preds = tmp_preds[-x_t.size(0):]
 
+        # meta_loss == False인 경우
+        ## support_loss와 loss가 같다
         if meta_loss_weights is None:
             loss = F.cross_entropy(input=tmp_preds, target=torch.cat((y, y_t), 0))
             preds = query_preds
@@ -530,6 +537,9 @@ class MAMLFewShotClassifier(nn.Module):
         :param epoch: The index of the currrent epoch.
         :return: A dictionary of losses for the current step.
         """
+
+        # outer loop
+        ## num_steps의 정체
         losses, per_task_target_preds = self.forward(data_batch=data_batch, epoch=epoch,
                                                      use_second_order=self.args.second_order and
                                                                       epoch > self.args.first_order_to_second_order_epoch,
@@ -588,7 +598,9 @@ class MAMLFewShotClassifier(nn.Module):
         stacked_acc = None
         self.optimizer.zero_grad()
 
+        # Outer-loop
         for nt in range(self.args.batch_size):
+            ## Meta-Batch
             x_support_set_t = x_support_set[nt:nt + 1]
             y_support_set_t = y_support_set[nt:nt + 1]
             x_target_set_t = x_target_set[nt:nt + 1]
