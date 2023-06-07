@@ -82,7 +82,7 @@ class MAMLFewShotClassifier(nn.Module):
             ## 1) support set loss의 평균(i-th itearation) 2) base learner의 weight의 layer-wise 평균 3) base-learner output value의 example wise 평균
             ## base learner f가 L-layer이고 output이 N차원이라면
             ## task state의 차원은 L+N+1
-            ## 근데 왜 Meta_loss와 query_loss가 따로 있을까?
+            ## 근데 왜 Meta_loss와 query_loss가 따로 있을까? -> Semi-supervised setting을 위해서
 
             self.meta_loss = MetaLossNetwork(support_meta_loss_num_dim, args=args, device=device).to(device=self.device)
             self.meta_query_loss = MetaLossNetwork(query_num_dim, args=args, device=device).to(device=self.device)
@@ -161,7 +161,7 @@ class MAMLFewShotClassifier(nn.Module):
             else:
                 self.to(torch.cuda.current_device())
 
-            self.device = torch.cuda.current_device()
+            self.device = torch.cuda.current_device() ##
 
     def get_per_step_loss_importance_vector(self):
         """
