@@ -381,7 +381,7 @@ class MetaConv2dLayer(nn.Module):
         :return: The output of a convolutional function.
         """
         if params is not None:
-            print("inner loop params!")
+            #print("inner loop params!")
             params = extract_top_level_dict(current_dict=params)
             if self.use_bias:
                 (weight, bias) = params["weight"], params["bias"]
