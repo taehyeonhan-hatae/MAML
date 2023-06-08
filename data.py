@@ -180,6 +180,7 @@ class FewShotLearningDatasetParallel(Dataset):
         """
         rng = np.random.RandomState(seed=self.seed['val'])
 
+        # True
         if self.args.sets_are_pre_split == True:
             data_image_paths, index_to_label_name_dict_file, label_to_index = self.load_datapaths()
             dataset_splits = dict()
@@ -226,6 +227,7 @@ class FewShotLearningDatasetParallel(Dataset):
                                      {class_key: data_image_paths[class_key] for class_key in x_test_classes},
             dataset_splits = {"train": x_train, "val":x_val , "test": x_test}
 
+        # False
         if self.args.load_into_memory is True:
 
             print("Loading data into RAM")
@@ -245,6 +247,7 @@ class FewShotLearningDatasetParallel(Dataset):
             dataset_splits = x_loaded
             self.data_loaded_in_memory = True
 
+        print("dataset_splits == ", dataset_splits.keys())
         return dataset_splits
 
     def load_datapaths(self):
@@ -534,6 +537,8 @@ class FewShotLearningDatasetParallel(Dataset):
         x_images = torch.stack(x_images)
         y_labels = np.array(y_labels, dtype=np.float32)
 
+
+        # 여기서 support set과 query set이 나눠지는구나
         support_set_images = x_images[:, :self.num_samples_per_class]
         support_set_labels = y_labels[:, :self.num_samples_per_class]
         target_set_images = x_images[:, self.num_samples_per_class:]

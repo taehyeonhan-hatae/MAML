@@ -609,6 +609,8 @@ class MAMLFewShotClassifier(nn.Module):
             data_batch = (x_support_set_t, x_target_set_t, y_support_set_t, y_target_set_t)
 
             losses, per_task_target_preds = self.train_forward_prop(data_batch=data_batch, epoch=epoch)
+
+            # 여기다가 curriculum을 추가하면 되려나? 그렇다면 inner loop는?>
             self.meta_update(loss=losses['loss'] / self.args.batch_size, task_idx=nt)
 
             if stacked_loss is None:
