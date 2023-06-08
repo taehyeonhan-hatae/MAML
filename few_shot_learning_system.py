@@ -341,7 +341,9 @@ class MAMLFewShotClassifier(nn.Module):
             for num_step in range(num_steps):
 
                 # MAML Inner-loop
-                ## 기존 alfa에서는 meta_loss가 없었다..
+                ## self.net_forward의 return 값 순서 : loss, preds, support_loss
+                ## self.meta_loss가 None인 경우 (names_loss_weights_copy == None)이면 loss와 support_loss가 같다
+                ## num_step은 inner-loop의 index를 뜻한다
                 meta_loss, support_preds, support_loss = self.net_forward(x=x_support_set_task,
                                                                           y=y_support_set_task,
                                                                           weights=names_weights_copy,
@@ -351,9 +353,6 @@ class MAMLFewShotClassifier(nn.Module):
                                                                           x_t=x_target_set_task,
                                                                           meta_loss_weights=names_loss_weights_copy,
                                                                           meta_query_loss_weights=names_query_loss_weights_copy)
-                ## self.net_forward의 return 값 순서 : loss, preds, support_loss
-                ### self.meta_loss가 None인 경우 (names_loss_weights_copy == None)이면
-                ### loss와 support_loss가 같다
 
                 generated_alpha_params = {}
                 generated_beta_params = {}
@@ -373,6 +372,7 @@ class MAMLFewShotClassifier(nn.Module):
 
                     per_step_task_embedding = torch.stack(per_step_task_embedding)
 
+                    # ALFA도 분석할 필요가 있다
                     generated_params = self.update_rule_learner(per_step_task_embedding)
                     num_layers = len(names_weights_copy)
 
@@ -538,7 +538,7 @@ class MAMLFewShotClassifier(nn.Module):
         :return: A dictionary of losses for the current step.
         """
 
-        # outer loop
+        # outer loop에서 실질적으로 inner loop를 호출하는 부분
         ## num_steps의 정체
         losses, per_task_target_preds = self.forward(data_batch=data_batch, epoch=epoch,
                                                      use_second_order=self.args.second_order and
@@ -608,6 +608,8 @@ class MAMLFewShotClassifier(nn.Module):
 
             data_batch = (x_support_set_t, x_target_set_t, y_support_set_t, y_target_set_t)
 
+
+            ## outer-loop를 update하기 위해 loss 값을 구한다
             losses, per_task_target_preds = self.train_forward_prop(data_batch=data_batch, epoch=epoch)
 
             # 여기다가 curriculum을 추가하면 되려나? 그렇다면 inner loop는?>
