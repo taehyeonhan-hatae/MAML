@@ -403,10 +403,12 @@ class MAMLFewShotClassifier(nn.Module):
 
                     task_losses.append(per_step_loss_importance_vectors[num_step] * target_loss)
 
-                # TODO: 내가 무언가를 잘못알고 있는건가?
+                # TODO: 내가 무언가를 잘못알고 있는건가? Querry loss를 수행하는 부분인데
                 ## x_target_set_task이 것이 Query data같은데.. inner loop에서 수행된다고?
                 else:
                     if num_step == (self.args.number_of_training_steps_per_iter - 1):
+                        #  apply_inner_loop_update로 parameter를 update를 하고,
+                        ## MAML++ 코드는 x_target_set_task로 net_forward 수행한다
                         target_loss, target_preds, _ = self.net_forward(x=x_support_set_task,
                                                                         y=y_support_set_task,
                                                                         weights=names_weights_copy,
@@ -423,6 +425,8 @@ class MAMLFewShotClassifier(nn.Module):
             _, predicted = torch.max(target_preds.data, 1)
 
             accuracy = predicted.float().eq(y_target_set_task.data.float()).cpu().float()
+
+            # target loss(query loss)를 전달하는구나.. 여기구나..
             task_losses = torch.sum(torch.stack(task_losses))
             total_losses.append(task_losses)
             total_accuracies.extend(accuracy)
@@ -457,6 +461,9 @@ class MAMLFewShotClassifier(nn.Module):
         :param num_step: An integer indicating the number of the step in the inner loop.
         :return: the crossentropy losses with respect to the given y, the predictions of the base model.
         """
+
+        # TODO: torch.cat((x, x_t)??????
+        ## x_t가 target이구나
         tmp_preds = self.classifier.forward(x=torch.cat((x, x_t), 0), params=weights,
                                             training=training,
                                             backup_running_statistics=backup_running_statistics, num_step=num_step)
