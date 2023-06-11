@@ -429,6 +429,8 @@ class MAMLFewShotClassifier(nn.Module):
             accuracy = predicted.float().eq(y_target_set_task.data.float()).cpu().float()
 
             # target loss(query loss)를 전달하는구나.. 여기구나..
+            ## 기억하자. MAML에서는 gradient decent를 할때, inner-loop에서 수행했던 loss 값들의 합을 이용하여
+            ## outer-loop에서 meta-learner의 weight를 update한다.
             task_losses = torch.sum(torch.stack(task_losses))
             total_losses.append(task_losses)
             total_accuracies.extend(accuracy)
