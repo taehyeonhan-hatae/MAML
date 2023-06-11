@@ -50,5 +50,10 @@ def maybe_unzip_dataset(args):
 
 
 def unzip_file(filepath_pack, filepath_to_store):
+
+    # Linux 용 코드
     command_to_run = "tar -I pbzip2 -xf {} -C {}".format(filepath_pack, filepath_to_store)
+
+    # Windows 용
+    command_to_run = "tar  -zxvf {} -C {}".format(filepath_pack, filepath_to_store)
     os.system(command_to_run)

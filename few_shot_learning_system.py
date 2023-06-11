@@ -279,6 +279,11 @@ class MAMLFewShotClassifier(nn.Module):
 
         x_support_set, x_target_set, y_support_set, y_target_set = data_batch
 
+        # print("x_support_set == " , len(x_support_set))
+        # print("x_target_set == ", len(x_target_set))
+        # print("y_support_set == ", len(y_support_set))
+        # print("y_target_set == ", len(y_target_set))
+
         [b, ncs, spc] = y_support_set.shape
 
         self.num_classes_per_set = ncs
@@ -298,8 +303,8 @@ class MAMLFewShotClassifier(nn.Module):
                               x_target_set,
                               y_target_set)):
 
-            print("y_support_set_task len == ", len(y_support_set_task))
-            print("y_target_set_task len == ", len(y_target_set_task))
+            # print("y_support_set_task len == ", len(y_support_set_task))
+            # print("y_target_set_task len == ", len(y_target_set_task))
 
             task_losses = []
             task_accuracies = []
@@ -343,7 +348,11 @@ class MAMLFewShotClassifier(nn.Module):
             x_target_set_task = x_target_set_task.view(-1, c, h, w)
             y_target_set_task = y_target_set_task.view(-1)
 
+            # TODO: 왜 25, 75가 반복될까?
+            #  당연하다. 5-way, 5-shot이면 support set의 개수는 25가 되고 query set의 개수는 75가 되는게 맞다.
+            print("x_support_set_task len == ", len(x_support_set_task))
             print("y_support_set_task len == ", len(y_support_set_task))
+            print("x_target_set_task len == ", len(x_target_set_task))
             print("y_target_set_task len == ", len(y_target_set_task))
 
             # MAML Outer-loop
@@ -414,7 +423,8 @@ class MAMLFewShotClassifier(nn.Module):
                     task_losses.append(per_step_loss_importance_vectors[num_step] * target_loss)
 
                 # TODO: Inner-loop안에서 query data에 대한 loss 함수의 함을 구한다
-                ## 기억하자. MAML에서는 gradient decent를 할때, inner-loop에서 수행했던 loss 값들의 합을 이용하여
+                ## 기억하자.
+                ## MAML에서는 gradient decent를 할때, inner-loop에서 수행했던 query data에 대한 loss 값들의 합을 이용하여
                 ## outer-loop에서 meta-learner의 weight를 update한다.
                 else:
                     if num_step == (self.args.number_of_training_steps_per_iter - 1):
@@ -432,14 +442,13 @@ class MAMLFewShotClassifier(nn.Module):
                         task_losses.append(target_loss)
 
                 ### MAML inner-loop End
-                ###
 
             per_task_target_preds[task_id] = target_preds.detach().cpu().numpy()
             _, predicted = torch.max(target_preds.data, 1)
 
             accuracy = predicted.float().eq(y_target_set_task.data.float()).cpu().float()
 
-            # Query loss의 합을 구하는 부분
+            # Query data에 대한 loss의 합을 구하는 부분
             task_losses = torch.sum(torch.stack(task_losses))
             total_losses.append(task_losses)
             total_accuracies.extend(accuracy)
@@ -482,6 +491,10 @@ class MAMLFewShotClassifier(nn.Module):
                                             backup_running_statistics=backup_running_statistics, num_step=num_step)
         support_preds = tmp_preds[:-x_t.size(0)]
         query_preds = tmp_preds[-x_t.size(0):]
+
+        # print("support_preds == ", support_preds)
+        print("support_preds len== ", len(support_preds))
+        # print("support_preds len== ", type(support_preds))
 
         # meta_loss == False인 경우
         ## support_loss와 loss가 같다
