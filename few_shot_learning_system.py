@@ -291,11 +291,16 @@ class MAMLFewShotClassifier(nn.Module):
         # 이것은 무엇일까?
         per_task_target_preds = [[] for i in range(len(x_target_set))]
 
+        # TODO: task를 구별할 수 있다는 task_id가 있다는 것은 task 별로 학습을 진행한다는 것 아닌가?
         for task_id, (x_support_set_task, y_support_set_task, x_target_set_task, y_target_set_task) in \
                 enumerate(zip(x_support_set,
                               y_support_set,
                               x_target_set,
                               y_target_set)):
+
+            print("y_support_set_task len == ", len(y_support_set_task))
+            print("y_target_set_task len == ", len(y_target_set_task))
+
             task_losses = []
             task_accuracies = []
             per_step_support_accuracy = []
@@ -337,6 +342,9 @@ class MAMLFewShotClassifier(nn.Module):
             y_support_set_task = y_support_set_task.view(-1)
             x_target_set_task = x_target_set_task.view(-1, c, h, w)
             y_target_set_task = y_target_set_task.view(-1)
+
+            print("y_support_set_task len == ", len(y_support_set_task))
+            print("y_target_set_task len == ", len(y_target_set_task))
 
             # MAML Outer-loop
             ## num_steps=args.number_of_training_steps_per_iter
@@ -405,8 +413,9 @@ class MAMLFewShotClassifier(nn.Module):
 
                     task_losses.append(per_step_loss_importance_vectors[num_step] * target_loss)
 
-                # TODO: 내가 무언가를 잘못알고 있는건가? Querry loss를 수행하는 부분인데
-                ## x_target_set_task이 것이 Query data같은데.. inner loop에서 수행된다고?
+                # TODO: Inner-loop안에서 query data에 대한 loss 함수의 함을 구한다
+                ## 기억하자. MAML에서는 gradient decent를 할때, inner-loop에서 수행했던 loss 값들의 합을 이용하여
+                ## outer-loop에서 meta-learner의 weight를 update한다.
                 else:
                     if num_step == (self.args.number_of_training_steps_per_iter - 1):
                         #  apply_inner_loop_update로 parameter를 update를 하고,
@@ -418,6 +427,8 @@ class MAMLFewShotClassifier(nn.Module):
                                                                         num_step=num_step,
                                                                         x_t=x_target_set_task,
                                                                         y_t=y_target_set_task)
+
+                        # 변수 명이 task_losses인것을 보면, task 당 loss를 구할 수 있다는 말일 것이다.
                         task_losses.append(target_loss)
 
                 ### MAML inner-loop End
@@ -428,9 +439,7 @@ class MAMLFewShotClassifier(nn.Module):
 
             accuracy = predicted.float().eq(y_target_set_task.data.float()).cpu().float()
 
-            # target loss(query loss)를 전달하는구나.. 여기구나..
-            ## 기억하자. MAML에서는 gradient decent를 할때, inner-loop에서 수행했던 loss 값들의 합을 이용하여
-            ## outer-loop에서 meta-learner의 weight를 update한다.
+            # Query loss의 합을 구하는 부분
             task_losses = torch.sum(torch.stack(task_losses))
             total_losses.append(task_losses)
             total_accuracies.extend(accuracy)
