@@ -6,8 +6,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-from meta_neural_network_architectures import VGGReLUNormNetwork
+from meta_neural_network_architectures import ResNet12, VGGReLUNormNetwork
 from inner_loop_optimizers import LSLRGradientDescentLearningRule
+
+
+from AdMSLoss import AdMSoftmaxLoss
 
 
 def set_torch_seed(seed):
@@ -40,9 +43,17 @@ class MAMLFewShotClassifier(nn.Module):
         self.current_epoch = 0
 
         self.rng = set_torch_seed(seed=args.seed)
-        self.classifier = VGGReLUNormNetwork(im_shape=self.im_shape, num_output_classes=self.args.
-                                             num_classes_per_set,
-                                             args=args, device=device, meta_classifier=True).to(device=self.device)
+
+        if self.args.backbone == 'ResNet12':
+            self.classifier = ResNet12(im_shape=self.im_shape, num_output_classes=self.args.
+                                       num_classes_per_set,
+                                       args=args, device=device, meta_classifier=True).to(device=self.device)
+        else:  # Conv-4
+            self.classifier = VGGReLUNormNetwork(im_shape=self.im_shape, num_output_classes=self.args.
+                                                 num_classes_per_set,
+                                                 args=args, device=device, meta_classifier=True).to(device=self.device)
+
+
         self.task_learning_rate = args.task_learning_rate
 
         self.inner_loop_optimizer = LSLRGradientDescentLearningRule(device=device,
@@ -289,6 +300,10 @@ class MAMLFewShotClassifier(nn.Module):
 
         loss = F.cross_entropy(input=preds, target=y)
 
+        # num_classes = 5
+        # adms_loss = AdMSoftmaxLoss(3, num_classes, s=10.0, m=0.5)
+        # loss = adms_loss(preds, y)
+
         return loss, preds
 
     def trainable_parameters(self):
@@ -362,6 +377,9 @@ class MAMLFewShotClassifier(nn.Module):
         x_target_set = torch.Tensor(x_target_set).float().to(device=self.device)
         y_support_set = torch.Tensor(y_support_set).long().to(device=self.device)
         y_target_set = torch.Tensor(y_target_set).long().to(device=self.device)
+
+
+        print("run_train_iter x_support_set shape == ", x_support_set.shape)
 
         data_batch = (x_support_set, x_target_set, y_support_set, y_target_set)
 

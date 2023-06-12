@@ -3,6 +3,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 ## 출처: https://github.com/Leethony/Additive-Margin-Softmax-Loss-Pytorch
+##### https://github.com/cvqluu/Angular-Penalty-Softmax-Losses-Pytorch/blob/master/loss_functions.py
+
+
+# TODO: https://github.com/wujiyang/Face_Pytorch/blob/master/train.py 이것을 먼저보자
+## https://github.com/wujiyang/Face_Pytorch/blob/master/margin/ArcMarginProduct.py
 
 class AdMSoftmaxLoss(nn.Module):
 

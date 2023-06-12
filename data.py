@@ -169,6 +169,8 @@ class FewShotLearningDatasetParallel(Dataset):
                                           for key in self.datasets[name]]) for name in self.datasets.keys()}
 
         print("data", self.data_length)
+        # data  {'test': 12000, 'train': 38400, 'val': 9600}
+
         self.observed_seed_set = None
 
     def load_dataset(self):
