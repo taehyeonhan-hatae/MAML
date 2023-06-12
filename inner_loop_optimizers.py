@@ -68,7 +68,7 @@ class LSLRGradientDescentLearningRule(nn.Module):
     will correspond to a stochastic gradient descent learning rule.
     """
 
-    def __init__(self, device, total_num_inner_loop_steps, use_learnable_learning_rates, use_learnable_weight_decay, alfa, random_init, init_learning_rate=1e-3, init_weight_decay=5e-4):
+    def __init__(self, device, total_num_inner_loop_steps, use_learnable_learning_rates, use_learnable_weight_decay=False, alfa=False, random_init=False, init_learning_rate=1e-3, init_weight_decay=5e-4):
         """Creates a new learning rule object.
         Args:
             init_learning_rate: A postive scalar to scale gradient updates to the

@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-from meta_neural_network_architectures import VGGReLUNormNetwork
+from meta_neural_network_architectures import VGGReLUNormNetwork, ResNet12
 from inner_loop_optimizers import LSLRGradientDescentLearningRule
 
 
@@ -40,17 +40,40 @@ class MAMLFewShotClassifier(nn.Module):
         self.current_epoch = 0
 
         self.rng = set_torch_seed(seed=args.seed)
-        self.classifier = VGGReLUNormNetwork(im_shape=self.im_shape, num_output_classes=self.args.
-                                             num_classes_per_set,
-                                             args=args, device=device, meta_classifier=True).to(device=self.device)
-        self.task_learning_rate = args.task_learning_rate
+
+        if self.args.backbone == 'ResNet12':
+            self.classifier = ResNet12(im_shape=self.im_shape, num_output_classes=self.args.
+                                       num_classes_per_set,
+                                       args=args, device=device, meta_classifier=True).to(device=self.device)
+        else:
+            self.classifier = VGGReLUNormNetwork(im_shape=self.im_shape, num_output_classes=self.args.
+                                                 num_classes_per_set,
+                                                 args=args, device=device, meta_classifier=True).to(device=self.device)
+
+        self.task_learning_rate = args.init_inner_loop_learning_rate
 
         self.inner_loop_optimizer = LSLRGradientDescentLearningRule(device=device,
                                                                     init_learning_rate=self.task_learning_rate,
+                                                                    init_weight_decay=args.init_inner_loop_weight_decay,
                                                                     total_num_inner_loop_steps=self.args.number_of_training_steps_per_iter,
-                                                                    use_learnable_learning_rates=self.args.learnable_per_layer_per_step_inner_loop_learning_rate)
+                                                                    use_learnable_weight_decay=self.args.alfa,
+                                                                    use_learnable_learning_rates=self.args.alfa,
+                                                                    alfa=self.args.alfa,
+                                                                    random_init=self.args.random_init)
+
+        names_weights_copy = self.get_inner_loop_parameter_dict(self.classifier.named_parameters())
+
+        if self.args.attenuate:
+            num_layers = len(names_weights_copy)
+            self.attenuator = nn.Sequential(
+                nn.Linear(num_layers, num_layers),
+                nn.ReLU(inplace=True),
+                nn.Linear(num_layers, num_layers),
+                nn.Sigmoid()
+            ).to(device=self.device)
+
         self.inner_loop_optimizer.initialise(
-            names_weights_dict=self.get_inner_loop_parameter_dict(params=self.classifier.named_parameters()))
+            names_weights_dict=names_weights_copy)
 
         print("Inner Loop parameters")
         for key, value in self.inner_loop_optimizer.named_parameters():
@@ -65,13 +88,53 @@ class MAMLFewShotClassifier(nn.Module):
             if param.requires_grad:
                 print(name, param.shape, param.device, param.requires_grad)
 
+        # ALFA
+        if self.args.alfa:
+            num_layers = len(names_weights_copy)
+            input_dim = num_layers * 2
+            self.regularizer = nn.Sequential(
+                nn.Linear(input_dim, input_dim),
+                nn.ReLU(inplace=True),
+                nn.Linear(input_dim, input_dim)
+            ).to(device=self.device)
 
-        self.optimizer = optim.Adam(self.trainable_parameters(), lr=args.meta_learning_rate, amsgrad=False)
+        if self.args.attenuate:
+            if self.args.alfa:
+                self.optimizer = optim.Adam([
+                    {'params': self.classifier.parameters()},
+                    {'params': self.inner_loop_optimizer.parameters()},
+                    {'params': self.regularizer.parameters()},
+                    {'params': self.attenuator.parameters()},
+                ], lr=args.meta_learning_rate, amsgrad=False)
+            else:
+                self.optimizer = optim.Adam([
+                    {'params': self.classifier.parameters()},
+                    {'params': self.attenuator.parameters()},
+                ], lr=args.meta_learning_rate, amsgrad=False)
+        else:
+            if self.args.alfa:
+                if self.args.random_init:
+                    self.optimizer = optim.Adam([
+                        {'params': self.inner_loop_optimizer.parameters()},
+                        {'params': self.regularizer.parameters()},
+                    ], lr=args.meta_learning_rate, amsgrad=False)
+                else:
+                    self.optimizer = optim.Adam([
+                        {'params': self.classifier.parameters()},
+                        {'params': self.inner_loop_optimizer.parameters()},
+                        {'params': self.regularizer.parameters()},
+                    ], lr=args.meta_learning_rate, amsgrad=False)
+            else:
+                self.optimizer = optim.Adam([
+                    {'params': self.classifier.parameters()},
+                ], lr=args.meta_learning_rate, amsgrad=False)
+
         self.scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer, T_max=self.args.total_epochs,
                                                               eta_min=self.args.min_learning_rate)
 
         self.device = torch.device('cpu')
         if torch.cuda.is_available():
+            print(torch.cuda.device_count())
             if torch.cuda.device_count() > 1:
                 self.to(torch.cuda.current_device())
                 self.classifier = nn.DataParallel(module=self.classifier)
@@ -79,6 +142,43 @@ class MAMLFewShotClassifier(nn.Module):
                 self.to(torch.cuda.current_device())
 
             self.device = torch.cuda.current_device()
+
+    def get_task_embeddings(self, x_support_set_task, y_support_set_task, names_weights_copy):
+        # Use gradients as task embeddings
+        support_loss, support_preds = self.net_forward(x=x_support_set_task,
+                                                       y=y_support_set_task,
+                                                       weights=names_weights_copy,
+                                                       backup_running_statistics=True,
+                                                       training=True, num_step=0)
+
+        if torch.cuda.device_count() > 1:
+            self.classifier.module.zero_grad(names_weights_copy)
+        else:
+            self.classifier.zero_grad(names_weights_copy)
+        grads = torch.autograd.grad(support_loss, names_weights_copy.values(), create_graph=True)
+
+        layerwise_mean_grads = []
+
+        for i in range(len(grads)):
+            layerwise_mean_grads.append(grads[i].mean())
+
+        layerwise_mean_grads = torch.stack(layerwise_mean_grads)
+
+        return layerwise_mean_grads
+
+    def attenuate_init(self, task_embeddings, names_weights_copy):
+        # Generate attenuation parameters
+        gamma = self.attenuator(task_embeddings)
+
+        ## Attenuate
+
+        updated_names_weights_copy = dict()
+        i = 0
+        for key in names_weights_copy.keys():
+            updated_names_weights_copy[key] = gamma[i] * names_weights_copy[key]
+            i += 1
+
+        return updated_names_weights_copy
 
     def get_per_step_loss_importance_vector(self):
         """
@@ -108,18 +208,19 @@ class MAMLFewShotClassifier(nn.Module):
         :param params: A dictionary of the network's parameters.
         :return: A dictionary of the parameters to use for the inner loop optimization process.
         """
-        return {
-            name: param.to(device=self.device)
-            for name, param in params
-            if param.requires_grad
-            and (
-                not self.args.enable_inner_loop_optimizable_bn_params
-                and "norm_layer" not in name
-                or self.args.enable_inner_loop_optimizable_bn_params
-            )
-        }
+        param_dict = dict()
+        for name, param in params:
+            if param.requires_grad:
+                if self.args.enable_inner_loop_optimizable_bn_params:
+                    param_dict[name] = param.to(device=self.device)
+                else:
+                    if "norm_layer" not in name:
+                        param_dict[name] = param.to(device=self.device)
 
-    def apply_inner_loop_update(self, loss, names_weights_copy,  generated_alpha_params, generated_beta_params, use_second_order, current_step_idx):
+        return param_dict
+
+    def apply_inner_loop_update(self, loss, names_weights_copy, generated_alpha_params, generated_beta_params,
+                                use_second_order, current_step_idx):
         """
         Applies an inner loop update given current step's loss, the weights to update, a flag indicating whether to use
         second order derivatives and the current step's index.
@@ -146,7 +247,6 @@ class MAMLFewShotClassifier(nn.Module):
                 print('Grads not found for inner loop parameter', key)
             names_grads_copy[key] = names_grads_copy[key].sum(dim=0)
 
-
         names_weights_copy = self.inner_loop_optimizer.update_params(names_weights_dict=names_weights_copy,
                                                                      names_grads_wrt_params_dict=names_grads_copy,
                                                                      generated_alpha_params=generated_alpha_params,
@@ -162,8 +262,9 @@ class MAMLFewShotClassifier(nn.Module):
         return names_weights_copy
 
     def get_across_task_loss_metrics(self, total_losses, total_accuracies):
-        losses = {'loss': torch.mean(torch.stack(total_losses))}
+        losses = dict()
 
+        losses['loss'] = torch.mean(torch.stack(total_losses))
         losses['accuracy'] = np.mean(total_accuracies)
 
         return losses
@@ -188,14 +289,24 @@ class MAMLFewShotClassifier(nn.Module):
 
         total_losses = []
         total_accuracies = []
+        total_support_accuracies = [[] for i in range(num_steps)]
+        total_target_accuracies = [[] for i in range(num_steps)]
         per_task_target_preds = [[] for i in range(len(x_target_set))]
-        self.classifier.zero_grad()
-        task_accuracies = []
-        for task_id, (x_support_set_task, y_support_set_task, x_target_set_task, y_target_set_task) in enumerate(zip(x_support_set,
+
+        if torch.cuda.device_count() > 1:
+            self.classifier.module.zero_grad()
+        else:
+            self.classifier.zero_grad()
+
+        for task_id, (x_support_set_task, y_support_set_task, x_target_set_task, y_target_set_task) in \
+                enumerate(zip(x_support_set,
                               y_support_set,
                               x_target_set,
                               y_target_set)):
             task_losses = []
+            task_accuracies = []
+            per_step_support_accuracy = []
+            per_step_target_accuracy = []
             per_step_loss_importance_vectors = self.get_per_step_loss_importance_vector()
             names_weights_copy = self.get_inner_loop_parameter_dict(self.classifier.named_parameters())
 
@@ -213,20 +324,52 @@ class MAMLFewShotClassifier(nn.Module):
             x_target_set_task = x_target_set_task.view(-1, c, h, w)
             y_target_set_task = y_target_set_task.view(-1)
 
+            # Attenuate the initialization for L2F
+            if self.args.attenuate:
+                # Obtain gradients from support set for task embedding
+                task_embeddings = self.get_task_embeddings(x_support_set_task=x_support_set_task,
+                                                           y_support_set_task=y_support_set_task,
+                                                           names_weights_copy=names_weights_copy)
+
+                names_weights_copy = self.attenuate_init(task_embeddings=task_embeddings,
+                                                         names_weights_copy=names_weights_copy)
+
             for num_step in range(num_steps):
 
-                support_loss, support_preds = self.net_forward(
-                    x=x_support_set_task,
-                    y=y_support_set_task,
-                    weights=names_weights_copy,
-                    backup_running_statistics=num_step == 0,
-                    training=True,
-                    num_step=num_step,
-                )
+                support_loss, support_preds = self.net_forward(x=x_support_set_task,
+                                                               y=y_support_set_task,
+                                                               weights=names_weights_copy,
+                                                               backup_running_statistics=
+                                                               True if (num_step == 0) else False,
+                                                               training=True, num_step=num_step)
+
+                ## 여기서 support loss를 커리큘럼으로 이용해야한다.
 
                 generated_alpha_params = {}
                 generated_beta_params = {}
 
+                if self.args.alfa:
+
+                    support_loss_grad = torch.autograd.grad(support_loss, names_weights_copy.values(),
+                                                            retain_graph=True)
+                    per_step_task_embedding = []
+                    for k, v in names_weights_copy.items():
+                        per_step_task_embedding.append(v.mean())
+
+                    for i in range(len(support_loss_grad)):
+                        per_step_task_embedding.append(support_loss_grad[i].mean())
+
+                    per_step_task_embedding = torch.stack(per_step_task_embedding)
+
+                    generated_params = self.regularizer(per_step_task_embedding)
+                    num_layers = len(names_weights_copy)
+
+                    generated_alpha, generated_beta = torch.split(generated_params, split_size_or_sections=num_layers)
+                    g = 0
+                    for key in names_weights_copy.keys():
+                        generated_alpha_params[key] = generated_alpha[g]
+                        generated_beta_params[key] = generated_beta[g]
+                        g += 1
 
                 names_weights_copy = self.apply_inner_loop_update(loss=support_loss,
                                                                   names_weights_copy=names_weights_copy,
@@ -242,12 +385,14 @@ class MAMLFewShotClassifier(nn.Module):
                                                                  num_step=num_step)
 
                     task_losses.append(per_step_loss_importance_vectors[num_step] * target_loss)
-                elif num_step == (self.args.number_of_training_steps_per_iter - 1):
-                    target_loss, target_preds = self.net_forward(x=x_target_set_task,
-                                                                 y=y_target_set_task, weights=names_weights_copy,
-                                                                 backup_running_statistics=False, training=True,
-                                                                 num_step=num_step)
-                    task_losses.append(target_loss)
+
+                else:
+                    if num_step == (self.args.number_of_training_steps_per_iter - 1):
+                        target_loss, target_preds = self.net_forward(x=x_target_set_task,
+                                                                     y=y_target_set_task, weights=names_weights_copy,
+                                                                     backup_running_statistics=False, training=True,
+                                                                     num_step=num_step)
+                        task_losses.append(target_loss)
 
             per_task_target_preds[task_id] = target_preds.detach().cpu().numpy()
             _, predicted = torch.max(target_preds.data, 1)
@@ -258,7 +403,10 @@ class MAMLFewShotClassifier(nn.Module):
             total_accuracies.extend(accuracy)
 
             if not training_phase:
-                self.classifier.restore_backup_stats()
+                if torch.cuda.device_count() > 1:
+                    self.classifier.module.restore_backup_stats()
+                else:
+                    self.classifier.restore_backup_stats()
 
         losses = self.get_across_task_loss_metrics(total_losses=total_losses,
                                                    total_accuracies=total_accuracies)
@@ -335,10 +483,13 @@ class MAMLFewShotClassifier(nn.Module):
         """
         self.optimizer.zero_grad()
         loss.backward()
-        if 'imagenet' in self.args.dataset_name:
-            for name, param in self.classifier.named_parameters():
-                if param.requires_grad:
-                    param.grad.data.clamp_(-10, 10)  # not sure if this is necessary, more experiments are needed
+        # if 'imagenet' in self.args.dataset_name:
+        #    for name, param in self.classifier.named_parameters():
+        #        if param.requires_grad:
+        #            param.grad.data.clamp_(-10, 10)  # not sure if this is necessary, more experiments are needed
+        # for name, param in self.classifier.named_parameters():
+        #    print(param.mean())
+
         self.optimizer.step()
 
     def run_train_iter(self, data_batch, epoch):
@@ -396,9 +547,9 @@ class MAMLFewShotClassifier(nn.Module):
 
         losses, per_task_target_preds = self.evaluation_forward_prop(data_batch=data_batch, epoch=self.current_epoch)
 
-        # losses['loss'].backward() # uncomment if you get the weird memory error
-        # self.zero_grad()
-        # self.optimizer.zero_grad()
+        losses['loss'].backward()  # uncomment if you get the weird memory error
+        self.zero_grad()
+        self.optimizer.zero_grad()
 
         return losses, per_task_target_preds
 
@@ -410,7 +561,6 @@ class MAMLFewShotClassifier(nn.Module):
         object.
         """
         state['network'] = self.state_dict()
-        state['optimizer'] = self.optimizer.state_dict()
         torch.save(state, f=model_save_dir)
 
     def load_model(self, model_save_dir, model_name, model_idx):
@@ -425,6 +575,5 @@ class MAMLFewShotClassifier(nn.Module):
         filepath = os.path.join(model_save_dir, "{}_{}".format(model_name, model_idx))
         state = torch.load(filepath)
         state_dict_loaded = state['network']
-        self.optimizer.load_state_dict(state['optimizer'])
         self.load_state_dict(state_dict=state_dict_loaded)
         return state

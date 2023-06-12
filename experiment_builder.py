@@ -218,7 +218,7 @@ class ExperimentBuilder(object):
         one marked as "latest" to be used by the system for the next epoch training. Useful when the training/val
         process is interrupted or stopped. Leads to fault tolerant training and validation systems that can continue
         from where they left off before.
-        :param model: Current meta learning model of any instance within the few_shot_learning_system_forMeTAL.py
+        :param model: Current meta learning model of any instance within the few_shot_learning_system_for_MeTAL.py
         :param epoch: Current epoch
         :param state: Current model and experiment state dict.
         """
@@ -339,16 +339,12 @@ class ExperimentBuilder(object):
                 ## 아니지..
 
                 for train_sample_idx, train_sample in enumerate(
-                        self.data.get_train_batches(total_batches=int(self.args.total_iter_per_epoch *
-                                                                      self.args.total_epochs) - self.state[
-                                                                      'current_iter'],
+                        self.data.get_train_batches(total_batches=int(self.args.total_iter_per_epoch *self.args.total_epochs) - self.state['current_iter'],
                                                     augment_images=self.augment_flag)):
 
                     # print(self.state['current_iter'], (self.args.total_epochs * self.args.total_iter_per_epoch))
 
                     # TODO: 학습을 진행하는 부분
-                    ## 일반적으로 딥러닝 모델을 구현할 때, epoch 수를 늘려가면서 학습을 진행하지 않나?
-                    ## 메타러닝에서 이렇게 한 뭔가의 이유가 있을 것이다.
                     train_losses, total_losses, self.state['current_iter'] = self.train_iteration(
                         train_sample=train_sample,
                         total_losses=self.total_losses,
