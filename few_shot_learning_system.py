@@ -292,9 +292,9 @@ class MAMLFewShotClassifier(nn.Module):
                     target_accuracy = target_predicted.float().eq(y_target_set_task.data.float()).cpu().float()
                     comprehensive_losses["target_accuracy"] = np.mean(list(target_accuracy))
 
-            for key, val in comprehensive_losses.items():
-                print("key = {key}, value={value}".format(key=key, value=val))
-            print("==========================================================")
+            # for key, val in comprehensive_losses.items():
+            #     print("key = {key}, value={value}".format(key=key, value=val))
+            # print("==========================================================")
 
 
             per_task_target_preds[task_id] = target_preds.detach().cpu().numpy()
