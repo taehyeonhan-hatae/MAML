@@ -506,6 +506,9 @@ class FewShotLearningDatasetParallel(Dataset):
         rng = np.random.RandomState(seed)
 
         # 미리 설정한 Task 당 class 수만큼으로 Task 하나를 구성한다
+        ## numpy.random.RandomState.choice는 주어진 배열에서 무작위 샘플을 생성하는 데 사용된다
+        ### 인자 중, replace=False로 하여 특정 class가 여러번 선택되는것을 막는다.
+        ### 인자 중, size를 통해 설정한 class 개수만큼으로 task를 구성한다.
         selected_classes = rng.choice(list(self.dataset_size_dict[dataset_name].keys()),
                                       size=self.num_classes_per_set, replace=False)
         rng.shuffle(selected_classes)
@@ -538,7 +541,6 @@ class FewShotLearningDatasetParallel(Dataset):
 
         x_images = torch.stack(x_images)
         y_labels = np.array(y_labels, dtype=np.float32)
-
 
         # 여기서 support set과 query set이 나눠지는구나
         support_set_images = x_images[:, :self.num_samples_per_class]
@@ -587,13 +589,13 @@ class MetaLearningSystemDataLoader(object):
         :param current_iter: Current iter of experiment. Is used to make sure the data loader continues where it left
         of previously.
         """
-        self.num_of_gpus = args.num_of_gpus
+        self.num_of_gpus = args.num_of_gpus             # default = 1
         self.batch_size = args.batch_size
-        self.samples_per_iter = args.samples_per_iter
+        self.samples_per_iter = args.samples_per_iter   # default=1
         self.num_workers = args.num_dataprovider_workers
         self.total_train_iters_produced = 0
         self.dataset = FewShotLearningDatasetParallel(args=args)
-        self.batches_per_iter = args.samples_per_iter
+        self.batches_per_iter = args.samples_per_iter   # default=1
         self.full_data_length = self.dataset.data_length
         self.continue_from_iter(current_iter=current_iter)
         self.args = args
@@ -603,6 +605,8 @@ class MetaLearningSystemDataLoader(object):
         Returns a data loader with the correct set (train, val or test), continuing from the current iter.
         :return:
         """
+
+        # pytorch의 DataLoader를 이용하여 학습용 데이터 준비한다
         return DataLoader(self.dataset, batch_size=(self.num_of_gpus * self.batch_size * self.samples_per_iter),
                           shuffle=False, num_workers=self.num_workers, drop_last=True)
 

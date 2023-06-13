@@ -9,6 +9,8 @@ import torch.optim as optim
 from meta_neural_network_architectures import ResNet12, VGGReLUNormNetwork
 from inner_loop_optimizers import LSLRGradientDescentLearningRule
 
+from utils.storage import save_statistics
+
 
 from AdMSLoss import AdMSoftmaxLoss
 
@@ -43,6 +45,8 @@ class MAMLFewShotClassifier(nn.Module):
         self.current_epoch = 0
 
         self.rng = set_torch_seed(seed=args.seed)
+
+        self.comprehensive_loss_excel_create = True
 
         if self.args.backbone == 'ResNet12':
             self.classifier = ResNet12(im_shape=self.im_shape, num_output_classes=self.args.
@@ -173,6 +177,8 @@ class MAMLFewShotClassifier(nn.Module):
         return names_weights_copy
 
     def get_across_task_loss_metrics(self, total_losses, total_accuracies):
+
+        # 왜 평균을 내고 있을까?
         losses = {'loss': torch.mean(torch.stack(total_losses))}
 
         losses['accuracy'] = np.mean(total_accuracies)
@@ -193,6 +199,9 @@ class MAMLFewShotClassifier(nn.Module):
         """
         x_support_set, x_target_set, y_support_set, y_target_set = data_batch
 
+        comprehensive_losses = dict()
+        comprehensive_losses["epoch"] = epoch
+
         [b, ncs, spc] = y_support_set.shape
 
         self.num_classes_per_set = ncs
@@ -206,6 +215,13 @@ class MAMLFewShotClassifier(nn.Module):
                               y_support_set,
                               x_target_set,
                               y_target_set)):
+
+            # print("task_id == ", task_id)
+            ## task_id ==  0
+            ## task_id ==  1 이 반복된다
+            ## batch_size가 2이기 때문이다. 즉 batch_size는 한번에 학습할 task의 수를 뜻한다
+            comprehensive_losses["task_id"] = task_id
+
             task_losses = []
             per_step_loss_importance_vectors = self.get_per_step_loss_importance_vector()
             names_weights_copy = self.get_inner_loop_parameter_dict(self.classifier.named_parameters())
@@ -239,6 +255,15 @@ class MAMLFewShotClassifier(nn.Module):
                 generated_beta_params = {}
 
 
+                # print("support_loss == " , support_loss)
+                comprehensive_losses["support_loss_" + str(num_step)] = support_loss.item()
+
+                _, support_predicted = torch.max(support_preds.data, 1)
+
+                support_accuracy = support_predicted.float().eq(y_support_set_task.data.float()).cpu().float()
+                comprehensive_losses["support_accuracy_"+ str(num_step)] = np.mean(list(support_accuracy))
+
+
                 names_weights_copy = self.apply_inner_loop_update(loss=support_loss,
                                                                   names_weights_copy=names_weights_copy,
                                                                   generated_beta_params=generated_beta_params,
@@ -253,17 +278,40 @@ class MAMLFewShotClassifier(nn.Module):
                                                                  num_step=num_step)
 
                     task_losses.append(per_step_loss_importance_vectors[num_step] * target_loss)
+
                 elif num_step == (self.args.number_of_training_steps_per_iter - 1):
                     target_loss, target_preds = self.net_forward(x=x_target_set_task,
                                                                  y=y_target_set_task, weights=names_weights_copy,
                                                                  backup_running_statistics=False, training=True,
                                                                  num_step=num_step)
                     task_losses.append(target_loss)
+                    # print("target_loss == ", target_loss)
+                    comprehensive_losses["target_loss"] = target_loss.item()
+
+                    _, target_predicted = torch.max(target_preds.data, 1)
+                    target_accuracy = target_predicted.float().eq(y_target_set_task.data.float()).cpu().float()
+                    comprehensive_losses["target_accuracy"] = np.mean(list(target_accuracy))
+
+            for key, val in comprehensive_losses.items():
+                print("key = {key}, value={value}".format(key=key, value=val))
+            print("==========================================================")
+
 
             per_task_target_preds[task_id] = target_preds.detach().cpu().numpy()
             _, predicted = torch.max(target_preds.data, 1)
 
             accuracy = predicted.float().eq(y_target_set_task.data.float()).cpu().float()
+            comprehensive_losses["accuracy"] = np.round(np.mean(list(accuracy)), 2)
+
+            if self.comprehensive_loss_excel_create:
+                save_statistics(experiment_name="comprehensive_losses", line_to_add=list(comprehensive_losses.keys()),
+                                filename="maml_comprehensive_losses.csv", create=True)
+                self.comprehensive_loss_excel_create = False
+            else:
+                save_statistics(experiment_name="comprehensive_losses", line_to_add=list(comprehensive_losses.values()),
+                                filename="maml_comprehensive_losses.csv", create=False)
+
+
             task_losses = torch.sum(torch.stack(task_losses))
             total_losses.append(task_losses)
             total_accuracies.extend(accuracy)
@@ -271,11 +319,14 @@ class MAMLFewShotClassifier(nn.Module):
             if not training_phase:
                 self.classifier.restore_backup_stats()
 
+        # 왜 평균을 내고 있을까?
+        ## batch (task 1, 2)에 대한 평균
         losses = self.get_across_task_loss_metrics(total_losses=total_losses,
                                                    total_accuracies=total_accuracies)
 
         for idx, item in enumerate(per_step_loss_importance_vectors):
             losses['loss_importance_vector_{}'.format(idx)] = item.detach().cpu().numpy()
+
 
         return losses, per_task_target_preds
 
@@ -378,8 +429,9 @@ class MAMLFewShotClassifier(nn.Module):
         y_support_set = torch.Tensor(y_support_set).long().to(device=self.device)
         y_target_set = torch.Tensor(y_target_set).long().to(device=self.device)
 
-
-        print("run_train_iter x_support_set shape == ", x_support_set.shape)
+        # print("run_train_iter x_support_set shape == ", x_support_set.shape)
+        ## run_train_iter x_support_set shape ==  torch.Size([2, 5, 5, 3, 84, 84])
+        ## 2가 batch_size
 
         data_batch = (x_support_set, x_target_set, y_support_set, y_target_set)
 

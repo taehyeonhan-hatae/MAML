@@ -8,7 +8,7 @@ from utils.dataset_tools import maybe_unzip_dataset
 
 from multiprocessing import freeze_support
 
-
+## python train_maml_system.py --name_of_args_json_file experiment_config/my_experiment/MAML.json --gpu_to_use $GPU_ID
 
 if __name__ == '__main__':
     freeze_support()

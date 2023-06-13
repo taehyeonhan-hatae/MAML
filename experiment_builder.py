@@ -82,6 +82,8 @@ class ExperimentBuilder(object):
         self.start_time = time.time()
         self.epochs_done_in_this_run = 0
 
+        # TODO: 여기서 iteration과 epoch이 설정되는구나
+        ## 1 epoch 당 500 iteration이고 total epoch이 500이니, 50000번의 가중치 update가 일어난다
         print(self.state['current_iter'], int(self.args.total_iter_per_epoch * self.args.total_epochs))
 
     def build_summary_dict(self, total_losses, phase, summary_losses=None):
