@@ -199,9 +199,6 @@ class MAMLFewShotClassifier(nn.Module):
         """
         x_support_set, x_target_set, y_support_set, y_target_set = data_batch
 
-        comprehensive_losses = dict()
-        comprehensive_losses["epoch"] = epoch
-
         [b, ncs, spc] = y_support_set.shape
 
         self.num_classes_per_set = ncs
@@ -211,6 +208,15 @@ class MAMLFewShotClassifier(nn.Module):
         per_task_target_preds = [[] for i in range(len(x_target_set))]
         self.classifier.zero_grad()
         task_accuracies = []
+
+
+        # print(" x_support_set === ", len(x_support_set))
+        # print(" x_target_set === ", len(x_target_set))
+        # print(" y_support_set === ", len(y_support_set))
+        # print(" y_target_set === ", len(y_target_set))
+
+        # Outer-loop Start
+        ## batch size만큼, 1 iteration을 수행한다.
         for task_id, (x_support_set_task, y_support_set_task, x_target_set_task, y_target_set_task) in enumerate(zip(x_support_set,
                               y_support_set,
                               x_target_set,
@@ -220,7 +226,6 @@ class MAMLFewShotClassifier(nn.Module):
             ## task_id ==  0
             ## task_id ==  1 이 반복된다
             ## batch_size가 2이기 때문이다. 즉 batch_size는 한번에 학습할 task의 수를 뜻한다
-            comprehensive_losses["task_id"] = task_id
 
             task_losses = []
             per_step_loss_importance_vectors = self.get_per_step_loss_importance_vector()
@@ -240,6 +245,16 @@ class MAMLFewShotClassifier(nn.Module):
             x_target_set_task = x_target_set_task.view(-1, c, h, w)
             y_target_set_task = y_target_set_task.view(-1)
 
+            comprehensive_losses = {}
+            comprehensive_losses["epoch"] = epoch
+            comprehensive_losses["task_id"] = task_id
+
+            if training_phase:
+                comprehensive_losses["phase"] = "train"
+            else:
+                comprehensive_losses["phase"] = "val"
+
+            ## Inner-loop Start
             for num_step in range(num_steps):
 
                 support_loss, support_preds = self.net_forward(
@@ -286,11 +301,28 @@ class MAMLFewShotClassifier(nn.Module):
                                                                  num_step=num_step)
                     task_losses.append(target_loss)
                     # print("target_loss == ", target_loss)
-                    comprehensive_losses["target_loss"] = target_loss.item()
+                    comprehensive_losses["target_loss_" + str(num_step)] = target_loss.item()
 
                     _, target_predicted = torch.max(target_preds.data, 1)
                     target_accuracy = target_predicted.float().eq(y_target_set_task.data.float()).cpu().float()
-                    comprehensive_losses["target_accuracy"] = np.mean(list(target_accuracy))
+                    comprehensive_losses["target_accuracy_" + str(num_step)] = np.mean(list(target_accuracy))
+
+                ## Inner-loop END
+
+            # Inner-loop 결과를 csv로 생성한다.
+            if self.comprehensive_loss_excel_create:
+                save_statistics(experiment_name="comprehensive_losses",
+                                line_to_add=list(comprehensive_losses.keys()),
+                                filename="maml_comprehensive_losses.csv", create=True)
+                self.comprehensive_loss_excel_create = False
+                save_statistics(experiment_name="comprehensive_losses",
+                                line_to_add=list(comprehensive_losses.values()),
+                                filename="maml_comprehensive_losses.csv", create=False)
+            else:
+                save_statistics(experiment_name="comprehensive_losses",
+                                line_to_add=list(comprehensive_losses.values()),
+                                filename="maml_comprehensive_losses.csv", create=False)
+
 
             # for key, val in comprehensive_losses.items():
             #     print("key = {key}, value={value}".format(key=key, value=val))
@@ -301,17 +333,8 @@ class MAMLFewShotClassifier(nn.Module):
             _, predicted = torch.max(target_preds.data, 1)
 
             accuracy = predicted.float().eq(y_target_set_task.data.float()).cpu().float()
-            comprehensive_losses["accuracy"] = np.round(np.mean(list(accuracy)), 2)
 
-            if self.comprehensive_loss_excel_create:
-                save_statistics(experiment_name="comprehensive_losses", line_to_add=list(comprehensive_losses.keys()),
-                                filename="maml_comprehensive_losses.csv", create=True)
-                self.comprehensive_loss_excel_create = False
-            else:
-                save_statistics(experiment_name="comprehensive_losses", line_to_add=list(comprehensive_losses.values()),
-                                filename="maml_comprehensive_losses.csv", create=False)
-
-
+            # batch에 대한 학습이 끝나고, acc와 loss를 기록
             task_losses = torch.sum(torch.stack(task_losses))
             total_losses.append(task_losses)
             total_accuracies.extend(accuracy)
@@ -319,14 +342,15 @@ class MAMLFewShotClassifier(nn.Module):
             if not training_phase:
                 self.classifier.restore_backup_stats()
 
+            # Outer-loop End
+
         # 왜 평균을 내고 있을까?
-        ## batch (task 1, 2)에 대한 평균
+        ## iteration (task 1, 2)에 대한 평균
         losses = self.get_across_task_loss_metrics(total_losses=total_losses,
                                                    total_accuracies=total_accuracies)
 
         for idx, item in enumerate(per_step_loss_importance_vectors):
             losses['loss_importance_vector_{}'.format(idx)] = item.detach().cpu().numpy()
-
 
         return losses, per_task_target_preds
 
@@ -434,6 +458,9 @@ class MAMLFewShotClassifier(nn.Module):
         ## 2가 batch_size
 
         data_batch = (x_support_set, x_target_set, y_support_set, y_target_set)
+
+
+        # print("run_train_iter epoch == " , epoch) 정확하다
 
         losses, per_task_target_preds = self.train_forward_prop(data_batch=data_batch, epoch=epoch)
 

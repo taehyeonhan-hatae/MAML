@@ -61,10 +61,6 @@ class ExperimentBuilder(object):
                 self.model.load_model(model_save_dir=self.saved_models_filepath, model_name="train_model",
                                       model_idx=self.args.continue_from_epoch)
             self.start_epoch = int(self.state['current_iter'] / self.args.total_iter_per_epoch)
-            # TODO: 굳이 이렇게 할 필요가 있나?
-            ## 그냥 epoch++ 로 학습을 진행하면 안되나? 아니다..
-            ## start_epoch을 통해 학습을 이어서 진행하고자한다.
-            ## 현재 interation / 총 epoch = 현재 epoch
 
         ## Data 구성
         ## current_iter에 주목해야할것 같다.
@@ -156,6 +152,7 @@ class ExperimentBuilder(object):
 
         pbar_train.update(1)
         pbar_train.set_description("training phase {} -> {}".format(self.epoch, train_output_update))
+        # pbar_train.set_description("training phase {} -> {}".format(epoch_idx, train_output_update)) 위 코드와 일치한다, 다만 epoch_idx는 소수점으로 나타난다
 
         # iteration 크기 증가
         current_iter += 1
@@ -335,10 +332,7 @@ class ExperimentBuilder(object):
         with tqdm.tqdm(initial=self.state['current_iter'],
                        total=int(self.args.total_iter_per_epoch * self.args.total_epochs)) as pbar_train:
 
-            while (self.state['current_iter'] < (self.args.total_epochs * self.args.total_iter_per_epoch)) and (
-                    self.args.evaluate_on_test_set_only == False):
-                # TODO: epoch 당 iteration이 끝나면 iteration이 초기화 되지 않나?
-                ## 아니지..
+            while (self.state['current_iter'] < (self.args.total_epochs * self.args.total_iter_per_epoch)) and (self.args.evaluate_on_test_set_only == False):
 
                 for train_sample_idx, train_sample in enumerate(
                         self.data.get_train_batches(total_batches=int(self.args.total_iter_per_epoch *self.args.total_epochs) - self.state['current_iter'],
@@ -346,7 +340,9 @@ class ExperimentBuilder(object):
 
                     # print(self.state['current_iter'], (self.args.total_epochs * self.args.total_iter_per_epoch))
 
-                    # TODO: 학습을 진행하는 부분
+                    # print("train_sample_idx == ", train_sample_idx)
+
+                    # TODO: 학습을 진행하는 부분(iteration)
                     train_losses, total_losses, self.state['current_iter'] = self.train_iteration(
                         train_sample=train_sample,
                         total_losses=self.total_losses,
@@ -356,6 +352,7 @@ class ExperimentBuilder(object):
                         current_iter=self.state['current_iter'],
                         sample_idx=self.state['current_iter'])
 
+                    # 먄악 하나의 epoch이 끝났을 때,
                     if self.state['current_iter'] % self.args.total_iter_per_epoch == 0:
 
                         total_losses = dict()
@@ -379,8 +376,6 @@ class ExperimentBuilder(object):
                                 self.state['best_epoch'] = int(
                                     self.state['best_val_iter'] / self.args.total_iter_per_epoch)
 
-                        # epoch 증가
-                        ## 굳이 epoch을 증가시키는 이유가 있을까?
                         self.epoch += 1
 
                         self.state = self.merge_two_dicts(first_dict=self.merge_two_dicts(first_dict=self.state,
