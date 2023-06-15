@@ -11,6 +11,7 @@ from inner_loop_optimizers import LSLRGradientDescentLearningRule
 
 from utils.storage import save_statistics
 
+
 from AdMSLoss import AdMSoftmaxLoss
 
 
@@ -56,6 +57,7 @@ class MAMLFewShotClassifier(nn.Module):
                                                  num_classes_per_set,
                                                  args=args, device=device, meta_classifier=True).to(device=self.device)
 
+
         self.task_learning_rate = args.task_learning_rate
 
         self.inner_loop_optimizer = LSLRGradientDescentLearningRule(device=device,
@@ -63,7 +65,7 @@ class MAMLFewShotClassifier(nn.Module):
                                                                     total_num_inner_loop_steps=self.args.number_of_training_steps_per_iter,
                                                                     use_learnable_weight_decay=self.args.alfa,
                                                                     use_learnable_learning_rates=(
-                                                                            self.args.learnable_per_layer_per_step_inner_loop_learning_rate or self.args.alfa),
+                                                                                self.args.learnable_per_layer_per_step_inner_loop_learning_rate or self.args.alfa),
                                                                     alfa=self.args.alfa,
                                                                     random_init=self.args.random_init)
 
@@ -143,15 +145,14 @@ class MAMLFewShotClassifier(nn.Module):
             name: param.to(device=self.device)
             for name, param in params
             if param.requires_grad
-               and (
-                       not self.args.enable_inner_loop_optimizable_bn_params
-                       and "norm_layer" not in name
-                       or self.args.enable_inner_loop_optimizable_bn_params
-               )
+            and (
+                not self.args.enable_inner_loop_optimizable_bn_params
+                and "norm_layer" not in name
+                or self.args.enable_inner_loop_optimizable_bn_params
+            )
         }
 
-    def apply_inner_loop_update(self, loss, names_weights_copy, generated_alpha_params, generated_beta_params,
-                                use_second_order, current_step_idx):
+    def apply_inner_loop_update(self, loss, names_weights_copy,  generated_alpha_params, generated_beta_params, use_second_order, current_step_idx):
         """
         Applies an inner loop update given current step's loss, the weights to update, a flag indicating whether to use
         second order derivatives and the current step's index.
@@ -177,6 +178,7 @@ class MAMLFewShotClassifier(nn.Module):
             if grad is None:
                 print('Grads not found for inner loop parameter', key)
             names_grads_copy[key] = names_grads_copy[key].sum(dim=0)
+
 
         names_weights_copy = self.inner_loop_optimizer.update_params(names_weights_dict=names_weights_copy,
                                                                      names_grads_wrt_params_dict=names_grads_copy,
@@ -225,6 +227,7 @@ class MAMLFewShotClassifier(nn.Module):
         self.classifier.zero_grad()
         task_accuracies = []
 
+
         # print(" x_support_set === ", len(x_support_set))
         # print(" x_target_set === ", len(x_target_set))
         # print(" y_support_set === ", len(y_support_set))
@@ -232,11 +235,10 @@ class MAMLFewShotClassifier(nn.Module):
 
         # Outer-loop Start
         ## batch size만큼, 1 iteration을 수행한다.
-        for task_id, (x_support_set_task, y_support_set_task, x_target_set_task, y_target_set_task) in enumerate(
-                zip(x_support_set,
-                    y_support_set,
-                    x_target_set,
-                    y_target_set)):
+        for task_id, (x_support_set_task, y_support_set_task, x_target_set_task, y_target_set_task) in enumerate(zip(x_support_set,
+                              y_support_set,
+                              x_target_set,
+                              y_target_set)):
 
             # print("task_id == ", task_id)
             ## task_id ==  0
@@ -285,13 +287,15 @@ class MAMLFewShotClassifier(nn.Module):
                 generated_alpha_params = {}
                 generated_beta_params = {}
 
+
                 # print("support_loss == " , support_loss)
                 comprehensive_losses["support_loss_" + str(num_step)] = support_loss.item()
 
                 _, support_predicted = torch.max(support_preds.data, 1)
 
                 support_accuracy = support_predicted.float().eq(y_support_set_task.data.float()).cpu().float()
-                comprehensive_losses["support_accuracy_" + str(num_step)] = np.mean(list(support_accuracy))
+                comprehensive_losses["support_accuracy_"+ str(num_step)] = np.mean(list(support_accuracy))
+
 
                 names_weights_copy = self.apply_inner_loop_update(loss=support_loss,
                                                                   names_weights_copy=names_weights_copy,
@@ -337,9 +341,11 @@ class MAMLFewShotClassifier(nn.Module):
                                 line_to_add=list(comprehensive_losses.values()),
                                 filename="maml_comprehensive_losses.csv", create=False)
 
+
             # for key, val in comprehensive_losses.items():
             #     print("key = {key}, value={value}".format(key=key, value=val))
             # print("==========================================================")
+
 
             per_task_target_preds[task_id] = target_preds.detach().cpu().numpy()
             _, predicted = torch.max(target_preds.data, 1)
@@ -470,6 +476,7 @@ class MAMLFewShotClassifier(nn.Module):
         ## 2가 batch_size
 
         data_batch = (x_support_set, x_target_set, y_support_set, y_target_set)
+
 
         # print("run_train_iter epoch == " , epoch) 정확하다
 
