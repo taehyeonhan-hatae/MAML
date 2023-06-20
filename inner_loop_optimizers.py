@@ -98,9 +98,11 @@ class LSLRGradientDescentLearningRule(nn.Module):
         self.init_bias_decay = torch.ones(1)
 
     def initialise(self, names_weights_dict):
+
         if self.alfa:
             if self.random_init:
                 self.names_beta_dict_per_param = nn.ParameterDict()
+                # random_init 일 때, ...
 
             self.names_alpha_dict = nn.ParameterDict()
             self.names_beta_dict = nn.ParameterDict()
@@ -126,17 +128,16 @@ class LSLRGradientDescentLearningRule(nn.Module):
                 self.names_alpha_dict[key.replace(".", "-")] = nn.Parameter(
                     data=torch.ones(self.total_num_inner_loop_steps + 1) * self.init_learning_rate,
                     requires_grad=self.use_learnable_learning_rates)
-
-                # self.names_alpha_dict에 넣을 때, key 값을 replace한 이유는 뭘까?
-                # torch.ones(self.total_num_inner_loop_steps + 1) * self.init_learning_rate
-                # torch.ones(5 + 1) * 0.01
-                # tensor([0.0100, 0.0100, 0.0100, 0.0100, 0.0100, 0.0100])
         else:
             self.names_learning_rates_dict = nn.ParameterDict()
             for idx, (key, param) in enumerate(names_weights_dict.items()):
                 self.names_learning_rates_dict[key.replace(".", "-")] = nn.Parameter(
                     data=torch.ones(self.total_num_inner_loop_steps + 1) * self.init_learning_rate,
                     requires_grad=self.use_learnable_learning_rates)
+
+            # torch.ones(self.total_num_inner_loop_steps + 1) * self.init_learning_rate
+            # torch.ones(5 + 1) * 0.01
+            # tensor([0.0100, 0.0100, 0.0100, 0.0100, 0.0100, 0.0100])
 
 
 
@@ -159,6 +160,7 @@ class LSLRGradientDescentLearningRule(nn.Module):
                     updated_names_weights_dict[key] = (1 - self.names_beta_dict_per_param[key.replace(".", "-")] * generated_beta_params[key] * self.names_beta_dict[key.replace(".", "-")][num_step]) * names_weights_dict[key] - generated_alpha_params[key] * self.names_alpha_dict[key.replace(".", "-")][num_step] * names_grads_wrt_params_dict[key]
                 else:
                     updated_names_weights_dict[key] = (1 - generated_beta_params[key] * self.names_beta_dict[key.replace(".", "-")][num_step]) * names_weights_dict[key] - generated_alpha_params[key] * self.names_alpha_dict[key.replace(".", "-")][num_step] * names_grads_wrt_params_dict[key]
+
             else:
                 #updated_names_weights_dict[key] = names_weights_dict[key] - self.init_lr_val * names_grads_wrt_params_dict[key]
                 for key in names_grads_wrt_params_dict.keys():
