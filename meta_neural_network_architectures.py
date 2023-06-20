@@ -905,6 +905,7 @@ class VGGReLUNormNetwork(nn.Module):
         self.upscale_shapes.append(x.shape)
 
         ## num_stages를 늘려가면, Conv4 -> Conv5 -> Conv6 -> Conv7을 구현할 수 있겠다
+        ## 참고로 args.number_of_training_steps_per_iter가 Inner loop step이다
         for i in range(self.num_stages):
             self.layer_dict['conv{}'.format(i)] = MetaConvNormLayerReLU(input_shape=out.shape,
                                                                         num_filters=self.cnn_filters,

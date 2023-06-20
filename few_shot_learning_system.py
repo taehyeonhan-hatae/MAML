@@ -68,12 +68,15 @@ class MAMLFewShotClassifier(nn.Module):
                                                                     random_init=self.args.random_init)
 
         names_weights_copy = self.get_inner_loop_parameter_dict(self.classifier.named_parameters())
+        #print("names_weights_copy == ", names_weights_copy)
 
         self.inner_loop_optimizer.initialise(names_weights_dict=names_weights_copy)
 
         print("Inner Loop parameters")
         for key, value in self.inner_loop_optimizer.named_parameters():
             print(key, value.shape)
+        print("=====================")
+
 
         self.use_cuda = args.use_cuda
         self.device = device
@@ -83,14 +86,15 @@ class MAMLFewShotClassifier(nn.Module):
         for name, param in self.named_parameters():
             if param.requires_grad:
                 print(name, param.shape, param.device, param.requires_grad)
+        print("=====================")
 
         # ALFA
         if self.args.alfa:
-            # input의 차원이 names_weights_copy 길이 x 2?
-            ## 이 것은 무엇을 하려고 하는 것일까? -> alpha와 beta를 위한 것이다
             ## ALFA에서는 Inner loop interation동안 주어진 task에 적응할 수 있게 하는 Hyper Parmeter(learning rate, weight decay)를 생성한다
             num_layers = len(names_weights_copy)
             input_dim = num_layers * 2
+            print("self.update_rule_learner input_dim == ", input_dim)
+
             self.update_rule_learner = nn.Sequential(
                 nn.Linear(input_dim, input_dim),
                 nn.ReLU(inplace=True),
