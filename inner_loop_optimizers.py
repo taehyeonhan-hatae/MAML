@@ -68,7 +68,7 @@ class LSLRGradientDescentLearningRule(nn.Module):
     will correspond to a stochastic gradient descent learning rule.
     """
 
-    def __init__(self, device, total_num_inner_loop_steps, use_learnable_learning_rates, use_learnable_weight_decay=False, alfa=False, random_init=False, init_learning_rate=1e-3, init_weight_decay=5e-4):
+    def __init__(self, device, total_num_inner_loop_steps, use_learnable_learning_rates, use_learnable_weight_decay=False, alfa=False, random_init=False, curriculum=False, init_learning_rate=1e-3, init_weight_decay=5e-4):
         """Creates a new learning rule object.
         Args:
             init_learning_rate: A postive scalar to scale gradient updates to the
@@ -82,6 +82,7 @@ class LSLRGradientDescentLearningRule(nn.Module):
 
         self.alfa = alfa
         self.random_init = random_init
+        self.curriculum = curriculum
 
         self.init_lr_val = init_learning_rate
         self.init_wd_val = init_weight_decay
@@ -139,6 +140,15 @@ class LSLRGradientDescentLearningRule(nn.Module):
             # torch.ones(5 + 1) * 0.01
             # tensor([0.0100, 0.0100, 0.0100, 0.0100, 0.0100, 0.0100])
 
+            # if self.curriculum:
+            #     for idx, (key, param) in enumerate(names_weights_dict.items()):
+            #         self.names_less_dict[key.replace(".", "-")] = nn.Parameter(
+            #             data=torch.ones(self.total_num_inner_loop_steps + 1) * self.init_learning_rate,
+            #             requires_grad=self.curriculum)
+            #
+            #         self.names_greater_dict[key.replace(".", "-")] = nn.Parameter(
+            #             data=torch.ones(self.total_num_inner_loop_steps + 1) * self.init_learning_rate,
+            #             requires_grad=self.curriculum)
 
 
     def update_params(self, names_weights_dict, names_grads_wrt_params_dict, generated_alpha_params, generated_beta_params, num_step, tau=0.1):
