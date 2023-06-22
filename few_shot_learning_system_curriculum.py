@@ -74,9 +74,12 @@ class MAMLFewShotClassifier(nn.Module):
 
         if self.args.curriculum:
 
-            # input_dim = 3인 이유?
+            num_layers = len(names_weights_copy)
+            #print("num_layers == ", num_layers)
+
+            # input_dim = 10인 이유가 뭘까?
+            self.meta_curriculum = MetaCurriculumNetwork(input_dim = num_layers, args=args, device=device).to(device=self.device)
             ## support grad, query grad, similarity
-            self.meta_curriculum = MetaCurriculumNetwork(input_dim = 3, args=args, device=device).to(device=self.device)
 
 
         print("Inner Loop parameters")
@@ -357,11 +360,12 @@ class MAMLFewShotClassifier(nn.Module):
                 per_step_task.append(target_grads_mean)
                 per_step_task.append(grad_similarity_mean)
 
-                print("per_step_task == ", len(per_step_task))
+                # print("per_step_task == ", len(per_step_task))
 
                 per_step_task = torch.stack(per_step_task)
                 # per_step_task = per_step_task.to(torch.float32)
                 a = self.meta_curriculum(per_step_task)
+                print("a === ", a)
 
             ## Inner-loop Start
             for num_step in range(num_steps):

@@ -398,6 +398,7 @@ class MetaConv2dLayer(nn.Module):
 
         out = F.conv2d(input=x, weight=weight, bias=bias, stride=self.stride,
                        padding=self.padding, dilation=self.dilation_rate, groups=self.groups)
+
         return out
 
 
@@ -664,7 +665,6 @@ class MetaConvNormLayerReLU(nn.Module):
         self.no_bn_learnable_params = no_bn_learnable_params
         self.device = device
 
-        # 코드가 동작하는데 전혀 필요없는 부분으로 보여짐. 이것 때문에 헷갈려하지말자
         self.layer_dict = nn.ModuleDict()
 
         self.build_block()
@@ -931,7 +931,6 @@ class VGGReLUNormNetwork(nn.Module):
 
         self.layer_dict['linear'] = MetaLinearLayer(input_shape=(out.shape[0], np.prod(out.shape[1:])),
                                                     num_filters=self.num_output_classes, use_bias=True)
-
         # forward 호출
         out = self.layer_dict['linear'](out)
 
@@ -953,11 +952,15 @@ class VGGReLUNormNetwork(nn.Module):
         """
         param_dict = dict()
 
+        # print('params == ', params.keys())
+        ## params ==  dict_keys(['layer_dict.conv0.conv.weight', 'layer_dict.conv0.conv.bias', 'layer_dict.conv1.conv.weight', 'layer_dict.conv1.conv.bias', 'layer_dict.conv2.conv.weight', 'layer_dict.conv2.conv.bias', 'layer_dict.conv3.conv.weight', 'layer_dict.conv3.conv.bias', 'layer_dict.linear.weights', 'layer_dict.linear.bias'])
         if params is not None:
             params = {key: value[0] for key, value in params.items()}
             param_dict = extract_top_level_dict(current_dict=params)
 
-        # print('top network', param_dict.keys())
+        # print('param_dict == ', param_dict.keys())
+        ## param_dict ==  dict_keys(['conv0', 'conv1', 'conv2', 'conv3', 'linear'])
+
         for name, param in self.layer_dict.named_parameters():
             path_bits = name.split(".")
             layer_name = path_bits[0]
@@ -1185,8 +1188,11 @@ class MetaCurriculumNetwork(nn.Module):
         self.linear1 = MetaLinearLayer(input_shape=self.input_shape,
                                        num_filters=self.input_dim, use_bias=True)
 
-        self.linear2 = MetaLinearLayer(input_shape=(1, self.input_dim),
-                                       num_filters=1, use_bias=True)
+        self.linear2 = MetaLinearLayer(input_shape=self.input_shape,
+                                       num_filters=self.input_dim, use_bias=True)
+
+        # self.linear2 = MetaLinearLayer(input_shape=(1, self.input_dim),
+        #                                num_filters=1, use_bias=True)
 
         out = self.linear1(out)
         out = F.relu_(out)
