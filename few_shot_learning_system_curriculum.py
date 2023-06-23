@@ -278,8 +278,8 @@ class MAMLFewShotClassifier(nn.Module):
 
         # print("grad_similarity_mean len == ", len(grad_similarity_mean))
 
-        # for i in range(len(target_grads)):
-        #     print("target_grads_mean" + "[" + str(i) + "] .shape == ", target_grads_mean[i].item())
+        for i in range(len(target_grads_mean)):
+            print("target_grads_mean" + "[" + str(i) + "] .shape == ", target_grads_mean[i].item())
 
         return support_grads_mean, target_grads_mean, grad_similarity_mean
 
