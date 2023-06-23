@@ -45,6 +45,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         self.rng = set_torch_seed(seed=args.seed)
 
+        self.experiment_name = self.args.experiment_name
         self.comprehensive_loss_excel_create = True
 
         if self.args.backbone == 'ResNet12':
@@ -74,12 +75,16 @@ class MAMLFewShotClassifier(nn.Module):
 
         if self.args.curriculum:
 
-            num_layers = len(names_weights_copy)
-            #print("num_layers == ", num_layers)
+            # adaptive curriculum learning을 구성하기 위해서는 두가지 방법이 있다
+            ## 1) meta_nerual_network_architectures를 사용
+            #self.meta_curriculum = MetaCurriculumNetwork(input_dim = num_layers, args=args, device=device).to(device=self.device)
 
-            # input_dim = 10인 이유가 뭘까?
-            self.meta_curriculum = MetaCurriculumNetwork(input_dim = num_layers, args=args, device=device).to(device=self.device)
-            ## support grad, query grad, similarity
+            ## 2) few_shot_learning_system_curriculum에서 직접 사용
+            self.meta_adaptive_curriculum = nn.Sequential(
+                    nn.Conv1d(in_channels=3, out_channels=1, kernel_size=2),
+                    nn.Linear(9,4),
+                    nn.Sigmoid()).to(device=self.device)
+
 
 
         print("Inner Loop parameters")
@@ -364,12 +369,13 @@ class MAMLFewShotClassifier(nn.Module):
 
                 per_step_task = torch.stack(per_step_task)
                 # per_step_task = per_step_task.to(torch.float32)
-                a = self.meta_curriculum(per_step_task)
-                print("a === ", a)
+                step = self.meta_adaptive_curriculum(per_step_task)
+                #print("step == ", step)
+                num_steps = int(torch.argmax(step)) + 1
+                print("num_steps === ", num_steps)
 
             ## Inner-loop Start
             for num_step in range(num_steps):
-
                 support_loss, support_preds = self.net_forward(
                     x=x_support_set_task,
                     y=y_support_set_task,
@@ -428,7 +434,8 @@ class MAMLFewShotClassifier(nn.Module):
 
                     task_losses.append(per_step_loss_importance_vectors[num_step] * target_loss)
 
-                elif num_step == (self.args.number_of_training_steps_per_iter - 1):
+                #elif num_step == (self.args.number_of_training_steps_per_iter - 1):
+                elif num_step == num_steps-1:
                     target_loss, target_preds = self.net_forward(x=x_target_set_task,
                                                                  y=y_target_set_task, weights=names_weights_copy,
                                                                  backup_running_statistics=False, training=True,
@@ -445,17 +452,17 @@ class MAMLFewShotClassifier(nn.Module):
 
             # Inner-loop 결과를 csv로 생성한다.
             if self.comprehensive_loss_excel_create:
-                save_statistics(experiment_name="comprehensive_losses",
+                save_statistics(experiment_name=self.experiment_name,
                                 line_to_add=list(comprehensive_losses.keys()),
-                                filename="alfa+maml_comprehensive_losses.csv", create=True)
+                                filename=self.experiment_name+".csv", create=True)
                 self.comprehensive_loss_excel_create = False
-                save_statistics(experiment_name="comprehensive_losses",
+                save_statistics(experiment_name=self.experiment_name,
                                 line_to_add=list(comprehensive_losses.values()),
-                                filename="alfa+maml_comprehensive_losses.csv", create=False)
+                                filename=self.experiment_name+".csv", create=False)
             else:
-                save_statistics(experiment_name="comprehensive_losses",
+                save_statistics(experiment_name=self.experiment_name,
                                 line_to_add=list(comprehensive_losses.values()),
-                                filename="alfa+maml_comprehensive_losses.csv", create=False)
+                                filename=self.experiment_name+".csv", create=False)
 
             # for key, val in comprehensive_losses.items():
             #     print("key = {key}, value={value}".format(key=key, value=val))
