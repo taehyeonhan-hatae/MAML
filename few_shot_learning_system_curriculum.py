@@ -232,6 +232,9 @@ class MAMLFewShotClassifier(nn.Module):
 
         layerwise_mean_grads = torch.stack(layerwise_mean_grads)
 
+        # gradient 값을 0~1로 Normalization
+        layerwise_mean_grads = F.normalize(layerwise_mean_grads, dim=0)
+
         return layerwise_mean_grads
 
     def layer_wise_similarity(self, grad1, grad2):
@@ -278,8 +281,9 @@ class MAMLFewShotClassifier(nn.Module):
 
         # print("grad_similarity_mean len == ", len(grad_similarity_mean))
 
-        for i in range(len(target_grads_mean)):
-            print("target_grads_mean" + "[" + str(i) + "] .shape == ", target_grads_mean[i].item())
+
+        # for i in range(len(grad_similarity_mean)):
+        #     print("grad_similarity_mean" + "[" + str(i) + "] .shape == ", grad_similarity_mean[i].item())
 
         return support_grads_mean, target_grads_mean, grad_similarity_mean
 
@@ -352,6 +356,12 @@ class MAMLFewShotClassifier(nn.Module):
             else:
                 comprehensive_losses["phase"] = "val"
 
+            comprehensive_losses["num_steps"] = self.args.number_of_training_steps_per_iter
+
+            for num_step in range(self.args.number_of_training_steps_per_iter):
+                comprehensive_losses["support_loss_" + str(num_step)] = "null"
+                comprehensive_losses["support_accuracy_" + str(num_step)] = "null"
+
             if self.args.curriculum:
                 support_grads_mean, target_grads_mean, grad_similarity_mean = self.get_task_embeddings(
                     x_support_set_task=x_support_set_task,
@@ -366,13 +376,17 @@ class MAMLFewShotClassifier(nn.Module):
                 per_step_task.append(grad_similarity_mean)
 
                 # print("per_step_task == ", len(per_step_task))
-
+                ## "per_step_task ==  3
                 per_step_task = torch.stack(per_step_task)
-                # per_step_task = per_step_task.to(torch.float32)
+
+                # print("per_step_task == ",  per_step_task.shape)
+                ## per_step_task ==  torch.Size([3, 10])
+
                 step = self.meta_adaptive_curriculum(per_step_task)
                 #print("step == ", step)
                 num_steps = int(torch.argmax(step)) + 1
-                print("num_steps === ", num_steps)
+                # print("num_steps === ", num_steps)
+                comprehensive_losses["num_steps"] = num_steps
 
             ## Inner-loop Start
             for num_step in range(num_steps):
