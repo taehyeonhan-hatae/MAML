@@ -86,7 +86,6 @@ class MAMLFewShotClassifier(nn.Module):
                     nn.Sigmoid()).to(device=self.device)
 
 
-
         print("Inner Loop parameters")
         for key, value in self.inner_loop_optimizer.named_parameters():
             print(key, value.shape)
