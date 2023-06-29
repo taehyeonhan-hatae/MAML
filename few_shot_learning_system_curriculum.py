@@ -80,7 +80,7 @@ class MAMLFewShotClassifier(nn.Module):
             #self.meta_curriculum = MetaCurriculumNetwork(input_dim = num_layers, args=args, device=device).to(device=self.device)
 
             ## 2) few_shot_learning_system_curriculum에서 직접 사용
-            self.meta_adaptive_curriculum = nn.Sequential(
+            self.Inner_loop_Aribiter = nn.Sequential(
                     nn.Conv1d(in_channels=3, out_channels=1, kernel_size=2),
                     nn.Linear(9,4),
                     nn.Sigmoid()).to(device=self.device)
@@ -381,7 +381,7 @@ class MAMLFewShotClassifier(nn.Module):
                 # print("per_step_task == ",  per_step_task.shape)
                 ## per_step_task ==  torch.Size([3, 10])
 
-                step = self.meta_adaptive_curriculum(per_step_task)
+                step = self.Inner_loop_Aribiter(per_step_task)
                 #print("step == ", step)
                 num_steps = int(torch.argmax(step)) + 1
                 # print("num_steps === ", num_steps)
