@@ -2,7 +2,7 @@
 
 from data import MetaLearningSystemDataLoader
 from experiment_builder import ExperimentBuilder
-from few_shot_learning_system_curriculum import MAMLFewShotClassifier
+from few_shot_learning_system_for_MeTAL import MAMLFewShotClassifier
 from utils.parser_utils import get_args
 from utils.dataset_tools import maybe_unzip_dataset
 
@@ -10,6 +10,7 @@ from multiprocessing import freeze_support
 
 ## python train_maml_system.py --name_of_args_json_file experiment_config/my_experiment/MAML.json --gpu_to_use $GPU_ID
 ## python train_maml_system.py --name_of_args_json_file experiment_config/my_experiment/maml+curriculum.json --gpu_to_use 0
+## python train_maml_system.py --name_of_args_json_file experiment_config/MeTAL.json --gpu_to_use 0
 
 if __name__ == '__main__':
     freeze_support()

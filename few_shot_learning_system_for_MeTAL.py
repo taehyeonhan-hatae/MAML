@@ -523,14 +523,24 @@ class MAMLFewShotClassifier(nn.Module):
             for v in weights.values():
                 support_task_state.append(v.mean())
 
+
+            # print("support_task_state == ", support_task_state)
+            # print("support_task_state len == ", len(support_task_state))
+
             support_task_state = torch.stack(support_task_state)
+
+            # print("support_task_state 1 == ", support_task_state)
+
             adapt_support_task_state = (support_task_state - support_task_state.mean()) / (
                         support_task_state.std() + 1e-12)
+
+            # print("adapt_support_task_state == " , adapt_support_task_state)
 
             updated_meta_loss_weights = self.meta_loss_adapter(adapt_support_task_state, num_step, meta_loss_weights)
 
             support_y = torch.zeros(support_preds.shape).to(support_preds.device)
             support_y[torch.arange(support_y.size(0)), y] = 1
+
             support_task_state = torch.cat((
                 support_task_state.view(1, -1).expand(support_preds.size(0), -1),
                 support_preds,
@@ -538,6 +548,10 @@ class MAMLFewShotClassifier(nn.Module):
             ), -1)
 
             support_task_state = (support_task_state - support_task_state.mean()) / (support_task_state.std() + 1e-12)
+
+
+            print("support_task_state 2 ==" , support_task_state)
+
             meta_support_loss = self.meta_loss(support_task_state, num_step,
                                                params=updated_meta_loss_weights).mean().squeeze()
 
