@@ -931,14 +931,14 @@ class VGGReLUNormNetwork(nn.Module):
 
         self.layer_dict['linear'] = MetaLinearLayer(input_shape=(out.shape[0], np.prod(out.shape[1:])),
                                                     num_filters=self.num_output_classes, use_bias=True)
-        # forward 호출
+
         out = self.layer_dict['linear'](out)
 
         print("VGGNetwork self.layer_dict === ", self.layer_dict)
         print("VGGNetwork build out.shape === ", out.shape)
         print("VGGNetwork build out === ", out)
 
-    def forward(self, x, num_step, params=None, training=False, backup_running_statistics=False):
+    def forward(self, x, num_step, params=None, training=False, backup_running_statistics=False, isDropout=False):
         """
         Forward propages through the network. If any params are passed then they are used instead of stored params.
         :param x: Input image batch.
@@ -975,6 +975,11 @@ class VGGReLUNormNetwork(nn.Module):
             out = self.layer_dict['conv{}'.format(i)](out, params=param_dict['conv{}'.format(i)], training=training,
                                                       backup_running_statistics=backup_running_statistics,
                                                       num_step=num_step)
+            # JM 추가
+            if isDropout:
+                if i != self.num_stages:
+                    out = F.dropout(input=out, p=0.5)
+
             if self.args.max_pooling:
                 out = F.max_pool2d(input=out, kernel_size=(2, 2), stride=2, padding=0)
 

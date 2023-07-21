@@ -523,9 +523,18 @@ class MAMLFewShotClassifier(nn.Module):
         """
         preds = self.classifier.forward(x=x, params=weights,
                                         training=training,
-                                        backup_running_statistics=backup_running_statistics, num_step=num_step)
+                                        backup_running_statistics=backup_running_statistics, num_step=num_step, isDropout=False)
+
+        preds_with_Dropout = self.classifier.forward(x=x, params=weights,
+                                        training=training,
+                                        backup_running_statistics=backup_running_statistics, num_step=num_step, isDropout=True)
+
 
         loss = F.cross_entropy(input=preds, target=y)
+        loss_with_dropout = F.cross_entropy(input=preds_with_Dropout, target=y)
+
+        print("loss == ", loss)
+        print("loss_with_dropout == ", loss_with_dropout)
 
         # num_classes = 5
         # adms_loss = AdMSoftmaxLoss(3, num_classes, s=10.0, m=0.5)
