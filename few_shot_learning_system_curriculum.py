@@ -76,14 +76,15 @@ class MAMLFewShotClassifier(nn.Module):
         if self.args.curriculum:
 
             # adaptive curriculum learning을 구성하기 위해서는 두가지 방법이 있다
+
             ## 1) meta_nerual_network_architectures를 사용
-            #self.meta_curriculum = MetaCurriculumNetwork(input_dim = num_layers, args=args, device=device).to(device=self.device)
+            self.Inner_loop_Aribiter = MetaCurriculumNetwork(input_dim = 3, args=args, device=device).to(device=self.device)
 
             ## 2) few_shot_learning_system_curriculum에서 직접 사용
-            self.Inner_loop_Aribiter = nn.Sequential(
-                    nn.Conv1d(in_channels=3, out_channels=1, kernel_size=2),
-                    nn.Linear(9,4),
-                    nn.Sigmoid()).to(device=self.device)
+            # self.Inner_loop_Aribiter = nn.Sequential(
+            #         nn.Conv1d(in_channels=3, out_channels=1, kernel_size=2),
+            #         nn.Linear(9,4),
+            #         nn.Sigmoid()).to(device=self.device)
 
 
         print("Inner Loop parameters")
@@ -251,12 +252,20 @@ class MAMLFewShotClassifier(nn.Module):
         return layerwise_sim_grads
 
     def get_task_embeddings(self, x_support_set_task, y_support_set_task, x_target_set_task, y_target_set_task, names_weights_copy):
-        # Use gradients as task embeddings
+        # 내가 input으로 활용할 변수
+        ## 1) support set을 통해 구한 loss
+        ## 2) support set을 통해 구한 gradient (layer-wise mean)
+        ## 3) dropout loss
+        ## 4) weight norm (meta-learner) 이건 왜?? meta-learner의 norm 값이 필요한가..? meta-laerner와 base-learner의 weight를 생각해보자
+        ### 즉, inner-loop 안에서 get_task_embeddings를 구현해야할거 같다.. MeTAL 처럼..쉬운일이다..
+
         support_loss, support_preds = self.net_forward(x=x_support_set_task,
                                                        y=y_support_set_task,
                                                        weights=names_weights_copy,
                                                        backup_running_statistics=True,
                                                        training=True, num_step=0)
+
+
 
         target_loss, target_preds = self.net_forward(x=x_target_set_task,
                                                      y=y_target_set_task,
@@ -432,6 +441,7 @@ class MAMLFewShotClassifier(nn.Module):
                 support_accuracy = support_predicted.float().eq(y_support_set_task.data.float()).cpu().float()
                 comprehensive_losses["support_accuracy_" + str(num_step)] = np.mean(list(support_accuracy))
 
+                # task specific knowledge를 얻는 부분
                 names_weights_copy = self.apply_inner_loop_update(loss=support_loss,
                                                                   names_weights_copy=names_weights_copy,
                                                                   generated_beta_params=generated_beta_params,
@@ -453,6 +463,7 @@ class MAMLFewShotClassifier(nn.Module):
                                                                  y=y_target_set_task, weights=names_weights_copy,
                                                                  backup_running_statistics=False, training=True,
                                                                  num_step=num_step)
+                    # target_loss에 가중치를 더 줄까?
                     task_losses.append(target_loss)
                     # print("target_loss == ", target_loss)
                     comprehensive_losses["target_loss_" + str(num_step)] = target_loss.item()
@@ -525,16 +536,16 @@ class MAMLFewShotClassifier(nn.Module):
                                         training=training,
                                         backup_running_statistics=backup_running_statistics, num_step=num_step, isDropout=False)
 
-        preds_with_Dropout = self.classifier.forward(x=x, params=weights,
-                                        training=training,
-                                        backup_running_statistics=backup_running_statistics, num_step=num_step, isDropout=True)
-
-
         loss = F.cross_entropy(input=preds, target=y)
+
+        preds_with_Dropout = self.classifier.forward(x=x, params=weights,
+                                                     training=training,
+                                                     backup_running_statistics=backup_running_statistics,
+                                                     num_step=num_step, isDropout=True)
         loss_with_dropout = F.cross_entropy(input=preds_with_Dropout, target=y)
 
-        print("loss == ", loss)
-        print("loss_with_dropout == ", loss_with_dropout)
+        # print("loss == ", loss)
+        # print("loss_with_dropout == ", loss_with_dropout)
 
         # num_classes = 5
         # adms_loss = AdMSoftmaxLoss(3, num_classes, s=10.0, m=0.5)
