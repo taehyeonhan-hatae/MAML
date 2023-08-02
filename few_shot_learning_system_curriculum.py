@@ -282,17 +282,6 @@ class MAMLFewShotClassifier(nn.Module):
         target_grads_mean = self.layer_wise_mean_grad(target_grads)
         grad_similarity_mean = self.layer_wise_similarity(support_grads, target_grads)
 
-        # print("support_grads_mean len == ", len(support_grads_mean))
-        # print("target_grads_mean len == ", len(target_grads_mean))
-        # support_grads_mean len ==  10, target_grads_mean len ==  10
-        ## [Conv4 x 2(weigth와 bias)] + 2(linear layer의 weight와 bias)
-
-        # print("grad_similarity_mean len == ", len(grad_similarity_mean))
-
-
-        # for i in range(len(grad_similarity_mean)):
-        #     print("grad_similarity_mean" + "[" + str(i) + "] .shape == ", grad_similarity_mean[i].item())
-
         return support_grads_mean, target_grads_mean, grad_similarity_mean
 
     def forward(self, data_batch, epoch, use_second_order, use_multi_step_loss_optimization, num_steps, training_phase):
@@ -370,32 +359,6 @@ class MAMLFewShotClassifier(nn.Module):
                 comprehensive_losses["support_loss_" + str(num_step)] = "null"
                 comprehensive_losses["support_accuracy_" + str(num_step)] = "null"
 
-            if self.args.curriculum:
-                support_grads_mean, target_grads_mean, grad_similarity_mean = self.get_task_embeddings(
-                    x_support_set_task=x_support_set_task,
-                    y_support_set_task=y_support_set_task,
-                    x_target_set_task=x_target_set_task,
-                    y_target_set_task=y_target_set_task,
-                    names_weights_copy=names_weights_copy)
-
-                per_step_task = []
-                per_step_task.append(support_grads_mean)
-                per_step_task.append(target_grads_mean)
-                per_step_task.append(grad_similarity_mean)
-
-                # print("per_step_task == ", len(per_step_task))
-                ## "per_step_task ==  3
-                per_step_task = torch.stack(per_step_task)
-
-                # print("per_step_task == ",  per_step_task.shape)
-                ## per_step_task ==  torch.Size([3, 10])
-
-                step = self.Inner_loop_Aribiter(per_step_task)
-                #print("step == ", step)
-                num_steps = int(torch.argmax(step)) + 1
-                # print("num_steps === ", num_steps)
-                comprehensive_losses["num_steps"] = num_steps
-
             ## Inner-loop Start
             for num_step in range(num_steps):
                 support_loss, support_preds = self.net_forward(
@@ -457,8 +420,7 @@ class MAMLFewShotClassifier(nn.Module):
 
                     task_losses.append(per_step_loss_importance_vectors[num_step] * target_loss)
 
-                #elif num_step == (self.args.number_of_training_steps_per_iter - 1):
-                elif num_step == num_steps-1:
+                elif num_step == (self.args.number_of_training_steps_per_iter - 1):
                     target_loss, target_preds = self.net_forward(x=x_target_set_task,
                                                                  y=y_target_set_task, weights=names_weights_copy,
                                                                  backup_running_statistics=False, training=True,
@@ -472,7 +434,28 @@ class MAMLFewShotClassifier(nn.Module):
                     target_accuracy = target_predicted.float().eq(y_target_set_task.data.float()).cpu().float()
                     comprehensive_losses["target_accuracy_" + str(num_step)] = np.mean(list(target_accuracy))
 
+                    # 마지막 num_step에서 loss값과 dropout loss 값을 저장한다.
+
                 ## Inner-loop END
+
+            # Inner-loop 결과를 바탕으로 Curriculum을 구성한다.
+            if self.args.curriculum:
+                support_grads_mean, target_grads_mean, grad_similarity_mean = self.get_task_embeddings(
+                    x_support_set_task=x_support_set_task,
+                    y_support_set_task=y_support_set_task,
+                    x_target_set_task=x_target_set_task,
+                    y_target_set_task=y_target_set_task,
+                    names_weights_copy=names_weights_copy)
+
+                per_step_task = []
+                per_step_task.append(support_grads_mean)
+                for k, v in names_weights_copy.items():
+                    per_step_task.append(v.mean())
+
+                per_step_task = torch.stack(per_step_task)
+
+                self.Inner_loop_Aribiter(per_step_task)
+
 
             # Inner-loop 결과를 csv로 생성한다.
             if self.comprehensive_loss_excel_create:
