@@ -82,7 +82,6 @@ class LSLRGradientDescentLearningRule(nn.Module):
 
         self.alfa = alfa
         self.random_init = random_init
-        self.curriculum = curriculum
 
         self.init_lr_val = init_learning_rate
         self.init_wd_val = init_weight_decay

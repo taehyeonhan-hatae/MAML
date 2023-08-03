@@ -78,7 +78,7 @@ class MAMLFewShotClassifier(nn.Module):
             # adaptive curriculum learning을 구성하기 위해서는 두가지 방법이 있다
 
             ## 1) meta_nerual_network_architectures를 사용
-            self.Inner_loop_Aribiter = MetaCurriculumNetwork(input_dim = 3, args=args, device=device).to(device=self.device)
+            self.curriculum_arbiter = MetaCurriculumNetwork(input_dim = 3, args=args, device=device).to(device=self.device)
 
             ## 2) few_shot_learning_system_curriculum에서 직접 사용
             # self.Inner_loop_Aribiter = nn.Sequential(
@@ -259,7 +259,7 @@ class MAMLFewShotClassifier(nn.Module):
         ## 4) weight norm (meta-learner) 이건 왜?? meta-learner의 norm 값이 필요한가..? meta-laerner와 base-learner의 weight를 생각해보자
         ### 즉, inner-loop 안에서 get_task_embeddings를 구현해야할거 같다.. MeTAL 처럼..쉬운일이다..
 
-        support_loss, support_preds = self.net_forward(x=x_support_set_task,
+        support_loss, support_preds, loss_with_dropout = self.net_forward(x=x_support_set_task,
                                                        y=y_support_set_task,
                                                        weights=names_weights_copy,
                                                        backup_running_statistics=True,
@@ -267,7 +267,7 @@ class MAMLFewShotClassifier(nn.Module):
 
 
 
-        target_loss, target_preds = self.net_forward(x=x_target_set_task,
+        target_loss, target_preds, _ = self.net_forward(x=x_target_set_task,
                                                      y=y_target_set_task,
                                                      weights=names_weights_copy,
                                                      backup_running_statistics=True, training=True,
@@ -282,7 +282,7 @@ class MAMLFewShotClassifier(nn.Module):
         target_grads_mean = self.layer_wise_mean_grad(target_grads)
         grad_similarity_mean = self.layer_wise_similarity(support_grads, target_grads)
 
-        return support_grads_mean, target_grads_mean, grad_similarity_mean
+        return support_loss, support_grads_mean, target_grads_mean, grad_similarity_mean, loss_with_dropout
 
     def forward(self, data_batch, epoch, use_second_order, use_multi_step_loss_optimization, num_steps, training_phase):
         """
@@ -361,7 +361,7 @@ class MAMLFewShotClassifier(nn.Module):
 
             ## Inner-loop Start
             for num_step in range(num_steps):
-                support_loss, support_preds = self.net_forward(
+                support_loss, support_preds, _ = self.net_forward(
                     x=x_support_set_task,
                     y=y_support_set_task,
                     weights=names_weights_copy,
@@ -413,7 +413,7 @@ class MAMLFewShotClassifier(nn.Module):
                                                                   current_step_idx=num_step)
 
                 if use_multi_step_loss_optimization and training_phase and epoch < self.args.multi_step_loss_num_epochs:
-                    target_loss, target_preds = self.net_forward(x=x_target_set_task,
+                    target_loss, target_preds, _ = self.net_forward(x=x_target_set_task,
                                                                  y=y_target_set_task, weights=names_weights_copy,
                                                                  backup_running_statistics=False, training=True,
                                                                  num_step=num_step)
@@ -421,7 +421,7 @@ class MAMLFewShotClassifier(nn.Module):
                     task_losses.append(per_step_loss_importance_vectors[num_step] * target_loss)
 
                 elif num_step == (self.args.number_of_training_steps_per_iter - 1):
-                    target_loss, target_preds = self.net_forward(x=x_target_set_task,
+                    target_loss, target_preds, _ = self.net_forward(x=x_target_set_task,
                                                                  y=y_target_set_task, weights=names_weights_copy,
                                                                  backup_running_statistics=False, training=True,
                                                                  num_step=num_step)
@@ -440,7 +440,7 @@ class MAMLFewShotClassifier(nn.Module):
 
             # Inner-loop 결과를 바탕으로 Curriculum을 구성한다.
             if self.args.curriculum:
-                support_grads_mean, target_grads_mean, grad_similarity_mean = self.get_task_embeddings(
+                support_loss, support_grads_mean, target_grads_mean, grad_similarity_mean, loss_with_dropout = self.get_task_embeddings(
                     x_support_set_task=x_support_set_task,
                     y_support_set_task=y_support_set_task,
                     x_target_set_task=x_target_set_task,
@@ -448,13 +448,17 @@ class MAMLFewShotClassifier(nn.Module):
                     names_weights_copy=names_weights_copy)
 
                 per_step_task = []
+                per_step_task.append(support_loss)
+                per_step_task.append(loss_with_dropout)
                 per_step_task.append(support_grads_mean)
                 for k, v in names_weights_copy.items():
                     per_step_task.append(v.mean())
 
+                print("per_step_task === ", per_step_task)
+
                 per_step_task = torch.stack(per_step_task)
 
-                self.Inner_loop_Aribiter(per_step_task)
+                self.curriculum_arbiter(per_step_task)
 
 
             # Inner-loop 결과를 csv로 생성한다.
@@ -534,7 +538,7 @@ class MAMLFewShotClassifier(nn.Module):
         # adms_loss = AdMSoftmaxLoss(3, num_classes, s=10.0, m=0.5)
         # loss = adms_loss(preds, y)
 
-        return loss, preds
+        return loss, preds, loss_with_dropout
 
     def trainable_parameters(self):
         """
