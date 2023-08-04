@@ -12,7 +12,6 @@ from inner_loop_optimizers import LSLRGradientDescentLearningRule
 from utils.storage import save_statistics
 
 
-
 def set_torch_seed(seed):
     """
     Sets the pytorch seeds for current experiment run
@@ -61,8 +60,8 @@ class MAMLFewShotClassifier(nn.Module):
         self.inner_loop_optimizer = LSLRGradientDescentLearningRule(device=device,
                                                                     init_learning_rate=self.task_learning_rate,
                                                                     total_num_inner_loop_steps=self.args.number_of_training_steps_per_iter,
-                                                                    use_learnable_learning_rates=self.args.learnable_per_layer_per_step_inner_loop_learning_rate)
 
+                                                                    use_learnable_learning_rates=self.args.learnable_per_layer_per_step_inner_loop_learning_rate)
         names_weights_copy = self.get_inner_loop_parameter_dict(self.classifier.named_parameters())
         # print("names_weights_copy == ", names_weights_copy)
 
@@ -81,6 +80,7 @@ class MAMLFewShotClassifier(nn.Module):
                 nn.ReLU(inplace=True)
             ).to(device=self.device)
 
+
         print("Inner Loop parameters")
         for key, value in self.inner_loop_optimizer.named_parameters():
             print(key, value.shape)
@@ -90,6 +90,7 @@ class MAMLFewShotClassifier(nn.Module):
         self.device = device
         self.args = args
         self.to(device)
+
 
         print("Outer Loop parameters")
         for name, param in self.named_parameters():
@@ -200,20 +201,6 @@ class MAMLFewShotClassifier(nn.Module):
 
         return losses
 
-    def layer_wise_similarity(self, grad1, grad2):
-
-        # grad1과 grad2의 차원이 같을 때만 사용 가능하다
-
-        layerwise_sim_grads = []
-
-        for i in range(len(grad1)):
-            cos_sim = F.cosine_similarity(grad1[i], grad2[i])
-            layerwise_sim_grads.append(cos_sim.mean())
-
-        layerwise_sim_grads = torch.stack(layerwise_sim_grads)
-
-        return layerwise_sim_grads
-
     def get_task_embeddings(self, x_support_set_task, y_support_set_task, names_weights_copy):
         # 내가 input으로 활용할 변수
         ## 1) support set을 통해 구한 loss
@@ -248,6 +235,7 @@ class MAMLFewShotClassifier(nn.Module):
         per_step_task = torch.stack(per_step_task)
         return per_step_task
 
+
     def forward(self, data_batch, epoch, use_second_order, use_multi_step_loss_optimization, num_steps, training_phase):
         """
         Runs a forward outer loop pass on the batch of tasks using the MAML/++ framework.
@@ -271,10 +259,24 @@ class MAMLFewShotClassifier(nn.Module):
         per_task_target_preds = [[] for i in range(len(x_target_set))]
         self.classifier.zero_grad()
         task_accuracies = []
+
+        # print(" x_support_set === ", len(x_support_set))
+        # print(" x_target_set === ", len(x_target_set))
+        # print(" y_support_set === ", len(y_support_set))
+        # print(" y_target_set === ", len(y_target_set))
+
+        # Outer-loop Start
+        ## batch size만큼, 1 iteration을 수행한다.
         for task_id, (x_support_set_task, y_support_set_task, x_target_set_task, y_target_set_task) in enumerate(zip(x_support_set,
                               y_support_set,
                               x_target_set,
                               y_target_set)):
+
+            # print("task_id == ", task_id)
+            ## task_id ==  0
+            ## task_id ==  1 이 반복된다
+            ## batch_size가 2이기 때문이다. 즉 batch_size는 한번에 학습할 task의 수를 뜻한다
+
             task_losses = []
             per_step_loss_importance_vectors = self.get_per_step_loss_importance_vector()
             names_weights_copy = self.get_inner_loop_parameter_dict(self.classifier.named_parameters())
@@ -308,6 +310,7 @@ class MAMLFewShotClassifier(nn.Module):
                 comprehensive_losses["support_loss_" + str(num_step)] = "null"
                 comprehensive_losses["support_accuracy_" + str(num_step)] = "null"
 
+            ## Inner-loop Start
             for num_step in range(num_steps):
 
                 support_loss, support_preds, _ = self.net_forward(
@@ -347,14 +350,14 @@ class MAMLFewShotClassifier(nn.Module):
                             y_support_set_task=y_support_set_task,
                             names_weights_copy=names_weights_copy)
 
-                    curriculum_loss = self.curriculum_arbiter(per_step_task)
-                    comprehensive_losses["curriculum_loss" + str(num_step)] = curriculum_loss.item()
+                        curriculum_loss = self.curriculum_arbiter(per_step_task)
+                        comprehensive_losses["curriculum_loss" + str(num_step)] = curriculum_loss.item()
+                        #print("curriculum_loss == ", curriculum_loss)
 
                     target_loss, target_preds, _ = self.net_forward(x=x_target_set_task,
-                                                                    y=y_target_set_task, weights=names_weights_copy,
-                                                                    backup_running_statistics=False, training=True,
-                                                                    num_step=num_step)
-
+                                                                 y=y_target_set_task, weights=names_weights_copy,
+                                                                 backup_running_statistics=False, training=True,
+                                                                 num_step=num_step)
                     task_losses.append(target_loss)
                     comprehensive_losses["target_loss_" + str(num_step)] = target_loss.item()
 
@@ -378,19 +381,23 @@ class MAMLFewShotClassifier(nn.Module):
                                 line_to_add=list(comprehensive_losses.values()),
                                 filename=self.experiment_name + ".csv", create=False)
 
+
             per_task_target_preds[task_id] = target_preds.detach().cpu().numpy()
             _, predicted = torch.max(target_preds.data, 1)
 
             accuracy = predicted.float().eq(y_target_set_task.data.float()).cpu().float()
+
+            # batch에 대한 학습이 끝나고, acc와 loss를 기록
             task_losses = torch.sum(torch.stack(task_losses))
             total_losses.append(task_losses)
             total_accuracies.extend(accuracy)
 
             if not training_phase:
                 self.classifier.restore_backup_stats()
-
             # Outer-loop End
 
+        # 왜 평균을 내고 있을까?
+        ## iteration (task 1, 2)에 대한 평균
         losses = self.get_across_task_loss_metrics(total_losses=total_losses,
                                                    total_accuracies=total_accuracies)
 
@@ -426,14 +433,6 @@ class MAMLFewShotClassifier(nn.Module):
                                                      backup_running_statistics=backup_running_statistics,
                                                      num_step=num_step, isDropout=True)
         loss_with_dropout = F.cross_entropy(input=preds_with_Dropout, target=y)
-        # loss_with_dropout=torch.tensor(0.0).float().to(device=self.device)
-
-        # print("loss == ", loss)
-        # print("loss_with_dropout == ", loss_with_dropout)
-
-        # num_classes = 5
-        # adms_loss = AdMSoftmaxLoss(3, num_classes, s=10.0, m=0.5)
-        # loss = adms_loss(preds, y)
 
         return loss, preds, loss_with_dropout
 
@@ -481,10 +480,10 @@ class MAMLFewShotClassifier(nn.Module):
         """
         self.optimizer.zero_grad()
         loss.backward()
-        # if 'imagenet' in self.args.dataset_name:
-        #     for name, param in self.classifier.named_parameters():
-        #         if param.requires_grad:
-        #             param.grad.data.clamp_(-10, 10)  # not sure if this is necessary, more experiments are needed
+        if 'imagenet' in self.args.dataset_name:
+            for name, param in self.classifier.named_parameters():
+                if param.requires_grad:
+                    param.grad.data.clamp_(-10, 10)  # not sure if this is necessary, more experiments are needed
         self.optimizer.step()
 
     def run_train_iter(self, data_batch, epoch):
@@ -513,6 +512,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         losses, per_task_target_preds = self.train_forward_prop(data_batch=data_batch, epoch=epoch)
 
+        # 여기서 update를 생략하면 된다
         self.meta_update(loss=losses['loss'])
         losses['learning_rate'] = self.scheduler.get_lr()[0]
         self.optimizer.zero_grad()

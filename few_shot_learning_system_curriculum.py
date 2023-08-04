@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 from meta_neural_network_architectures import VGGReLUNormNetwork, ResNet12
-from inner_loop_optimizers_MeTAL import LSLRGradientDescentLearningRule
+from inner_loop_optimizers import LSLRGradientDescentLearningRule
 
 from utils.storage import save_statistics
 
@@ -584,16 +584,11 @@ class MAMLFewShotClassifier(nn.Module):
         y_support_set = torch.Tensor(y_support_set).long().to(device=self.device)
         y_target_set = torch.Tensor(y_target_set).long().to(device=self.device)
 
-        # print("run_train_iter x_support_set shape == ", x_support_set.shape)
-        ## run_train_iter x_support_set shape ==  torch.Size([2, 5, 5, 3, 84, 84])
-        ## 2가 batch_size
-
         data_batch = (x_support_set, x_target_set, y_support_set, y_target_set)
-
-        # print("run_train_iter epoch == " , epoch) 정확하다
 
         losses, per_task_target_preds = self.train_forward_prop(data_batch=data_batch, epoch=epoch)
 
+        # 여기서 update를 생략하면 된다
         self.meta_update(loss=losses['loss'])
         losses['learning_rate'] = self.scheduler.get_lr()[0]
         self.optimizer.zero_grad()
