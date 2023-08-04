@@ -343,7 +343,6 @@ class MAMLFewShotClassifier(nn.Module):
                                                                True if (num_step == 0) else False,
                                                                training=True, num_step=num_step)
 
-                ## 여기서 support loss를 커리큘럼으로 이용해야한다.
 
                 generated_alpha_params = {}
                 generated_beta_params = {}
