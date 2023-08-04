@@ -6,12 +6,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-from meta_neural_network_architectures import VGGReLUNormNetwork, ResNet12, MetaCurriculumNetwork
-from inner_loop_optimizers import LSLRGradientDescentLearningRule
+from meta_neural_network_architectures import VGGReLUNormNetwork, ResNet12
+from inner_loop_optimizers_MeTAL import LSLRGradientDescentLearningRule
 
 from utils.storage import save_statistics
 
-from AdMSLoss import AdMSoftmaxLoss
 
 
 def set_torch_seed(seed):
@@ -499,6 +498,7 @@ class MAMLFewShotClassifier(nn.Module):
                                                      backup_running_statistics=backup_running_statistics,
                                                      num_step=num_step, isDropout=True)
         loss_with_dropout = F.cross_entropy(input=preds_with_Dropout, target=y)
+        #loss_with_dropout=torch.tensor(0.0).float().to(device=self.device)
 
         # print("loss == ", loss)
         # print("loss_with_dropout == ", loss_with_dropout)
