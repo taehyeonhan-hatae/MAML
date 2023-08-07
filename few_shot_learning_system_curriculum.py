@@ -74,7 +74,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         if self.args.curriculum:
 
-            ## input : loss, dropout loss, gradient, loss
+            ## input : loss, dropout loss, gradient, weight
             num_layers = len(names_weights_copy)
             input_dim = 2 + (num_layers * 2)
 
@@ -266,7 +266,19 @@ class MAMLFewShotClassifier(nn.Module):
         for k, v in names_weights_copy.items():
             per_step_task.append(v.mean())
 
+        # 평균을 구하면 안될거 같다..
+        ## Task-Specific Learner들 사이에 Conv1 ~ Conv4 Layer의 유사도가 높으니 마지막 FC Layer만 구해보자.
+        # for k, v in names_weights_copy.items():
+        #     if k == 'layer_dict.linear.weights':
+        #         l1_norm = torch.norm(v, p=2, dim=1)
+
         per_step_task = torch.stack(per_step_task)
+
+        # Excel에 기록하자
+        # losses_List = per_step_task[:2]
+        # gradient_List = per_step_task[2:12]
+        # weight_List = per_step_task[12:22]
+
         return per_step_task
 
     def forward(self, data_batch, epoch, use_second_order, use_multi_step_loss_optimization, num_steps, training_phase):
@@ -429,7 +441,6 @@ class MAMLFewShotClassifier(nn.Module):
                     _, target_predicted = torch.max(target_preds.data, 1)
                     target_accuracy = target_predicted.float().eq(y_target_set_task.data.float()).cpu().float()
                     comprehensive_losses["target_accuracy_" + str(num_step)] = np.mean(list(target_accuracy))
-
                 ## Inner-loop END
 
             # Inner-loop 결과를 csv로 생성한다.
