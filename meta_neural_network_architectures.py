@@ -858,7 +858,7 @@ class MetaNormLayerConvReLU(nn.Module):
 
 
 class VGGReLUNormNetwork(nn.Module):
-    def __init__(self, im_shape, num_output_classes, args, device, meta_classifier=True):
+    def __init__(self, im_shape, num_output_classes, args, device, meta_classifier=True, absorption=False):
         """
         Builds a multilayer convolutional network. It also provides functionality for passing external parameters to be
         used at inference time. Enables inner loop optimization readily.
@@ -879,6 +879,8 @@ class VGGReLUNormNetwork(nn.Module):
         self.input_shape = list(im_shape)
         self.num_stages = args.num_stages
         self.num_output_classes = num_output_classes
+
+        self.absorption
 
         if args.max_pooling:
             print("Using max pooling")
