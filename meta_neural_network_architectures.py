@@ -970,8 +970,6 @@ class VGGReLUNormNetwork(nn.Module):
         out = x
 
         for i in range(self.num_stages):
-            # 각 Layer의 forward를 호출한다
-            ## 그래서 build_block에 유사한 코드가 있었던거다
             out = self.layer_dict['conv{}'.format(i)](out, params=param_dict['conv{}'.format(i)], training=training,
                                                       backup_running_statistics=backup_running_statistics,
                                                       num_step=num_step)
@@ -987,10 +985,6 @@ class VGGReLUNormNetwork(nn.Module):
             out = F.avg_pool2d(out, out.shape[2])
 
         out = out.view(out.size(0), -1)
-
-        # print("out shape == ", out.shape)
-        # out shape ==  torch.Size([25, 1200])
-        # out shape ==  torch.Size([75, 1200])
 
         out = self.layer_dict['linear'](out, param_dict['linear'])
 

@@ -396,25 +396,6 @@ class MAMLFewShotClassifier(nn.Module):
                 support_accuracy = support_predicted.float().eq(y_support_set_task.data.float()).cpu().float()
                 comprehensive_losses["support_accuracy_" + str(num_step)] = np.mean(list(support_accuracy))
 
-                # Inner-loop 결과를 바탕으로 Curriculum을 구성한다.
-                if self.args.curriculum:
-                    per_step_task = self.get_task_embeddings(
-                        x_support_set_task=x_support_set_task,
-                        y_support_set_task=y_support_set_task,
-                        names_weights_copy=names_weights_copy)
-                    # apply_inner_loop_updater가 안됐을 때 weight 값을 넣고있다.
-                    # 반드시 수정해야할 부분이다.
-                    # 그러나 지금은 curriculum_loss 값이 바뀌지 않는 문제를 해결하는게 더욱 시급하다
-
-                    # Excel에 기록하자
-                    losses_List = per_step_task[:2]
-                    comprehensive_losses["dropout_losses" + str(num_step)] = losses_List[1]
-                    gradient_List = per_step_task[2:12]
-                    weight_List = per_step_task[12:22]
-
-                    curriculum_loss = self.curriculum_arbiter(per_step_task)
-                    comprehensive_losses["curriculum_loss" + str(num_step)] = curriculum_loss.item()
-
                 # task specific knowledge를 얻는 부분
                 names_weights_copy = self.apply_inner_loop_update(loss=support_loss,
                                                                   names_weights_copy=names_weights_copy,
@@ -432,6 +413,25 @@ class MAMLFewShotClassifier(nn.Module):
                     task_losses.append(per_step_loss_importance_vectors[num_step] * target_loss)
 
                 elif num_step == (self.args.number_of_training_steps_per_iter - 1):
+
+                    # Inner-loop 결과를 바탕으로 Curriculum을 구성한다.
+                    if self.args.curriculum:
+                        per_step_task = self.get_task_embeddings(
+                            x_support_set_task=x_support_set_task,
+                            y_support_set_task=y_support_set_task,
+                            names_weights_copy=names_weights_copy)
+                        # apply_inner_loop_updater가 안됐을 때 weight 값을 넣고있다.
+                        # 반드시 수정해야할 부분이다.
+                        # 그러나 지금은 curriculum_loss 값이 바뀌지 않는 문제를 해결하는게 더욱 시급하다
+
+                        # Excel에 기록하자
+                        losses_List = per_step_task[:2]
+                        comprehensive_losses["dropout_losses" + str(num_step)] = losses_List[1]
+                        gradient_List = per_step_task[2:12]
+                        weight_List = per_step_task[12:22]
+
+                        curriculum_loss = self.curriculum_arbiter(per_step_task)
+                        comprehensive_losses["curriculum_loss" + str(num_step)] = curriculum_loss.item()
 
                     target_loss, target_preds, _ = self.net_forward(x=x_target_set_task,
                                                                  y=y_target_set_task, weights=names_weights_copy,
