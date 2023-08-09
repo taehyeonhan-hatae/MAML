@@ -249,6 +249,7 @@ class MAMLFewShotClassifier(nn.Module):
             per_step_task.append(support_grads[i].mean())
 
         # Layer 별 Weight 평균을 구한다
+        ## Classifier의 유사도가 매우 다르니, 그것을 지표로 삼아보자..
         for k, v in names_weights_copy.items():
             per_step_task.append(v.mean())
 
