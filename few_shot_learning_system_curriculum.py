@@ -426,7 +426,7 @@ class MAMLFewShotClassifier(nn.Module):
 
                         # Excel에 기록하자
                         losses_List = per_step_task[:2]
-                        comprehensive_losses["dropout_losses" + str(num_step)] = losses_List[1]
+                        comprehensive_losses["dropout_losses" + str(num_step)] = losses_List[1].item()
                         gradient_List = per_step_task[2:12]
                         weight_List = per_step_task[12:22]
 
