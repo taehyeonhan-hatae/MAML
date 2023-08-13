@@ -216,6 +216,8 @@ class MAMLFewShotClassifier(nn.Module):
     def get_across_task_loss_metrics(self, total_losses, total_accuracies):
         losses = dict()
 
+        print("total_losses == ", total_losses)
+
         losses['loss'] = torch.mean(torch.stack(total_losses))
         losses['accuracy'] = np.mean(total_accuracies)
 
@@ -288,6 +290,9 @@ class MAMLFewShotClassifier(nn.Module):
         :param training_phase: Whether this is a training phase (True) or an evaluation phase (False)
         :return: A dictionary with the collected losses of the current outer forward propagation.
         """
+
+        print("====forward===")
+
         x_support_set, x_target_set, y_support_set, y_target_set = data_batch
 
         [b, ncs, spc] = y_support_set.shape
@@ -468,7 +473,10 @@ class MAMLFewShotClassifier(nn.Module):
             accuracy = predicted.float().eq(y_target_set_task.data.float()).cpu().float()
 
             # batch에 대한 학습이 끝나고, acc와 loss를 기록
+            ## torch.sum을 더한다는 의미로 받아들여서는 안된다.. tensor로 바꿔준다는 것이다.
+            print("task_losses 1== ", task_losses)
             task_losses = torch.sum(torch.stack(task_losses))
+            print("task_losses 2== ", task_losses)
             total_losses.append(task_losses)
             total_accuracies.extend(accuracy)
 
@@ -566,6 +574,9 @@ class MAMLFewShotClassifier(nn.Module):
         Applies an outer loop update on the meta-parameters of the model.
         :param loss: The current crossentropy loss.
         """
+
+        print("meta_update loss===", loss)
+
         self.optimizer.zero_grad()
         loss.backward()
         # if 'imagenet' in self.args.dataset_name:
@@ -604,6 +615,7 @@ class MAMLFewShotClassifier(nn.Module):
         losses, per_task_target_preds = self.train_forward_prop(data_batch=data_batch, epoch=epoch)
 
         # 여기서 update를 생략하면 된다
+        ## 각 task의 query set에 대한 loss의 합이 아니라, loss의 평균으로 update를 하고 있다..
         self.meta_update(loss=losses['loss'])
         losses['learning_rate'] = self.scheduler.get_lr()[0]
         self.optimizer.zero_grad()
