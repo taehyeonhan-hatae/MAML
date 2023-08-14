@@ -76,7 +76,7 @@ class MAMLFewShotClassifier(nn.Module):
 
             ## input : loss, dropout loss, gradient, weight
             num_layers = len(names_weights_copy)
-            input_dim = 2 + (num_layers * 2)
+            input_dim = 2 + (num_layers * 1)
 
             self.curriculum_arbiter = nn.Sequential(
                 nn.Linear(input_dim, input_dim),
@@ -216,7 +216,7 @@ class MAMLFewShotClassifier(nn.Module):
     def get_across_task_loss_metrics(self, total_losses, total_accuracies):
         losses = dict()
 
-        print("total_losses == ", total_losses)
+        #print("total_losses == ", total_losses)
 
         losses['loss'] = torch.mean(torch.stack(total_losses))
         losses['accuracy'] = np.mean(total_accuracies)
@@ -265,8 +265,8 @@ class MAMLFewShotClassifier(nn.Module):
             per_step_task.append(support_grads[i].mean())
 
         # Layer 별 Weight 평균을 구한다
-        for k, v in names_weights_copy.items():
-            per_step_task.append(v.mean())
+        # for k, v in names_weights_copy.items():
+        #     per_step_task.append(v.mean())
 
         # 평균을 구하면 안될거 같다..
         ## Task-Specific Learner들 사이에 Conv1 ~ Conv4 Layer의 유사도가 높으니 마지막 FC Layer만 구해보자.
@@ -291,7 +291,7 @@ class MAMLFewShotClassifier(nn.Module):
         :return: A dictionary with the collected losses of the current outer forward propagation.
         """
 
-        print("====forward===")
+        #print("====forward===")
 
         x_support_set, x_target_set, y_support_set, y_target_set = data_batch
 
@@ -474,9 +474,7 @@ class MAMLFewShotClassifier(nn.Module):
 
             # batch에 대한 학습이 끝나고, acc와 loss를 기록
             ## torch.sum을 더한다는 의미로 받아들여서는 안된다.. tensor로 바꿔준다는 것이다.
-            print("task_losses 1== ", task_losses)
             task_losses = torch.sum(torch.stack(task_losses))
-            print("task_losses 2== ", task_losses)
             total_losses.append(task_losses)
             total_accuracies.extend(accuracy)
 
@@ -575,7 +573,7 @@ class MAMLFewShotClassifier(nn.Module):
         :param loss: The current crossentropy loss.
         """
 
-        print("meta_update loss===", loss)
+        #print("meta_update loss===", loss)
 
         self.optimizer.zero_grad()
         loss.backward()

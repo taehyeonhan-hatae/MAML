@@ -57,5 +57,6 @@
   "alfa": true,
   "random_init": false,
   "meta_loss": false,
+  "curriculum": false,
   "backbone": "4-CONV"
 }
