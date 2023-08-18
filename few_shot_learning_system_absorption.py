@@ -527,6 +527,7 @@ class MAMLFewShotClassifier(nn.Module):
         :param loss: The current crossentropy loss.
         """
         self.optimizer.zero_grad()
+
         loss.backward()
         # if 'imagenet' in self.args.dataset_name:
         #    for name, param in self.classifier.named_parameters():

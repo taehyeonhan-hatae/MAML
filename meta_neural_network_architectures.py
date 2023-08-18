@@ -880,7 +880,6 @@ class VGGReLUNormNetwork(nn.Module):
         self.num_stages = args.num_stages
         self.num_output_classes = num_output_classes
 
-        self.absorption = args.absorption
 
         if args.max_pooling:
             print("Using max pooling")

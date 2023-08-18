@@ -76,13 +76,12 @@ class MAMLFewShotClassifier(nn.Module):
 
             ## input : loss, dropout loss, gradient, weight
             num_layers = len(names_weights_copy)
-            input_dim = 2 + (num_layers * 1)
+            input_dim = 2 + (num_layers * 2)
 
             self.curriculum_arbiter = nn.Sequential(
                 nn.Linear(input_dim, input_dim),
                 nn.ReLU(inplace=True),
-                nn.Linear(input_dim, 1),
-                nn.ReLU(inplace=True)
+                nn.Linear(input_dim, 1)
             ).to(device=self.device)
 
 
@@ -91,12 +90,10 @@ class MAMLFewShotClassifier(nn.Module):
             print(key, value.shape)
         print("=====================")
 
-
         self.use_cuda = args.use_cuda
         self.device = device
         self.args = args
         self.to(device)
-
 
         print("Outer Loop parameters")
         for name, param in self.named_parameters():
@@ -265,8 +262,8 @@ class MAMLFewShotClassifier(nn.Module):
             per_step_task.append(support_grads[i].mean())
 
         # Layer 별 Weight 평균을 구한다
-        # for k, v in names_weights_copy.items():
-        #     per_step_task.append(v.mean())
+        for k, v in names_weights_copy.items():
+            per_step_task.append(v.mean())
 
         # 평균을 구하면 안될거 같다..
         ## Task-Specific Learner들 사이에 Conv1 ~ Conv4 Layer의 유사도가 높으니 마지막 FC Layer만 구해보자.
@@ -409,6 +406,8 @@ class MAMLFewShotClassifier(nn.Module):
                                                                   use_second_order=use_second_order,
                                                                   current_step_idx=num_step)
 
+                curriculum_loss = 0.0
+
                 if use_multi_step_loss_optimization and training_phase and epoch < self.args.multi_step_loss_num_epochs:
                     target_loss, target_preds, _ = self.net_forward(x=x_target_set_task,
                                                                  y=y_target_set_task, weights=names_weights_copy,
@@ -429,20 +428,39 @@ class MAMLFewShotClassifier(nn.Module):
                         # 반드시 수정해야할 부분이다.
                         # 그러나 지금은 curriculum_loss 값이 바뀌지 않는 문제를 해결하는게 더욱 시급하다
 
+                        per_step_task = (per_step_task - per_step_task.mean()) / (per_step_task.std() + 1e-12)
+
+                        curriculum_loss = self.curriculum_arbiter(per_step_task) + 1.0
+
                         # Excel에 기록하자
                         losses_List = per_step_task[:2]
-                        comprehensive_losses["dropout_losses" + str(num_step)] = losses_List[1].item()
+                        comprehensive_losses["dropout_losses"] = losses_List[1].item()
                         gradient_List = per_step_task[2:12]
-                        weight_List = per_step_task[12:22]
 
-                        curriculum_loss = self.curriculum_arbiter(per_step_task)
+                        a=1
+                        for grad in gradient_List:
+                            comprehensive_losses["gradient_layer_" + str(a)] = grad.item()
+                            a=a+1
+
+                        a=1
+                        weight_List = per_step_task[12:22]
+                        for weight in weight_List:
+                            comprehensive_losses["weight_layer_" + str(a)]  = weight.item()
+                            a=a+1
+
                         comprehensive_losses["curriculum_loss" + str(num_step)] = curriculum_loss.item()
+                        #### Excel 기록
 
                     target_loss, target_preds, _ = self.net_forward(x=x_target_set_task,
                                                                  y=y_target_set_task, weights=names_weights_copy,
                                                                  backup_running_statistics=False, training=True,
                                                                  num_step=num_step)
 
+                    # curriculum loss보다 크면 loss를 0으로 만들어서 가중치 업데이트를 막는다.
+                    ## 근데 이렇게하면 평균을 하면 안되잖아..
+                    if self.args.curriculum:
+                        if target_loss > curriculum_loss:
+                            target_loss = torch.zeros(1).to(device=self.device)
 
                     task_losses.append(target_loss)
                     comprehensive_losses["target_loss_" + str(num_step)] = target_loss.item()
@@ -519,14 +537,6 @@ class MAMLFewShotClassifier(nn.Module):
                                                      backup_running_statistics=backup_running_statistics,
                                                      num_step=num_step, isDropout=True)
         loss_with_dropout = F.cross_entropy(input=preds_with_Dropout, target=y)
-        #loss_with_dropout=torch.tensor(0.0).float().to(device=self.device)
-
-        # print("loss == ", loss)
-        # print("loss_with_dropout == ", loss_with_dropout)
-
-        # num_classes = 5
-        # adms_loss = AdMSoftmaxLoss(3, num_classes, s=10.0, m=0.5)
-        # loss = adms_loss(preds, y)
 
         return loss, preds, loss_with_dropout
 
@@ -573,9 +583,8 @@ class MAMLFewShotClassifier(nn.Module):
         :param loss: The current crossentropy loss.
         """
 
-        #print("meta_update loss===", loss)
-
         self.optimizer.zero_grad()
+
         loss.backward()
         # if 'imagenet' in self.args.dataset_name:
         #    for name, param in self.classifier.named_parameters():
@@ -614,7 +623,10 @@ class MAMLFewShotClassifier(nn.Module):
 
         # 여기서 update를 생략하면 된다
         ## 각 task의 query set에 대한 loss의 합이 아니라, loss의 평균으로 update를 하고 있다..
-        self.meta_update(loss=losses['loss'])
+        if not torch.eq(losses['loss'], torch.zeros(1).to(device=self.device)):
+            ## loss에 current epoch \ total epoch을 지수로 취하자
+            self.meta_update(loss=losses['loss'])
+
         losses['learning_rate'] = self.scheduler.get_lr()[0]
         self.optimizer.zero_grad()
         self.zero_grad()
@@ -643,7 +655,9 @@ class MAMLFewShotClassifier(nn.Module):
 
         losses, per_task_target_preds = self.evaluation_forward_prop(data_batch=data_batch, epoch=self.current_epoch)
 
-        losses['loss'].backward()  # uncomment if you get the weird memory error
+        if not torch.eq(losses['loss'], torch.zeros(1).to(device=self.device)):
+            self.meta_update(loss=losses['loss'])
+
         self.zero_grad()
         self.optimizer.zero_grad()
 
