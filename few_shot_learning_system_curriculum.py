@@ -457,7 +457,6 @@ class MAMLFewShotClassifier(nn.Module):
                                                                  num_step=num_step)
 
                     # curriculum loss보다 크면 loss를 0으로 만들어서 가중치 업데이트를 막는다.
-                    ## 근데 이렇게하면 평균을 하면 안되잖아..
                     if self.args.curriculum:
                         if target_loss > curriculum_loss:
                             target_loss = torch.zeros(1).to(device=self.device)
