@@ -11,7 +11,6 @@ from multiprocessing import freeze_support
 
 ## python train_maml_system.py --name_of_args_json_file experiment_config/my_experiment/MAML+ALFA.json --gpu_to_use 0
 ## python train_maml_system.py --name_of_args_json_file experiment_config/my_experiment/MAML.json --gpu_to_use $GPU_ID
-## python train_maml_system.py --name_of_args_json_file experiment_config/my_experiment/MAML+ALFA.json --gpu_to_use 0
 ## python train_maml_system.py --name_of_args_json_file experiment_config/my_experiment/MAML+Arbiter.json --gpu_to_use 0
 ## python train_maml_system.py --name_of_args_json_file experiment_config/my_experiment/MAML+ALFA+Arbiter.json --gpu_to_use 0
 

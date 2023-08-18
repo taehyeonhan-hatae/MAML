@@ -244,7 +244,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         per_step_task = []
 
-        support_loss, support_preds, loss_with_dropout = self.net_forward(x=x_support_set_task,
+        support_loss, support_preds, loss_with_dropout, _ = self.net_forward(x=x_support_set_task,
                                                        y=y_support_set_task,
                                                        weights=names_weights_copy,
                                                        backup_running_statistics=True,
@@ -355,7 +355,7 @@ class MAMLFewShotClassifier(nn.Module):
 
             ## Inner-loop Start
             for num_step in range(num_steps):
-                support_loss, support_preds, _ = self.net_forward(
+                support_loss, support_preds, _, _ = self.net_forward(
                     x=x_support_set_task,
                     y=y_support_set_task,
                     weights=names_weights_copy,
@@ -409,7 +409,7 @@ class MAMLFewShotClassifier(nn.Module):
                 curriculum_loss = 0.0
 
                 if use_multi_step_loss_optimization and training_phase and epoch < self.args.multi_step_loss_num_epochs:
-                    target_loss, target_preds, _ = self.net_forward(x=x_target_set_task,
+                    target_loss, target_preds, _, _ = self.net_forward(x=x_target_set_task,
                                                                  y=y_target_set_task, weights=names_weights_copy,
                                                                  backup_running_statistics=False, training=True,
                                                                  num_step=num_step)
@@ -451,18 +451,22 @@ class MAMLFewShotClassifier(nn.Module):
                         comprehensive_losses["curriculum_loss" + str(num_step)] = curriculum_loss.item()
                         #### Excel 기록
 
-                    target_loss, target_preds, _ = self.net_forward(x=x_target_set_task,
+                    target_loss, target_preds, _ , focal_loss = self.net_forward(x=x_target_set_task,
                                                                  y=y_target_set_task, weights=names_weights_copy,
                                                                  backup_running_statistics=False, training=True,
-                                                                 num_step=num_step)
+                                                                 num_step=num_step, isFocalLoss=True)
+
+                    comprehensive_losses["target_loss_" + str(num_step)] = target_loss.item()
 
                     # curriculum loss보다 크면 loss를 0으로 만들어서 가중치 업데이트를 막는다.
                     if self.args.curriculum:
                         if target_loss > curriculum_loss:
                             target_loss = torch.zeros(1).to(device=self.device)
+                        else:
+                            comprehensive_losses["focal_loss" + str(num_step)] = focal_loss.item()
+                            target_loss = focal_loss
 
                     task_losses.append(target_loss)
-                    comprehensive_losses["target_loss_" + str(num_step)] = target_loss.item()
 
                     _, target_predicted = torch.max(target_preds.data, 1)
                     target_accuracy = target_predicted.float().eq(y_target_set_task.data.float()).cpu().float()
@@ -510,7 +514,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         return losses, per_task_target_preds
 
-    def net_forward(self, x, y, weights, backup_running_statistics, training, num_step):
+    def net_forward(self, x, y, weights, backup_running_statistics, training, num_step, isFocalLoss=False):
         """
         A base model forward pass on some data points x. Using the parameters in the weights dictionary. Also requires
         boolean flags indicating whether to reset the running statistics at the end of the run (if at evaluation phase).
@@ -529,7 +533,17 @@ class MAMLFewShotClassifier(nn.Module):
                                         training=training,
                                         backup_running_statistics=backup_running_statistics, num_step=num_step, isDropout=False)
 
-        loss = F.cross_entropy(input=preds, target=y)
+        loss = F.cross_entropy(input=preds, target=y, reduction='none')
+        focal_loss = 0.0
+
+        if isFocalLoss:
+            pt = torch.exp(-loss)
+            alpha = 1
+            gamma = 2
+            focal_loss = (alpha * (1 - pt) ** gamma * loss).mean()  # mean over the batch
+
+
+        loss = loss.mean()
 
         preds_with_Dropout = self.classifier.forward(x=x, params=weights,
                                                      training=training,
@@ -537,7 +551,7 @@ class MAMLFewShotClassifier(nn.Module):
                                                      num_step=num_step, isDropout=True)
         loss_with_dropout = F.cross_entropy(input=preds_with_Dropout, target=y)
 
-        return loss, preds, loss_with_dropout
+        return loss, preds, loss_with_dropout, focal_loss
 
     def trainable_parameters(self):
         """
