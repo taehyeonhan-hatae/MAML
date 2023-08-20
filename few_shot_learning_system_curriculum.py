@@ -636,7 +636,6 @@ class MAMLFewShotClassifier(nn.Module):
         losses, per_task_target_preds = self.train_forward_prop(data_batch=data_batch, epoch=epoch)
 
         # 여기서 update를 생략하면 된다
-        ## 각 task의 query set에 대한 loss의 합이 아니라, loss의 평균으로 update를 하고 있다..
         if not torch.eq(losses['loss'], torch.zeros(1).to(device=self.device)):
             ## loss에 current epoch \ total epoch을 지수로 취하자
             self.meta_update(loss=losses['loss'])
