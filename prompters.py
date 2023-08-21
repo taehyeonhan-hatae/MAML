@@ -1,0 +1,108 @@
+import torch
+import torch.nn as nn
+import numpy as np
+
+class PadPrompter(nn.Module):
+    def __init__(self, prompt_size, image_size):
+        super(PadPrompter, self).__init__()
+
+        self.pad_size = prompt_size
+        b, c, self.h, self.w = image_size
+
+        self.name_weight_dict = nn.ParameterDict()
+
+        self.build_network()
+
+    def build_network(self):
+
+
+        self.name_weight_dict['pad_up'] = nn.init.xavier_uniform_(nn.Parameter(torch.empty([1, 3, self.pad_size, self.w])))
+        self.name_weight_dict['pad_down'] = nn.init.xavier_uniform_(nn.Parameter(torch.empty([1, 3, self.pad_size, self.w])))
+        self.name_weight_dict['pad_left'] = nn.init.xavier_uniform_(nn.Parameter(torch.empty([1, 3, self.w - self.pad_size*2, self.pad_size])))
+        self.name_weight_dict['pad_right'] = nn.init.xavier_uniform_(nn.Parameter(torch.empty([1, 3, self.w - self.pad_size*2, self.pad_size])))
+
+
+    def forward(self, x, params=None):
+
+        base = torch.zeros(1, 3, self.base_size, self.base_size).cuda()
+
+        if params is not None:
+            # param이 지정될 경우 (inner-loop)
+            pad_up = params['pad_up']
+            pad_down = params['pad_down']
+            pad_left = params['pad_left']
+            pad_right = params['pad_right']
+        else:
+            # param이 지정되지 않을 경우 (outer-loop)
+            pad_up = self.name_weight_dict['pad_up']
+            pad_down = self.name_weight_dict['pad_down']
+            pad_left = self.name_weight_dict['pad_left']
+            pad_right = self.name_weight_dict['pad_right']
+
+
+        prompt = torch.cat([pad_left, base, pad_right], dim=3)
+
+        prompt = torch.cat([pad_up, prompt, pad_down], dim=2)
+
+        prompt = torch.cat(x.size(0) * [prompt])
+
+        return x + prompt
+
+    def zero_grad(self, params=None):
+        if params is None:
+            for param in self.parameters():
+                if param.requires_grad == True:
+                    if param.grad is not None:
+                        if torch.sum(param.grad) > 0:
+                            print(param.grad)
+                            param.grad.zero_()
+        else:
+            for name, param in params.items():
+                if param.requires_grad == True:
+                    if param.grad is not None:
+                        if torch.sum(param.grad) > 0:
+                            print(param.grad)
+                            param.grad.zero_()
+                            params[name].grad = None
+
+class FixedPatchPrompter(nn.Module):
+    def __init__(self, args):
+        super(FixedPatchPrompter, self).__init__()
+        self.isize = args.image_size
+        self.psize = args.prompt_size
+        self.patch = nn.Parameter(torch.randn([1, 3, self.psize, self.psize]))
+
+    def forward(self, x):
+        prompt = torch.zeros([1, 3, self.isize, self.isize]).cuda()
+        prompt[:, :, :self.psize, :self.psize] = self.patch
+
+        return x + prompt
+
+
+class RandomPatchPrompter(nn.Module):
+    def __init__(self, args):
+        super(RandomPatchPrompter, self).__init__()
+        self.isize = args.image_size
+        self.psize = args.prompt_size
+        self.patch = nn.Parameter(torch.randn([1, 3, self.psize, self.psize]))
+
+    def forward(self, x):
+        x_ = np.random.choice(self.isize - self.psize)
+        y_ = np.random.choice(self.isize - self.psize)
+
+        prompt = torch.zeros([1, 3, self.isize, self.isize]).cuda()
+        prompt[:, :, x_:x_ + self.psize, y_:y_ + self.psize] = self.patch
+
+        return x + prompt
+
+
+def padding(prompt_size, image_size):
+    return PadPrompter(prompt_size, image_size)
+
+
+def fixed_patch(args):
+    return FixedPatchPrompter(args)
+
+
+def random_patch(args):
+    return RandomPatchPrompter(args)

@@ -442,11 +442,11 @@ class MAMLFewShotClassifier(nn.Module):
                             comprehensive_losses["gradient_layer_" + str(a)] = grad.item()
                             a=a+1
 
-                        # a=1
-                        # weight_List = per_step_task[12:22]
-                        # for weight in weight_List:
-                        #     comprehensive_losses["weight_layer_" + str(a)]  = weight.item()
-                        #     a=a+1
+                        a=1
+                        weight_List = per_step_task[12:22]
+                        for weight in weight_List:
+                            comprehensive_losses["weight_layer_" + str(a)]  = weight.item()
+                            a=a+1
 
                         comprehensive_losses["curriculum_loss" + str(num_step)] = curriculum_loss.item()
                         #### Excel 기록

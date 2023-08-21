@@ -139,17 +139,6 @@ class LSLRGradientDescentLearningRule(nn.Module):
             # torch.ones(5 + 1) * 0.01
             # tensor([0.0100, 0.0100, 0.0100, 0.0100, 0.0100, 0.0100])
 
-            # if self.curriculum:
-            #     for idx, (key, param) in enumerate(names_weights_dict.items()):
-            #         self.names_less_dict[key.replace(".", "-")] = nn.Parameter(
-            #             data=torch.ones(self.total_num_inner_loop_steps + 1) * self.init_learning_rate,
-            #             requires_grad=self.curriculum)
-            #
-            #         self.names_greater_dict[key.replace(".", "-")] = nn.Parameter(
-            #             data=torch.ones(self.total_num_inner_loop_steps + 1) * self.init_learning_rate,
-            #             requires_grad=self.curriculum)
-
-
     def update_params(self, names_weights_dict, names_grads_wrt_params_dict, generated_alpha_params, generated_beta_params, num_step, tau=0.1):
         """Applies a single gradient descent update to all parameters.
         All parameter updates are performed using in-place operations and so

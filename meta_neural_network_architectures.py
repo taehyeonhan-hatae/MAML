@@ -924,9 +924,6 @@ class VGGReLUNormNetwork(nn.Module):
             if self.args.max_pooling:
                 out = F.max_pool2d(input=out, kernel_size=(2, 2), stride=2, padding=0)
 
-        # Task-specific knowledge absorption을 위한 layer
-        # if self.absorption:
-        #     self.layer_dict['conv_absorption'] =
 
         if not self.args.max_pooling:
             out = F.avg_pool2d(out, out.shape[2])
