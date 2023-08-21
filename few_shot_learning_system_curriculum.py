@@ -442,11 +442,11 @@ class MAMLFewShotClassifier(nn.Module):
                             comprehensive_losses["gradient_layer_" + str(a)] = grad.item()
                             a=a+1
 
-                        a=1
-                        weight_List = per_step_task[12:22]
-                        for weight in weight_List:
-                            comprehensive_losses["weight_layer_" + str(a)]  = weight.item()
-                            a=a+1
+                        # a=1
+                        # weight_List = per_step_task[12:22]
+                        # for weight in weight_List:
+                        #     comprehensive_losses["weight_layer_" + str(a)]  = weight.item()
+                        #     a=a+1
 
                         comprehensive_losses["curriculum_loss" + str(num_step)] = curriculum_loss.item()
                         #### Excel 기록
@@ -456,7 +456,7 @@ class MAMLFewShotClassifier(nn.Module):
                                                                  backup_running_statistics=False, training=True,
                                                                  num_step=num_step, isFocalLoss=True)
 
-                    comprehensive_losses["target_loss_" + str(num_step)] = target_loss.item()
+
 
                     # curriculum loss보다 크면 loss를 0으로 만들어서 가중치 업데이트를 막는다.
                     if self.args.curriculum:
@@ -468,6 +468,7 @@ class MAMLFewShotClassifier(nn.Module):
                             #target_loss = focal_loss
 
                     task_losses.append(target_loss)
+                    comprehensive_losses["target_loss_" + str(num_step)] = target_loss.item()
 
                     _, target_predicted = torch.max(target_preds.data, 1)
                     target_accuracy = target_predicted.float().eq(y_target_set_task.data.float()).cpu().float()
