@@ -57,7 +57,7 @@ class MAMLFewShotClassifier(nn.Module):
                                                  num_classes_per_set,
                                                  args=args, device=device, meta_classifier=True).to(device=self.device)
 
-        self.prompter = prompters.padding(prompt_size=10, image_size=self.im_shape)
+        self.prompter = prompters.padding(args=args, prompt_size=10, image_size=self.im_shape)
 
         self.task_learning_rate = args.init_inner_loop_learning_rate
 
@@ -158,11 +158,13 @@ class MAMLFewShotClassifier(nn.Module):
         else:
             self.prompter.zero_grad(params=names_weights_copy)
 
+        # print("loss == ", loss)
+        # print("names_weights_copy.values() == ", names_weights_copy.values())
+
         grads = torch.autograd.grad(loss, names_weights_copy.values(),
                                     create_graph=use_second_order, allow_unused=True)
 
         print("names_weights_copy.keys() == ", names_weights_copy.keys())
-        print("names_weights_copy.values() == ", names_weights_copy.values())
         print("grads == ", grads)
 
         names_grads_copy = dict(zip(names_weights_copy.keys(), grads))
@@ -284,8 +286,11 @@ class MAMLFewShotClassifier(nn.Module):
             ## Inner-loop Start
             for num_step in range(num_steps):
 
+                prompted_images = self.prompter(x_support_set_task)
+
                 support_loss, support_preds = self.net_forward(
-                    x=x_support_set_task,
+                    #x=x_support_set_task,
+                    x=prompted_images,
                     y=y_support_set_task,
                     weights=names_weights_copy,
                     backup_running_statistics=

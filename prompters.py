@@ -3,18 +3,19 @@ import torch.nn as nn
 import numpy as np
 
 class PadPrompter(nn.Module):
-    def __init__(self, prompt_size, image_size):
+    def __init__(self, args, prompt_size, image_size):
         super(PadPrompter, self).__init__()
 
         self.pad_size = prompt_size
         b, c, self.h, self.w = image_size
+
+        self.base_size = self.w - self.pad_size * 2
 
         self.name_weight_dict = nn.ParameterDict()
 
         self.build_network()
 
     def build_network(self):
-
 
         self.name_weight_dict['pad_up'] = nn.init.xavier_uniform_(nn.Parameter(torch.empty([1, 3, self.pad_size, self.w])))
         self.name_weight_dict['pad_down'] = nn.init.xavier_uniform_(nn.Parameter(torch.empty([1, 3, self.pad_size, self.w])))
@@ -96,8 +97,8 @@ class RandomPatchPrompter(nn.Module):
         return x + prompt
 
 
-def padding(prompt_size, image_size):
-    return PadPrompter(prompt_size, image_size)
+def padding(args, prompt_size, image_size):
+    return PadPrompter(args, prompt_size, image_size)
 
 
 def fixed_patch(args):
