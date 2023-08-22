@@ -179,8 +179,8 @@ class MAMLFewShotClassifier(nn.Module):
         :param current_step_idx: Current step's index.
         :return: A dictionary with the updated weights (name, param)
         """
-        print("names_weights_copy.keys() == ", names_weights_copy.keys())
-        print("==")
+        #print("names_weights_copy.keys() == ", names_weights_copy.keys())
+        #print("==")
 
         num_gpus = torch.cuda.device_count()
         if num_gpus > 1:
@@ -190,6 +190,9 @@ class MAMLFewShotClassifier(nn.Module):
 
         grads = torch.autograd.grad(loss, names_weights_copy.values(),
                                     create_graph=use_second_order, allow_unused=True)
+
+        #print("grads == ", grads)
+
         names_grads_copy = dict(zip(names_weights_copy.keys(), grads))
 
         names_weights_copy = {key: value[0] for key, value in names_weights_copy.items()}

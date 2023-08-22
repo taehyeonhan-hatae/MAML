@@ -108,6 +108,9 @@ class LSLRGradientDescentLearningRule(nn.Module):
 
         updated_names_weights_dict = dict()
 
+        # print("names_weights_dict.keys() == ", names_weights_dict.keys())
+        # print("names_grads_wrt_params_dict.keys() == ", names_grads_wrt_params_dict.keys())
+
         for key in names_grads_wrt_params_dict.keys():
             updated_names_weights_dict[key] = names_weights_dict[key] - \
                                               self.names_learning_rates_dict[key.replace(".", "-")][num_step] * \
