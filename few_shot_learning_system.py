@@ -262,9 +262,6 @@ class MAMLFewShotClassifier(nn.Module):
 
             names_prompt_weights_copy = self.get_inner_loop_parameter_dict(self.prompter.named_parameters())
 
-            # print("prompt_weight keys == ", names_prompt_weights_copy.keys())
-            # print("weights keys == ", names_weights_copy.keys())
-
             # 1차원 늘려주는건데.. 왜 하는거지..? task 단위라 그런가..?
             names_prompt_weights_copy = {
                 name.replace('module.', ''): value.unsqueeze(0).repeat(
@@ -401,6 +398,8 @@ class MAMLFewShotClassifier(nn.Module):
         # print("x_support_set shape == ", x.shape)
         # print("prompt_weight keys == ", prompter_params.keys())
         # print("weights keys == ", weights.keys())
+
+        print("y ============= ", y)
 
         preds = self.classifier.forward(x=x,
                                         params=weights,
