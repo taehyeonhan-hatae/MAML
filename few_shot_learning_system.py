@@ -168,7 +168,7 @@ class MAMLFewShotClassifier(nn.Module):
         grads = torch.autograd.grad(loss, names_weights_copy.values(),
                                     create_graph=use_second_order, allow_unused=True)
 
-        print("grads == ", grads[0])
+        #print("grads == ", grads[0])
         # grads 값이 0이다
 
         names_grads_copy = dict(zip(names_weights_copy.keys(), grads))
@@ -306,6 +306,8 @@ class MAMLFewShotClassifier(nn.Module):
                                                                            num_step == 0) else False, training=True,
                                                                num_step=num_step)
 
+                #print("support_preds == ", support_preds)
+
                 comprehensive_losses["support_loss_" + str(num_step)] = support_loss.item()
 
                 _, support_predicted = torch.max(support_preds.data, 1)
@@ -407,11 +409,6 @@ class MAMLFewShotClassifier(nn.Module):
                                         num_step=num_step,
                                         isDropout=False)
 
-        # preds = self.classifier.forward(x=x, params=weights,
-        #                                 training=training,
-        #                                 backup_running_statistics=backup_running_statistics, num_step=num_step,
-        #                                 isDropout=False)
-
         loss = F.cross_entropy(input=preds, target=y)
 
         return loss, preds
@@ -459,11 +456,14 @@ class MAMLFewShotClassifier(nn.Module):
         :param loss: The current crossentropy loss.
         """
         self.optimizer.zero_grad()
+
         loss.backward()
-        if 'imagenet' in self.args.dataset_name:
-            for name, param in self.classifier.named_parameters():
-                if param.requires_grad:
-                    param.grad.data.clamp_(-10, 10)  # not sure if this is necessary, more experiments are needed
+
+        # if 'imagenet' in self.args.dataset_name:
+        #     for name, param in self.classifier.named_parameters():
+        #         if param.requires_grad:
+        #             param.grad.data.clamp_(-10, 10)  # not sure if this is necessary, more experiments are needed
+
         self.optimizer.step()
 
     def run_train_iter(self, data_batch, epoch):
@@ -492,7 +492,6 @@ class MAMLFewShotClassifier(nn.Module):
 
         losses, per_task_target_preds = self.train_forward_prop(data_batch=data_batch, epoch=epoch)
 
-        # 여기서 update를 생략하면 된다
         self.meta_update(loss=losses['loss'])
         losses['learning_rate'] = self.scheduler.get_lr()[0]
         self.optimizer.zero_grad()
