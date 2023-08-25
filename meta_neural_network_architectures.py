@@ -996,14 +996,14 @@ class VGGReLUNormNetwork(nn.Module):
                 if param.requires_grad == True:
                     if param.grad is not None:
                         if torch.sum(param.grad) > 0:
-                            print(param.grad)
+                            #print(param.grad)
                             param.grad.zero_()
         else:
             for name, param in params.items():
                 if param.requires_grad == True:
                     if param.grad is not None:
                         if torch.sum(param.grad) > 0:
-                            print(param.grad)
+                            #print(param.grad)
                             param.grad.zero_()
                             params[name].grad = None
 

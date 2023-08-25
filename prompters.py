@@ -38,10 +38,13 @@ class PadPrompter(nn.Module):
         if params is not None:
             # param이 지정될 경우 (inner-loop)
 
-            # print("PadPrompter == ", params.keys())
+            #print("PadPrompter == ", params.keys())
             # print("PadPrompter == ", params['pad_dict.pad_up'].shape)
 
             param_dict = extract_top_level_dict(current_dict=params)
+
+            #print("PadPrompter param_dict == ", param_dict.keys())
+
             pad_up = param_dict['pad_up']
             pad_down = param_dict['pad_down']
             pad_left = param_dict['pad_left']
@@ -71,14 +74,14 @@ class PadPrompter(nn.Module):
                 if param.requires_grad == True:
                     if param.grad is not None:
                         if torch.sum(param.grad) > 0:
-                            print(param.grad)
+                            #print(param.grad)
                             param.grad.zero_()
         else:
             for name, param in params.items():
                 if param.requires_grad == True:
                     if param.grad is not None:
                         if torch.sum(param.grad) > 0:
-                            print(param.grad)
+                            #print(param.grad)
                             param.grad.zero_()
                             params[name].grad = None
 

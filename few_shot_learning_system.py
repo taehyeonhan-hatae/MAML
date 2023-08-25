@@ -161,15 +161,8 @@ class MAMLFewShotClassifier(nn.Module):
         else:
             self.prompter.zero_grad(params=names_weights_copy)
 
-
-        #print("names_weights_copy == ", names_weights_copy.values())
-        #print("loss == ", loss)
-
         grads = torch.autograd.grad(loss, names_weights_copy.values(),
                                     create_graph=use_second_order, allow_unused=True)
-
-        #print("grads == ", grads[0])
-        # grads 값이 0이다
 
         names_grads_copy = dict(zip(names_weights_copy.keys(), grads))
 
@@ -179,7 +172,6 @@ class MAMLFewShotClassifier(nn.Module):
             if grad is None:
                 print('Grads not found for inner loop parameter', key)
 
-            # print("names_grads_copy[key] == ", names_grads_copy[key]) 왜 None일까?
             names_grads_copy[key] = names_grads_copy[key].sum(dim=0)
 
         names_weights_copy = self.inner_loop_optimizer.update_params(names_weights_dict=names_weights_copy,
@@ -188,12 +180,10 @@ class MAMLFewShotClassifier(nn.Module):
 
         num_devices = torch.cuda.device_count() if torch.cuda.is_available() else 1
 
-        #print("names_weights_copy == ", names_weights_copy.values())
         names_weights_copy = {
             name.replace('module.', ''): value.unsqueeze(0).repeat(
                 [num_devices] + [1 for i in range(len(value.shape))]) for
             name, value in names_weights_copy.items()}
-        #print("names_weights_copy == ", names_weights_copy.values())
 
         return names_weights_copy
 
@@ -231,11 +221,6 @@ class MAMLFewShotClassifier(nn.Module):
 
         self.prompter.zero_grad()
         task_accuracies = []
-
-        # print(" x_support_set === ", len(x_support_set))
-        # print(" x_target_set === ", len(x_target_set))
-        # print(" y_support_set === ", len(y_support_set))
-        # print(" y_target_set === ", len(y_target_set))
 
         # Outer-loop Start
         ## batch size만큼, 1 iteration을 수행한다.
@@ -303,7 +288,6 @@ class MAMLFewShotClassifier(nn.Module):
                                                                            num_step == 0) else False, training=True,
                                                                num_step=num_step)
 
-                #print("support_preds == ", support_preds)
 
                 comprehensive_losses["support_loss_" + str(num_step)] = support_loss.item()
 
@@ -331,6 +315,8 @@ class MAMLFewShotClassifier(nn.Module):
                                                                  weights=names_weights_copy,
                                                                  backup_running_statistics=False, training=True,
                                                                  num_step=num_step)
+
+
                     task_losses.append(target_loss)
                     comprehensive_losses["target_loss_" + str(num_step)] = target_loss.item()
 
@@ -362,7 +348,9 @@ class MAMLFewShotClassifier(nn.Module):
 
             # batch에 대한 학습이 끝나고, acc와 loss를 기록
             task_losses = torch.sum(torch.stack(task_losses))
+
             total_losses.append(task_losses)
+
             total_accuracies.extend(accuracy)
 
             if not training_phase:
@@ -394,12 +382,6 @@ class MAMLFewShotClassifier(nn.Module):
         :param num_step: An integer indicating the number of the step in the inner loop.
         :return: the crossentropy losses with respect to the given y, the predictions of the base model.
         """
-
-        # print("x_support_set shape == ", x.shape)
-        # print("prompt_weight keys == ", prompter_params.keys())
-        # print("weights keys == ", weights.keys())
-
-        print("y ============= ", y)
 
         preds = self.classifier.forward(x=x,
                                         params=weights,
@@ -449,21 +431,35 @@ class MAMLFewShotClassifier(nn.Module):
 
         return losses, per_task_target_preds
 
-    def meta_update(self, loss):
+    def meta_update(self, loss, epoch):
         """
         Applies an outer loop update on the meta-parameters of the model.
         :param loss: The current crossentropy loss.
         """
         self.optimizer.zero_grad()
 
+
+        # Classifier를 먼저 학습한다
+        if epoch % 2 == 0:
+            for param in self.prompter.parameters():
+                param.requires_grad = False
+        else:
+            for param in self.classifier.parameters():
+                param.requires_grad = False
+
         loss.backward()
+        self.optimizer.step()
+
+        for param in self.classifier.parameters():
+            param.requires_grad = True
+        for param in self.prompter.parameters():
+            param.requires_grad = True
 
         # if 'imagenet' in self.args.dataset_name:
         #     for name, param in self.classifier.named_parameters():
         #         if param.requires_grad:
         #             param.grad.data.clamp_(-10, 10)  # not sure if this is necessary, more experiments are needed
 
-        self.optimizer.step()
 
     def run_train_iter(self, data_batch, epoch):
         """
@@ -490,8 +486,8 @@ class MAMLFewShotClassifier(nn.Module):
         data_batch = (x_support_set, x_target_set, y_support_set, y_target_set)
 
         losses, per_task_target_preds = self.train_forward_prop(data_batch=data_batch, epoch=epoch)
+        self.meta_update(loss=losses['loss'], epoch=epoch)
 
-        self.meta_update(loss=losses['loss'])
         losses['learning_rate'] = self.scheduler.get_lr()[0]
         self.optimizer.zero_grad()
         self.zero_grad()
