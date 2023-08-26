@@ -348,10 +348,10 @@ class MAMLFewShotClassifier(nn.Module):
         :param loss: The current crossentropy loss.
         """
 
-        # 가중치 업데이트 확인용 변수
-        prev_weights = {}
-        for name, param in self.prompter.named_parameters():
-            prev_weights[name] = param.data.clone()
+        ## 가중치 업데이트 확인용 변수
+        # prev_weights = {}
+        # for name, param in self.prompter.named_parameters():
+        #     prev_weights[name] = param.data.clone()
 
         self.optimizer.zero_grad()
 
@@ -365,10 +365,10 @@ class MAMLFewShotClassifier(nn.Module):
         self.optimizer.step()
 
         ## 가중치 업데이트 확인
-        for name, param in self.prompter.named_parameters():
-            if not torch.equal(prev_weights[name], param.data):
-                print(f"{name} 가중치가 업데이트되었습니다.")
-                prev_weights[name] = param.data.clone()
+        # for name, param in self.prompter.named_parameters():
+        #     if not torch.equal(prev_weights[name], param.data):
+        #         print(f"{name} 가중치가 업데이트되었습니다.")
+        #         prev_weights[name] = param.data.clone()
 
 
 
