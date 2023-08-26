@@ -604,17 +604,28 @@ class MAMLFewShotClassifier(nn.Module):
         :param loss: The current crossentropy loss.
         """
 
+        initial_state = dict(self.curriculum_arbiter.named_parameters())
+
         self.optimizer.zero_grad()
 
         loss.backward()
+
         # if 'imagenet' in self.args.dataset_name:
-        #    for name, param in self.classifier.named_parameters():
-        #        if param.requires_grad:
-        #            param.grad.data.clamp_(-10, 10)  # not sure if this is necessary, more experiments are needed
-        # for name, param in self.classifier.named_parameters():
-        #    print(param.mean())
+        #     for name, param in self.classifier.named_parameters():
+        #         if param.requires_grad:
+        #             param.grad.data.clamp_(-10, 10)  # not sure if this is necessary, more experiments are needed
 
         self.optimizer.step()
+
+        updated_state = dict(self.curriculum_arbiter.named_parameters())
+        # self.curriculum_arbiter weight가 update되었는지 확인한다
+        self.check_weight_update(initial_state, updated_state)
+
+    def check_weight_update(self, initial_state, updated_state):
+        # 가중치 변화 확인
+        for name, param in updated_state.items():
+            if not torch.equal(param, initial_state[name]):
+                print(f"{name} 가중치가 업데이트되었습니다.")
 
     def run_train_iter(self, data_batch, epoch):
         """
