@@ -196,7 +196,10 @@ class MAMLFewShotClassifier(nn.Module):
         total_losses = []
         total_accuracies = []
         per_task_target_preds = [[] for i in range(len(x_target_set))]
+
         self.classifier.zero_grad()
+        self.prompter.zero_grad()
+
         task_accuracies = []
         for task_id, (x_support_set_task, y_support_set_task, x_target_set_task, y_target_set_task) in enumerate(zip(x_support_set,
                               y_support_set,
@@ -204,7 +207,9 @@ class MAMLFewShotClassifier(nn.Module):
                               y_target_set)):
             task_losses = []
             per_step_loss_importance_vectors = self.get_per_step_loss_importance_vector()
+
             names_weights_copy = self.get_inner_loop_parameter_dict(self.classifier.named_parameters())
+            names_prompter_weights_copy = self.get_inner_loop_parameter_dict(self.prompter.named_parameters())
 
             num_devices = torch.cuda.device_count() if torch.cuda.is_available() else 1
 
@@ -222,7 +227,7 @@ class MAMLFewShotClassifier(nn.Module):
 
             for num_step in range(num_steps):
 
-                prompted_images_tasks = self.prompter.forward(x_support_set_task)
+                prompted_images_tasks = self.prompter.forward(x_support_set_task, names_prompter_weights_copy)
 
                 support_loss, support_preds = self.net_forward(
                     x=prompted_images_tasks,
