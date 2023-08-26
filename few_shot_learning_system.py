@@ -218,6 +218,11 @@ class MAMLFewShotClassifier(nn.Module):
                     [num_devices] + [1 for i in range(len(value.shape))]) for
                 name, value in names_weights_copy.items()}
 
+            names_prompt_weights_copy = {
+                name.replace('module.', ''): value.unsqueeze(0).repeat(
+                    [num_devices] + [1 for i in range(len(value.shape))]) for
+                name, value in names_prompt_weights_copy.items()}
+
             n, s, c, h, w = x_target_set_task.shape
 
             x_support_set_task = x_support_set_task.view(-1, c, h, w)
