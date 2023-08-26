@@ -365,7 +365,7 @@ class MAMLFewShotClassifier(nn.Module):
         self.optimizer.step()
 
         ## 가중치 업데이트 확인
-        for name, param in net.named_parameters():
+        for name, param in self.prompter.named_parameters():
             if not torch.equal(prev_weights[name], param.data):
                 print(f"{name} 가중치가 업데이트되었습니다.")
                 prev_weights[name] = param.data.clone()
