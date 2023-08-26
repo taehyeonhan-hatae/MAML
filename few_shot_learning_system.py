@@ -51,7 +51,9 @@ class MAMLFewShotClassifier(nn.Module):
         ## query set에도 추가를 해야할까?
         self.prompter = prompters.padding(args=args, prompt_size=10, image_size=self.im_shape)
 
-        self.task_learning_rate = args.task_learning_rate
+        #self.task_learning_rate = args.task_learning_rate
+
+        self.task_learning_rate = args.init_inner_loop_learning_rate
 
         self.inner_loop_optimizer = LSLRGradientDescentLearningRule(device=device,
                                                                     init_learning_rate=self.task_learning_rate,

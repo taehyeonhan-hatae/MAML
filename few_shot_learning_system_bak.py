@@ -43,7 +43,10 @@ class MAMLFewShotClassifier(nn.Module):
         self.classifier = VGGReLUNormNetwork(im_shape=self.im_shape, num_output_classes=self.args.
                                              num_classes_per_set,
                                              args=args, device=device, meta_classifier=True).to(device=self.device)
-        self.task_learning_rate = args.task_learning_rate
+
+        #self.task_learning_rate = args.task_learning_rate
+
+        self.task_learning_rate = args.init_inner_loop_learning_rate
 
         self.inner_loop_optimizer = LSLRGradientDescentLearningRule(device=device,
                                                                     init_learning_rate=self.task_learning_rate,
