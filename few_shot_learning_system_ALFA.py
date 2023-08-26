@@ -482,7 +482,7 @@ class MAMLFewShotClassifier(nn.Module):
         """
         self.optimizer.zero_grad()
 
-        # # 가중치 업데이트 확인용 변수
+        ## 가중치 업데이트 확인용 변수
         # prev_weights = {}
         # for name, param in self.regularizer.named_parameters():
         #     prev_weights[name] = param.data.clone()
