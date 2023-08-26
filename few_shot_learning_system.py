@@ -369,6 +369,9 @@ class MAMLFewShotClassifier(nn.Module):
 
     def check_weight_update(self, initial_state, updated_state):
         # 가중치 변화 확인
+
+        #print("가중치 변화 확인")
+
         for name, param in updated_state.items():
             if not torch.equal(param, initial_state[name]):
                 print(f"{name} 가중치가 업데이트되었습니다.")
