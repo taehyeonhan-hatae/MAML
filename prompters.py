@@ -38,27 +38,19 @@ class PadPrompter(nn.Module):
         if params is not None:
             # param이 지정될 경우 (inner-loop)
 
-            #print("PadPrompter == ", params.keys())
-            # print("PadPrompter == ", params['pad_dict.pad_up'].shape)
-
             param_dict = extract_top_level_dict(current_dict=params)
-
-            #print("PadPrompter param_dict == ", param_dict.keys())
 
             pad_up = param_dict['pad_up']
             pad_down = param_dict['pad_down']
             pad_left = param_dict['pad_left']
             pad_right = param_dict['pad_right']
+
         else:
+
             pad_up = self.pad_dict['pad_up']
             pad_down = self.pad_dict['pad_down']
             pad_left = self.pad_dict['pad_left']
             pad_right = self.pad_dict['pad_right']
-
-        # print("pad_up.shape == ", pad_up.shape)
-        # print("pad_down.shape == ", pad_down.shape)
-        # print("pad_left.shape == ", pad_left.shape)
-        # print("pad_left.shape == ", pad_left.shape)
 
         base = torch.zeros(1, 3, self.base_size, self.base_size).cuda()
         prompt = torch.cat([pad_left, base, pad_right], dim=3)

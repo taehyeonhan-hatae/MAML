@@ -51,6 +51,7 @@ class MAMLFewShotClassifier(nn.Module):
         ## query set에도 추가를 해야할까?
         self.prompter = prompters.padding(args=args, prompt_size=10, image_size=self.im_shape)
 
+
         #self.task_learning_rate = args.task_learning_rate
 
         self.task_learning_rate = args.init_inner_loop_learning_rate
@@ -59,11 +60,29 @@ class MAMLFewShotClassifier(nn.Module):
                                                                     init_learning_rate=self.task_learning_rate,
                                                                     total_num_inner_loop_steps=self.args.number_of_training_steps_per_iter,
                                                                     use_learnable_learning_rates=self.args.learnable_per_layer_per_step_inner_loop_learning_rate)
+
         self.inner_loop_optimizer.initialise(
             names_weights_dict=self.get_inner_loop_parameter_dict(params=self.classifier.named_parameters()))
 
+
+
+        ## Prompt도 inner-loop에서 학습한다
+        self.inner_loop_prompt_optimizer = LSLRGradientDescentLearningRule(device=device,
+                                                                    init_learning_rate=self.task_learning_rate,
+                                                                    total_num_inner_loop_steps=self.args.number_of_training_steps_per_iter,
+                                                                    use_learnable_learning_rates=self.args.learnable_per_layer_per_step_inner_loop_learning_rate)
+
+        self.inner_loop_prompt_optimizer.initialise(
+            names_weights_dict=self.get_inner_loop_parameter_dict(params=self.prompter.named_parameters()))
+
+
+
+
         print("Inner Loop parameters")
         for key, value in self.inner_loop_optimizer.named_parameters():
+            print(key, value.shape)
+
+        for key, value in self.inner_loop_prompt_optimizer.named_parameters():
             print(key, value.shape)
 
         self.use_cuda = args.use_cuda
@@ -118,32 +137,40 @@ class MAMLFewShotClassifier(nn.Module):
         :param params: A dictionary of the network's parameters.
         :return: A dictionary of the parameters to use for the inner loop optimization process.
         """
-        return {
-            name: param.to(device=self.device)
-            for name, param in params
-            if param.requires_grad
-            and (
-                not self.args.enable_inner_loop_optimizable_bn_params
-                and "norm_layer" not in name
-                or self.args.enable_inner_loop_optimizable_bn_params
-            )
-        }
+        param_dict = dict()
+        for name, param in params:
+            if param.requires_grad:
+                if self.args.enable_inner_loop_optimizable_bn_params:
+                    param_dict[name] = param.to(device=self.device)
+                else:
+                    if "norm_layer" not in name:
+                        param_dict[name] = param.to(device=self.device)
 
-    def apply_inner_loop_update(self, loss, names_weights_copy, use_second_order, current_step_idx):
-        """
-        Applies an inner loop update given current step's loss, the weights to update, a flag indicating whether to use
-        second order derivatives and the current step's index.
-        :param loss: Current step's loss with respect to the support set.
-        :param names_weights_copy: A dictionary with names to parameters to update.
-        :param use_second_order: A boolean flag of whether to use second order derivatives.
-        :param current_step_idx: Current step's index.
-        :return: A dictionary with the updated weights (name, param)
-        """
+        return param_dict
+
+    def setGrad_inner_loop_parameter_dict(self, params):
+
+        param_dict = dict()
+        for name, param in params:
+            if "norm_layer" not in name:
+                param_dict[name] = param.detach().to(device=self.device)
+                param_dict[name].requires_grad = False
+
+        return param_dict
+
+    def apply_inner_loop_update(self, loss, names_weights_copy, inner_loop_optimizer, use_second_order, current_step_idx):
+
         num_gpus = torch.cuda.device_count()
         if num_gpus > 1:
             self.classifier.module.zero_grad(params=names_weights_copy)
         else:
             self.classifier.zero_grad(params=names_weights_copy)
+            self.prompter.zero_grad(params=names_weights_copy)
+
+        # 가중치 업데이트 확인용 변수
+        # prev_weights = {}
+        # for name, param in names_weights_copy.items():
+        #     prev_weights[name] = param.data.clone()
 
         grads = torch.autograd.grad(loss, names_weights_copy.values(),
                                     create_graph=use_second_order, allow_unused=True)
@@ -156,8 +183,7 @@ class MAMLFewShotClassifier(nn.Module):
                 print('Grads not found for inner loop parameter', key)
             names_grads_copy[key] = names_grads_copy[key].sum(dim=0)
 
-
-        names_weights_copy = self.inner_loop_optimizer.update_params(names_weights_dict=names_weights_copy,
+        names_weights_copy = inner_loop_optimizer.update_params(names_weights_dict=names_weights_copy,
                                                                      names_grads_wrt_params_dict=names_grads_copy,
                                                                      num_step=current_step_idx)
 
@@ -167,6 +193,11 @@ class MAMLFewShotClassifier(nn.Module):
                 [num_devices] + [1 for i in range(len(value.shape))]) for
             name, value in names_weights_copy.items()}
 
+        ## 가중치 업데이트 확인
+        # for name, param in names_weights_copy.items():
+        #     if not torch.equal(prev_weights[name], param.data):
+        #         print(f"{name} inner-loop 가중치가 업데이트되었습니다.")
+        #         prev_weights[name] = param.data.clone()
 
         return names_weights_copy
 
@@ -195,7 +226,9 @@ class MAMLFewShotClassifier(nn.Module):
 
         self.num_classes_per_set = ncs
 
-        total_losses = []
+        total_classifier_losses = []
+        total_prompter_losses = []
+
         total_accuracies = []
         per_task_target_preds = [[] for i in range(len(x_target_set))]
 
@@ -207,11 +240,19 @@ class MAMLFewShotClassifier(nn.Module):
                               y_support_set,
                               x_target_set,
                               y_target_set)):
-            task_losses = []
+
+            task_classifier_losses = []
+            task_prompter_losses = []
             per_step_loss_importance_vectors = self.get_per_step_loss_importance_vector()
 
+
+            # gradient update가 가능한 weight (requires_grad = True)
             names_weights_copy = self.get_inner_loop_parameter_dict(self.classifier.named_parameters())
             names_prompt_weights_copy = self.get_inner_loop_parameter_dict(self.prompter.named_parameters())
+
+            # gradient update가 가능한 weight (requires_grad = False)
+            names_weights_copy_notUpdated = self.setGrad_inner_loop_parameter_dict(self.classifier.named_parameters())
+            names_prompt_weights_copy_notUpdated = self.setGrad_inner_loop_parameter_dict(self.prompter.named_parameters())
 
             num_devices = torch.cuda.device_count() if torch.cuda.is_available() else 1
 
@@ -225,6 +266,17 @@ class MAMLFewShotClassifier(nn.Module):
                     [num_devices] + [1 for i in range(len(value.shape))]) for
                 name, value in names_prompt_weights_copy.items()}
 
+            names_weights_copy_notUpdated = {
+                name.replace('module.', ''): value.unsqueeze(0).repeat(
+                    [num_devices] + [1 for i in range(len(value.shape))]) for
+                name, value in names_weights_copy_notUpdated.items()}
+
+            names_prompt_weights_copy_notUpdated = {
+                name.replace('module.', ''): value.unsqueeze(0).repeat(
+                    [num_devices] + [1 for i in range(len(value.shape))]) for
+                name, value in names_prompt_weights_copy_notUpdated.items()}
+
+
             n, s, c, h, w = x_target_set_task.shape
 
             x_support_set_task = x_support_set_task.view(-1, c, h, w)
@@ -234,78 +286,119 @@ class MAMLFewShotClassifier(nn.Module):
 
             for num_step in range(num_steps):
 
-                prompted_images_tasks = self.prompter.forward(x_support_set_task, names_prompt_weights_copy)
-
-                support_loss, support_preds = self.net_forward(
-                    x=prompted_images_tasks,
+                # alternative optimization
+                support_prompt_loss, support_classifer_loss, support_preds = self.net_forward(
+                    x=x_support_set_task,
                     y=y_support_set_task,
-                    weights=names_weights_copy,
+                    prompt_weights=names_prompt_weights_copy,
+                    prompt_weights_notUpdated=names_prompt_weights_copy_notUpdated,
+                    classifier_weights=names_weights_copy,
+                    classifier_weights_notUpdated=names_weights_copy_notUpdated,
                     backup_running_statistics=num_step == 0,
                     training=True,
-                    num_step=num_step,
-                )
+                    num_step=num_step)
 
-
-                names_weights_copy = self.apply_inner_loop_update(loss=support_loss,
+                # Prompt의 paramter를 inner-loop에서 update한다
+                names_prompt_weights_copy = self.apply_inner_loop_update(loss=support_prompt_loss,
+                                                                         names_weights_copy=names_prompt_weights_copy,
+                                                                         inner_loop_optimizer=self.inner_loop_prompt_optimizer,
+                                                                         use_second_order=use_second_order,
+                                                                         current_step_idx=num_step)
+                # Classifier의 parameter를 inner-loop에서 update한다
+                names_weights_copy = self.apply_inner_loop_update(loss=support_classifer_loss,
                                                                   names_weights_copy=names_weights_copy,
+                                                                  inner_loop_optimizer=self.inner_loop_optimizer,
                                                                   use_second_order=use_second_order,
                                                                   current_step_idx=num_step)
 
                 if use_multi_step_loss_optimization and training_phase and epoch < self.args.multi_step_loss_num_epochs:
-                    target_loss, target_preds = self.net_forward(x=x_target_set_task,
-                                                                 y=y_target_set_task, weights=names_weights_copy,
-                                                                 backup_running_statistics=False, training=True,
-                                                                 num_step=num_step)
+                    target_prompt_loss, target_classifier_loss, target_preds = self.net_forward(x=x_target_set_task,
+                                                                                y=y_target_set_task,
+                                                                               prompt_weights=names_prompt_weights_copy,
+                                                                               prompt_weights_notUpdated=names_prompt_weights_copy_notUpdated,
+                                                                                classifier_weights=names_weights_copy,
+                                                                                classifier_weights_notUpdated=names_weights_copy_notUpdated,
+                                                                                backup_running_statistics=False, training=True,
+                                                                                num_step=num_step)
 
-                    task_losses.append(per_step_loss_importance_vectors[num_step] * target_loss)
+                    task_classifier_losses.append(per_step_loss_importance_vectors[num_step] * target_classifier_loss)
+
                 elif num_step == (self.args.number_of_training_steps_per_iter - 1):
-                    target_loss, target_preds = self.net_forward(x=x_target_set_task,
-                                                                 y=y_target_set_task, weights=names_weights_copy,
-                                                                 backup_running_statistics=False, training=True,
-                                                                 num_step=num_step)
-                    task_losses.append(target_loss)
+                    target_prompt_loss, target_classifier_loss, target_preds = self.net_forward(x=x_target_set_task,
+                                                                                y=y_target_set_task,
+                                                                               prompt_weights=names_prompt_weights_copy,
+                                                                               prompt_weights_notUpdated=names_prompt_weights_copy_notUpdated,
+                                                                                classifier_weights=names_weights_copy,
+                                                                                classifier_weights_notUpdated=names_weights_copy_notUpdated,
+                                                                                backup_running_statistics=False, training=True,
+                                                                                num_step=num_step)
+                    task_prompter_losses.append(target_prompt_loss)
+                    task_classifier_losses.append(target_classifier_loss)
 
             per_task_target_preds[task_id] = target_preds.detach().cpu().numpy()
             _, predicted = torch.max(target_preds.data, 1)
 
             accuracy = predicted.float().eq(y_target_set_task.data.float()).cpu().float()
-            task_losses = torch.sum(torch.stack(task_losses))
-            total_losses.append(task_losses)
+
+            # prompter loss 저장
+            task_prompter_losses = torch.sum(torch.stack(task_prompter_losses))
+            total_prompter_losses.append(task_prompter_losses)
+
+            # classifer loss 저장
+            task_classifier_losses = torch.sum(torch.stack(task_classifier_losses))
+            total_classifier_losses.append(task_classifier_losses)
+
             total_accuracies.extend(accuracy)
 
             if not training_phase:
                 self.classifier.restore_backup_stats()
 
-        losses = self.get_across_task_loss_metrics(total_losses=total_losses,
+        total_classifier_losses = self.get_across_task_loss_metrics(total_losses=total_classifier_losses,
                                                    total_accuracies=total_accuracies)
 
+        total_prompter_losses = self.get_across_task_loss_metrics(total_losses=total_prompter_losses,
+                                                                    total_accuracies=total_accuracies)
+
         for idx, item in enumerate(per_step_loss_importance_vectors):
-            losses['loss_importance_vector_{}'.format(idx)] = item.detach().cpu().numpy()
+            total_classifier_losses['loss_importance_vector_{}'.format(idx)] = item.detach().cpu().numpy()
 
-        return losses, per_task_target_preds
+        return total_classifier_losses, total_prompter_losses, per_task_target_preds
 
-    def net_forward(self, x, y, weights, backup_running_statistics, training, num_step):
-        """
-        A base model forward pass on some data points x. Using the parameters in the weights dictionary. Also requires
-        boolean flags indicating whether to reset the running statistics at the end of the run (if at evaluation phase).
-        A flag indicating whether this is the training session and an int indicating the current step's number in the
-        inner loop.
-        :param x: A data batch of shape b, c, h, w
-        :param y: A data targets batch of shape b, n_classes
-        :param weights: A dictionary containing the weights to pass to the network.
-        :param backup_running_statistics: A flag indicating whether to reset the batch norm running statistics to their
-         previous values after the run (only for evaluation)
-        :param training: A flag indicating whether the current process phase is a training or evaluation.
-        :param num_step: An integer indicating the number of the step in the inner loop.
-        :return: the crossentropy losses with respect to the given y, the predictions of the base model.
-        """
-        preds = self.classifier.forward(x=x, params=weights,
+    def net_forward(self, x, y, prompt_weights, classifier_weights, prompt_weights_notUpdated, classifier_weights_notUpdated, backup_running_statistics, training, num_step):
+
+        ## requires_grad check
+        for name, param in prompt_weights.items():
+            if not param.requires_grad:
+                print("prompt_weights == ", name)
+
+        for name, param in classifier_weights.items():
+            if not param.requires_grad:
+                print("classifier_weights == ", name)
+
+        for name, param in prompt_weights_notUpdated.items():
+            if param.requires_grad:
+                print("prompt_weights == ", name)
+
+        for name, param in classifier_weights_notUpdated.items():
+            if param.requires_grad:
+                print("classifier_weights_notUpdated == ", name)
+        #####
+
+        # Prompter의 weight를 update하기 위한 로직
+        prompted_images_x = self.prompter.forward(x=x, params=prompt_weights)
+        preds1 = self.classifier.forward(x=prompted_images_x, params=classifier_weights_notUpdated,
                                         training=training,
                                         backup_running_statistics=backup_running_statistics, num_step=num_step)
+        prompt_loss = F.cross_entropy(input=preds1, target=y)
 
-        loss = F.cross_entropy(input=preds, target=y)
+        # Classifier의 weight를 update하기 위한 로직
+        prompted_images_x2 = self.prompter.forward(x, prompt_weights_notUpdated)
+        preds = self.classifier.forward(x=prompted_images_x2, params=classifier_weights,
+                                        training=training,
+                                        backup_running_statistics=backup_running_statistics, num_step=num_step)
+        classifier_loss = F.cross_entropy(input=preds, target=y)
 
-        return loss, preds
+        return prompt_loss, classifier_loss, preds
 
     def trainable_parameters(self):
         """
@@ -322,13 +415,14 @@ class MAMLFewShotClassifier(nn.Module):
         :param epoch: The index of the currrent epoch.
         :return: A dictionary of losses for the current step.
         """
-        losses, per_task_target_preds = self.forward(data_batch=data_batch, epoch=epoch,
+        total_classifier_losses, total_prompter_losses, per_task_target_preds = self.forward(data_batch=data_batch, epoch=epoch,
                                                      use_second_order=self.args.second_order and
                                                                       epoch > self.args.first_order_to_second_order_epoch,
                                                      use_multi_step_loss_optimization=self.args.use_multi_step_loss_optimization,
                                                      num_steps=self.args.number_of_training_steps_per_iter,
                                                      training_phase=True)
-        return losses, per_task_target_preds
+
+        return total_classifier_losses, total_prompter_losses, per_task_target_preds
 
     def evaluation_forward_prop(self, data_batch, epoch):
         """
@@ -337,27 +431,29 @@ class MAMLFewShotClassifier(nn.Module):
         :param epoch: The index of the currrent epoch.
         :return: A dictionary of losses for the current step.
         """
-        losses, per_task_target_preds = self.forward(data_batch=data_batch, epoch=epoch, use_second_order=False,
+        total_classifier_losses, total_prompter_losses, per_task_target_preds = self.forward(data_batch=data_batch, epoch=epoch, use_second_order=False,
                                                      use_multi_step_loss_optimization=True,
                                                      num_steps=self.args.number_of_evaluation_steps_per_iter,
                                                      training_phase=False)
 
-        return losses, per_task_target_preds
+        return total_classifier_losses, total_prompter_losses, per_task_target_preds
 
-    def meta_update(self, loss):
+    def meta_update(self, total_classifier_losses, total_prompter_losses):
         """
         Applies an outer loop update on the meta-parameters of the model.
         :param loss: The current crossentropy loss.
         """
 
-        ## 가중치 업데이트 확인용 변수
+        # ## 가중치 업데이트 확인용 변수
         # prev_weights = {}
         # for name, param in self.prompter.named_parameters():
         #     prev_weights[name] = param.data.clone()
 
         self.optimizer.zero_grad()
 
-        loss.backward()
+        total_classifier_losses.backward()
+
+        total_prompter_losses.backward()
 
         # if 'imagenet' in self.args.dataset_name:
         #     for name, param in self.classifier.named_parameters():
@@ -366,7 +462,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         self.optimizer.step()
 
-        ## 가중치 업데이트 확인
+        # ## 가중치 업데이트 확인
         # for name, param in self.prompter.named_parameters():
         #     if not torch.equal(prev_weights[name], param.data):
         #         print(f"{name} 가중치가 업데이트되었습니다.")
@@ -398,14 +494,14 @@ class MAMLFewShotClassifier(nn.Module):
 
         data_batch = (x_support_set, x_target_set, y_support_set, y_target_set)
 
-        losses, per_task_target_preds = self.train_forward_prop(data_batch=data_batch, epoch=epoch)
+        total_classifier_losses, total_prompter_losses, per_task_target_preds = self.train_forward_prop(data_batch=data_batch, epoch=epoch)
 
-        self.meta_update(loss=losses['loss'])
-        losses['learning_rate'] = self.scheduler.get_lr()[0]
+        self.meta_update(total_classifier_losses=total_classifier_losses['loss'], total_prompter_losses=total_prompter_losses['loss'])
+        total_classifier_losses['learning_rate'] = self.scheduler.get_lr()[0]
         self.optimizer.zero_grad()
         self.zero_grad()
 
-        return losses, per_task_target_preds
+        return total_classifier_losses, per_task_target_preds
 
     def run_validation_iter(self, data_batch):
         """
@@ -427,8 +523,8 @@ class MAMLFewShotClassifier(nn.Module):
 
         data_batch = (x_support_set, x_target_set, y_support_set, y_target_set)
 
-        losses, per_task_target_preds = self.evaluation_forward_prop(data_batch=data_batch, epoch=self.current_epoch)
-
+        total_classifier_losses, total_prompter_losses, per_task_target_preds = self.evaluation_forward_prop(data_batch=data_batch, epoch=self.current_epoch)
+        losses = total_classifier_losses
         # losses['loss'].backward() # uncomment if you get the weird memory error
         # self.zero_grad()
         # self.optimizer.zero_grad()
