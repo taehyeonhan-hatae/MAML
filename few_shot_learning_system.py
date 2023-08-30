@@ -364,7 +364,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         return total_classifier_losses, total_prompter_losses, per_task_target_preds
 
-    def net_forward(self, x, y, prompt_weights, classifier_weights, prompt_weights_notUpdated, classifier_weights_notUpdated, backup_running_statistics, training, num_step):
+    def net_forward(self, x, y, prompt_weights, classifier_weights, prompt_weights_notUpdated, classifier_weights_notUpdated, backup_running_statistics, training, num_step, isQueryset=False):
 
         ## requires_grad check
         for name, param in prompt_weights.items():
@@ -384,19 +384,27 @@ class MAMLFewShotClassifier(nn.Module):
                 print("classifier_weights_notUpdated == ", name)
         #####
 
-        # Prompter의 weight를 update하기 위한 로직
-        prompted_images_x = self.prompter.forward(x=x, params=prompt_weights)
-        preds1 = self.classifier.forward(x=prompted_images_x, params=classifier_weights_notUpdated,
-                                        training=training,
-                                        backup_running_statistics=backup_running_statistics, num_step=num_step)
-        prompt_loss = F.cross_entropy(input=preds1, target=y)
+        if not isQueryset:
+            # Prompter의 weight를 update하기 위한 로직
+            prompted_images_x = self.prompter.forward(x=x, params=prompt_weights)
+            preds1 = self.classifier.forward(x=prompted_images_x, params=classifier_weights_notUpdated,
+                                            training=training,
+                                            backup_running_statistics=backup_running_statistics, num_step=num_step)
+            prompt_loss = F.cross_entropy(input=preds1, target=y)
 
-        # Classifier의 weight를 update하기 위한 로직
-        prompted_images_x2 = self.prompter.forward(x, prompt_weights_notUpdated)
-        preds = self.classifier.forward(x=prompted_images_x2, params=classifier_weights,
-                                        training=training,
-                                        backup_running_statistics=backup_running_statistics, num_step=num_step)
-        classifier_loss = F.cross_entropy(input=preds, target=y)
+            # Classifier의 weight를 update하기 위한 로직
+            prompted_images_x2 = self.prompter.forward(x, prompt_weights_notUpdated)
+            preds = self.classifier.forward(x=prompted_images_x2, params=classifier_weights,
+                                            training=training,
+                                            backup_running_statistics=backup_running_statistics, num_step=num_step)
+            classifier_loss = F.cross_entropy(input=preds, target=y)
+        else:
+            # Queryset인 경우 prompt를 추가하지 않는다.
+            preds = self.classifier.forward(x=x, params=classifier_weights,
+                                            training=training,
+                                            backup_running_statistics=backup_running_statistics, num_step=num_step)
+            prompt_loss=0.0
+            classifier_loss = F.cross_entropy(input=preds, target=y)
 
         return prompt_loss, classifier_loss, preds
 
@@ -453,7 +461,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         total_classifier_losses.backward()
 
-        total_prompter_losses.backward()
+        #total_prompter_losses.backward()
 
         # if 'imagenet' in self.args.dataset_name:
         #     for name, param in self.classifier.named_parameters():
