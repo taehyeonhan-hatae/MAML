@@ -319,8 +319,8 @@ class MAMLFewShotClassifier(nn.Module):
                                                                                 classifier_weights=names_weights_copy,
                                                                                 classifier_weights_notUpdated=names_weights_copy_notUpdated,
                                                                                 backup_running_statistics=False, training=True,
-                                                                                num_step=num_step)
-
+                                                                                num_step=num_step,
+                                                                                isQueryset=True)
                     task_classifier_losses.append(per_step_loss_importance_vectors[num_step] * target_classifier_loss)
 
                 elif num_step == (self.args.number_of_training_steps_per_iter - 1):
@@ -331,7 +331,8 @@ class MAMLFewShotClassifier(nn.Module):
                                                                                 classifier_weights=names_weights_copy,
                                                                                 classifier_weights_notUpdated=names_weights_copy_notUpdated,
                                                                                 backup_running_statistics=False, training=True,
-                                                                                num_step=num_step)
+                                                                                num_step=num_step,
+                                                                                isQueryset=True)
                     task_prompter_losses.append(target_prompt_loss)
                     task_classifier_losses.append(target_classifier_loss)
 
@@ -403,8 +404,9 @@ class MAMLFewShotClassifier(nn.Module):
             preds = self.classifier.forward(x=x, params=classifier_weights,
                                             training=training,
                                             backup_running_statistics=backup_running_statistics, num_step=num_step)
-            prompt_loss=0.0
+
             classifier_loss = F.cross_entropy(input=preds, target=y)
+            prompt_loss = classifier_loss
 
         return prompt_loss, classifier_loss, preds
 

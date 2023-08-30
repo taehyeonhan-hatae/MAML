@@ -984,6 +984,7 @@ class VGGReLUNormNetwork(nn.Module):
 
         return out
 
+
     def re_init(self):
         # for param in self.parameters():
         for name, param in self.named_parameters():

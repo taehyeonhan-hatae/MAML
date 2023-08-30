@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 from meta_neural_network_architectures import VGGReLUNormNetwork, ResNet12
-from inner_loop_optimizers_MeTAL import LSLRGradientDescentLearningRule
+from inner_loop_optimizers import LSLRGradientDescentLearningRule
 
 from utils.storage import save_statistics
 
@@ -101,17 +101,6 @@ class MAMLFewShotClassifier(nn.Module):
                 print(name, param.shape, param.device, param.requires_grad)
         print("=====================")
 
-        # ALFA
-        if self.args.alfa:
-            ## ALFA에서는 Inner loop interation동안 주어진 task에 적응할 수 있게 하는 Hyper Parmeter(learning rate, weight decay)를 생성한다
-            num_layers = len(names_weights_copy)
-            input_dim = num_layers * 2
-
-            self.update_rule_learner = nn.Sequential(
-                nn.Linear(input_dim, input_dim),
-                nn.ReLU(inplace=True),
-                nn.Linear(input_dim, input_dim)
-            ).to(device=self.device)
 
         self.optimizer = optim.Adam(self.trainable_parameters(), lr=args.meta_learning_rate, amsgrad=False)
 
@@ -168,8 +157,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         return param_dict
 
-    def apply_inner_loop_update(self, loss, names_weights_copy, generated_alpha_params, generated_beta_params,
-                                use_second_order, current_step_idx):
+    def apply_inner_loop_update(self, loss, names_weights_copy, use_second_order, current_step_idx):
         """
         Applies an inner loop update given current step's loss, the weights to update, a flag indicating whether to use
         second order derivatives and the current step's index.
@@ -179,9 +167,6 @@ class MAMLFewShotClassifier(nn.Module):
         :param current_step_idx: Current step's index.
         :return: A dictionary with the updated weights (name, param)
         """
-        #print("names_weights_copy.keys() == ", names_weights_copy.keys())
-        #print("==")
-
         num_gpus = torch.cuda.device_count()
         if num_gpus > 1:
             self.classifier.module.zero_grad(params=names_weights_copy)
@@ -190,9 +175,6 @@ class MAMLFewShotClassifier(nn.Module):
 
         grads = torch.autograd.grad(loss, names_weights_copy.values(),
                                     create_graph=use_second_order, allow_unused=True)
-
-        #print("grads == ", grads)
-
         names_grads_copy = dict(zip(names_weights_copy.keys(), grads))
 
         names_weights_copy = {key: value[0] for key, value in names_weights_copy.items()}
@@ -204,8 +186,6 @@ class MAMLFewShotClassifier(nn.Module):
 
         names_weights_copy = self.inner_loop_optimizer.update_params(names_weights_dict=names_weights_copy,
                                                                      names_grads_wrt_params_dict=names_grads_copy,
-                                                                     generated_alpha_params=generated_alpha_params,
-                                                                     generated_beta_params=generated_beta_params,
                                                                      num_step=current_step_idx)
 
         num_devices = torch.cuda.device_count() if torch.cuda.is_available() else 1
@@ -294,8 +274,6 @@ class MAMLFewShotClassifier(nn.Module):
         :return: A dictionary with the collected losses of the current outer forward propagation.
         """
 
-        #print("====forward===")
-
         x_support_set, x_target_set, y_support_set, y_target_set = data_batch
 
         [b, ncs, spc] = y_support_set.shape
@@ -307,11 +285,6 @@ class MAMLFewShotClassifier(nn.Module):
         per_task_target_preds = [[] for i in range(len(x_target_set))]
         self.classifier.zero_grad()
         task_accuracies = []
-
-        # print(" x_support_set === ", len(x_support_set))
-        # print(" x_target_set === ", len(x_target_set))
-        # print(" y_support_set === ", len(y_support_set))
-        # print(" y_target_set === ", len(y_target_set))
 
         # Outer-loop Start
         ## batch size만큼, 1 iteration을 수행한다.
@@ -369,32 +342,6 @@ class MAMLFewShotClassifier(nn.Module):
                     True if (num_step == 0) else False,
                     training=True, num_step=num_step)
 
-                generated_alpha_params = {}
-                generated_beta_params = {}
-
-                if self.args.alfa:
-
-                    support_loss_grad = torch.autograd.grad(support_loss, names_weights_copy.values(),
-                                                            retain_graph=True)
-                    per_step_task_embedding = []
-                    for k, v in names_weights_copy.items():
-                        per_step_task_embedding.append(v.mean())
-
-                    for i in range(len(support_loss_grad)):
-                        # For the computational efficiency, layer-wise means of gradients and weights
-                        per_step_task_embedding.append(support_loss_grad[i].mean())
-
-                    per_step_task_embedding = torch.stack(per_step_task_embedding)
-
-                    generated_params = self.update_rule_learner(per_step_task_embedding)
-                    num_layers = len(names_weights_copy)
-
-                    generated_alpha, generated_beta = torch.split(generated_params, split_size_or_sections=num_layers)
-                    g = 0
-                    for key in names_weights_copy.keys():
-                        generated_alpha_params[key] = generated_alpha[g]
-                        generated_beta_params[key] = generated_beta[g]
-                        g += 1
 
                 # print("support_loss == " , support_loss)
                 comprehensive_losses["support_loss_" + str(num_step)] = support_loss.item()
@@ -407,8 +354,6 @@ class MAMLFewShotClassifier(nn.Module):
                 # task specific knowledge를 얻는 부분
                 names_weights_copy = self.apply_inner_loop_update(loss=support_loss,
                                                                   names_weights_copy=names_weights_copy,
-                                                                  generated_beta_params=generated_beta_params,
-                                                                  generated_alpha_params=generated_alpha_params,
                                                                   use_second_order=use_second_order,
                                                                   current_step_idx=num_step)
 
