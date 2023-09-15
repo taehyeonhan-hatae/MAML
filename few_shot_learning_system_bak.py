@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-from meta_neural_network_architectures import VGGReLUNormNetwork
+from meta_neural_network_architectures import VGGReLUNormNetwork,ResNet12
 from inner_loop_optimizers import LSLRGradientDescentLearningRule
 
 
@@ -40,9 +40,15 @@ class MAMLFewShotClassifier(nn.Module):
         self.current_epoch = 0
 
         self.rng = set_torch_seed(seed=args.seed)
-        self.classifier = VGGReLUNormNetwork(im_shape=self.im_shape, num_output_classes=self.args.
-                                             num_classes_per_set,
-                                             args=args, device=device, meta_classifier=True).to(device=self.device)
+
+        if self.args.backbone == 'ResNet12':
+            self.classifier = ResNet12(im_shape=self.im_shape, num_output_classes=self.args.
+                                       num_classes_per_set,
+                                       args=args, device=device, meta_classifier=True).to(device=self.device)
+        else:
+            self.classifier = VGGReLUNormNetwork(im_shape=self.im_shape, num_output_classes=self.args.
+                                                 num_classes_per_set,
+                                                 args=args, device=device, meta_classifier=True).to(device=self.device)
 
         #self.task_learning_rate = args.task_learning_rate
 
@@ -52,8 +58,11 @@ class MAMLFewShotClassifier(nn.Module):
                                                                     init_learning_rate=self.task_learning_rate,
                                                                     total_num_inner_loop_steps=self.args.number_of_training_steps_per_iter,
                                                                     use_learnable_learning_rates=self.args.learnable_per_layer_per_step_inner_loop_learning_rate)
+
+        names_weights_copy = self.get_inner_loop_parameter_dict(self.classifier.named_parameters())
+
         self.inner_loop_optimizer.initialise(
-            names_weights_dict=self.get_inner_loop_parameter_dict(params=self.classifier.named_parameters()))
+            names_weights_dict=names_weights_copy)
 
         print("Inner Loop parameters")
         for key, value in self.inner_loop_optimizer.named_parameters():
@@ -111,16 +120,16 @@ class MAMLFewShotClassifier(nn.Module):
         :param params: A dictionary of the network's parameters.
         :return: A dictionary of the parameters to use for the inner loop optimization process.
         """
-        return {
-            name: param.to(device=self.device)
-            for name, param in params
-            if param.requires_grad
-            and (
-                not self.args.enable_inner_loop_optimizable_bn_params
-                and "norm_layer" not in name
-                or self.args.enable_inner_loop_optimizable_bn_params
-            )
-        }
+        param_dict = dict()
+        for name, param in params:
+            if param.requires_grad:
+                if self.args.enable_inner_loop_optimizable_bn_params:
+                    param_dict[name] = param.to(device=self.device)
+                else:
+                    if "norm_layer" not in name:
+                        param_dict[name] = param.to(device=self.device)
+
+        return param_dict
 
     def apply_inner_loop_update(self, loss, names_weights_copy, use_second_order, current_step_idx):
         """
@@ -164,8 +173,9 @@ class MAMLFewShotClassifier(nn.Module):
         return names_weights_copy
 
     def get_across_task_loss_metrics(self, total_losses, total_accuracies):
-        losses = {'loss': torch.mean(torch.stack(total_losses))}
+        losses = dict()
 
+        losses['loss'] = torch.mean(torch.stack(total_losses))
         losses['accuracy'] = np.mean(total_accuracies)
 
         return losses
@@ -332,10 +342,10 @@ class MAMLFewShotClassifier(nn.Module):
         """
         self.optimizer.zero_grad()
         loss.backward()
-        if 'imagenet' in self.args.dataset_name:
-            for name, param in self.classifier.named_parameters():
-                if param.requires_grad:
-                    param.grad.data.clamp_(-10, 10)  # not sure if this is necessary, more experiments are needed
+        # if 'imagenet' in self.args.dataset_name:
+        #     for name, param in self.classifier.named_parameters():
+        #         if param.requires_grad:
+        #             param.grad.data.clamp_(-10, 10)  # not sure if this is necessary, more experiments are needed
         self.optimizer.step()
 
     def run_train_iter(self, data_batch, epoch):
@@ -393,9 +403,9 @@ class MAMLFewShotClassifier(nn.Module):
 
         losses, per_task_target_preds = self.evaluation_forward_prop(data_batch=data_batch, epoch=self.current_epoch)
 
-        # losses['loss'].backward() # uncomment if you get the weird memory error
-        # self.zero_grad()
-        # self.optimizer.zero_grad()
+        losses['loss'].backward() # uncomment if you get the weird memory error
+        self.zero_grad()
+        self.optimizer.zero_grad()
 
         return losses, per_task_target_preds
 
@@ -407,7 +417,7 @@ class MAMLFewShotClassifier(nn.Module):
         object.
         """
         state['network'] = self.state_dict()
-        state['optimizer'] = self.optimizer.state_dict()
+        #state['optimizer'] = self.optimizer.state_dict()
         torch.save(state, f=model_save_dir)
 
     def load_model(self, model_save_dir, model_name, model_idx):
@@ -422,6 +432,6 @@ class MAMLFewShotClassifier(nn.Module):
         filepath = os.path.join(model_save_dir, "{}_{}".format(model_name, model_idx))
         state = torch.load(filepath)
         state_dict_loaded = state['network']
-        self.optimizer.load_state_dict(state['optimizer'])
+        #self.optimizer.load_state_dict(state['optimizer'])
         self.load_state_dict(state_dict=state_dict_loaded)
         return state
