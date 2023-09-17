@@ -8,6 +8,12 @@ import math
 from torch.nn import Linear, Conv2d, BatchNorm1d, BatchNorm2d, PReLU, ReLU, Sigmoid, Dropout, MaxPool2d, \
     AdaptiveAvgPool2d, Sequential, Module
 
+from torch.autograd import Function
+
+import numpy as np
+import scipy as sp
+import scipy.linalg as linalg
+
 
 # Support: ['ArcFace', 'CurricularFace']
 
@@ -106,3 +112,92 @@ class CurricularFace(nn.Module):
         output = cos_theta * self.s
         return output, origin_cos * self.s
 
+class FocalLoss(nn.Module):
+    def __init__(self, gamma = 2, eps = 1e-7):
+        super(FocalLoss, self).__init__()
+        self.gamma = gamma
+        self.eps = eps
+        self.ce = nn.CrossEntropyLoss()
+
+    def forward(self, input, target):
+        logp = self.ce(input, target)
+        p = torch.exp(-logp)
+        loss = (1 - p) ** self.gamma * logp
+        return loss.mean()
+
+class OLELoss(Function):
+    @staticmethod
+    def forward(ctx, X, y):
+
+        X = X.cpu().numpy()
+        y = y.cpu().numpy()
+
+        classes = np.unique(y)
+        C = classes.size
+
+        N, D = X.shape
+
+        lambda_ = 1.
+        DELTA = 1.
+
+        # gradients initialization
+        Obj_c = 0
+        dX_c = np.zeros((N, D))
+        Obj_all = 0;
+        dX_all = np.zeros((N, D))
+
+        eigThd = 1e-6  # threshold small eigenvalues for a better subgradient
+
+        # compute objective and gradient for first term \sum ||TX_c||*
+        for c in classes:
+            A = X[y == c, :]
+
+            # SVD
+            U, S, V = sp.linalg.svd(A, full_matrices=False, lapack_driver='gesvd')
+
+            V = V.T
+            nuclear = np.sum(S);
+
+            ## L_c = max(DELTA, ||TY_c||_*)-DELTA
+
+            if nuclear > DELTA:
+                Obj_c += nuclear;
+
+                # discard small singular values
+                r = np.sum(S < eigThd)
+                uprod = U[:, 0:U.shape[1] - r].dot(V[:, 0:V.shape[1] - r].T)
+
+                dX_c[y == c, :] += uprod
+            else:
+                Obj_c += DELTA
+
+        # compute objective and gradient for secon term ||TX||*
+
+        U, S, V = sp.linalg.svd(X, full_matrices=False, lapack_driver='gesvd')  # all classes
+
+        V = V.T
+
+        Obj_all = np.sum(S);
+
+        r = np.sum(S < eigThd)
+
+        uprod = U[:, 0:U.shape[1] - r].dot(V[:, 0:V.shape[1] - r].T)
+
+        dX_all = uprod
+
+        obj = (Obj_c - lambda_ * Obj_all) / N * np.float(lambda_)
+
+        dX = (dX_c - lambda_ * dX_all) / N * np.float(lambda_)
+
+        dX = torch.FloatTensor(dX)
+
+        ctx.save_for_backward(dX)
+
+        return torch.FloatTensor([float(obj)]).cuda()
+
+    @staticmethod
+    def backward(ctx, grad_output):
+
+        dX = ctx.saved_tensors[0]
+
+        return dX.cuda(), None

@@ -9,8 +9,7 @@ import torch.optim as optim
 from meta_neural_network_architectures_OLE import VGGReLUNormNetwork
 from inner_loop_optimizers import LSLRGradientDescentLearningRule
 
-from loss import CurricularFace
-from OLE import OLELoss
+from loss import *
 
 
 def set_torch_seed(seed):
@@ -296,6 +295,7 @@ class MAMLFewShotClassifier(nn.Module):
         loss = F.cross_entropy(input=preds, target=y)
 
         ole_loss = OLELoss.apply(embedding, y)
+
         loss = loss + ole_loss
 
         return loss, preds
