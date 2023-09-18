@@ -14,6 +14,8 @@ import numpy as np
 import scipy as sp
 import scipy.linalg as linalg
 
+from meta_neural_network_architectures import extract_top_level_dict
+
 
 # Support: ['ArcFace', 'CurricularFace']
 
@@ -48,9 +50,18 @@ class ArcFace(nn.Module):
         self.th = math.cos(math.pi - m)
         self.mm = math.sin(math.pi - m) * m
 
-    def forward(self, embbedings, label):
+    def forward(self, embbedings, label, params=None):
         embbedings = l2_norm(embbedings, axis=1)
-        kernel_norm = l2_norm(self.kernel, axis=0)
+
+        if params is not None:
+            # param이 지정될 경우 (inner-loop)
+            param_dict = extract_top_level_dict(current_dict=params)
+            kernel = param_dict['kernel']
+        else:
+            kernel = self.pad_dict['kernel']
+
+        kernel_norm = l2_norm(kernel, axis=0)
+
         cos_theta = torch.mm(embbedings, kernel_norm)
         cos_theta = cos_theta.clamp(-1, 1)  # for numerical stability
         with torch.no_grad():

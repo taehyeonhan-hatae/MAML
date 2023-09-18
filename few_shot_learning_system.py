@@ -289,26 +289,22 @@ class MAMLFewShotClassifier(nn.Module):
         :param num_step: An integer indicating the number of the step in the inner loop.
         :return: the crossentropy losses with respect to the given y, the predictions of the base model.
         """
-        preds, embedding = self.classifier.forward(x=x, params=weights,
+        preds, embedding = self.classifier.forward(x=x, label=y, params=weights,
                                         training=training,
                                         backup_running_statistics=backup_running_statistics, num_step=num_step)
 
         #print("embedding size == ", embedding.size())
 
-        #loss = F.cross_entropy(input=preds, target=y)
+        loss = F.cross_entropy(input=preds, target=y)
 
         # ole_loss = OLELoss.apply(embedding, y)
         # rate = (current_epoch / self.args.total_epochs) ** 3
         # loss = loss + rate * ole_loss
 
-        head = ArcFace(in_features=1200, out_features=self.args.num_classes_per_set)
-        # GPU 설정
-        head.cuda(0)
+        #outputs, original_logits = self.head(embedding, y)
+        #print("outputs == ", outputs)
 
-        outputs, original_logits = head(embedding, y)
-        print("outputs == ", outputs)
-
-        loss = F.cross_entropy(outputs, y)
+        #loss = F.cross_entropy(outputs, y)
         # criterion = nn.CrossEntropyLoss()
         # loss = criterion(outputs, y)
 

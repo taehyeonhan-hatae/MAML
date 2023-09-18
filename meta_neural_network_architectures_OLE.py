@@ -6,6 +6,7 @@ import torch.nn.functional as F
 import torch
 import numpy as np
 
+from loss import *
 
 def extract_top_level_dict(current_dict):
     """
@@ -932,12 +933,24 @@ class VGGReLUNormNetwork(nn.Module):
         self.encoder_features_shape = list(out.shape)
         out = out.view(out.shape[0], -1)
 
-        self.layer_dict['linear'] = MetaLinearLayer(input_shape=(out.shape[0], np.prod(out.shape[1:])),
-                                                    num_filters=self.num_output_classes, use_bias=True)
+        # print("out.shape[0] == ", out.shape[0]) #2
+        # print("out.shape[1] == ", out.shape[1]) #1200
 
-        out = self.layer_dict['linear'](out)
+        # self.layer_dict['linear'] = MetaLinearLayer(input_shape=(out.shape[0], np.prod(out.shape[1:])),
+        #                                             num_filters=self.num_output_classes, use_bias=True)
+        #
+        # out = self.layer_dict['linear'](out)
 
-    def forward(self, x, num_step, params=None, training=False, backup_running_statistics=False, isDropout=False):
+        # print("out.shape[0] == ", out.shape[0]) #2
+        # print("out.shape[1] == ", out.shape[1]) #5
+
+        self.layer_dict['head'] = ArcFace(in_features=out.shape[1], out_features=self.args.num_classes_per_set).to(device=self.device)
+
+        print("out.shape[0] == ", out.shape[0]) #2
+        print("out.shape[1] == ", out.shape[1]) #5
+
+
+    def forward(self, x, num_step, label, params=None, training=False, backup_running_statistics=False, isDropout=False):
         """
         Forward propages through the network. If any params are passed then they are used instead of stored params.
         :param x: Input image batch.
@@ -982,9 +995,10 @@ class VGGReLUNormNetwork(nn.Module):
 
         embedding = out
 
-        out = self.layer_dict['linear'](out, param_dict['linear'])
+        #out = self.layer_dict['linear'](out, param_dict['linear'])
+        out = self.layer_dict['head'](embedding, label, param_dict['head'])
 
-        return out, embedding
+        return out
 
 
     def re_init(self):
