@@ -293,16 +293,24 @@ class MAMLFewShotClassifier(nn.Module):
                                         training=training,
                                         backup_running_statistics=backup_running_statistics, num_step=num_step)
 
-        #print("embedding shape == ", embedding.shape)
+        #print("embedding size == ", embedding.size())
 
-        loss = F.cross_entropy(input=preds, target=y)
+        #loss = F.cross_entropy(input=preds, target=y)
 
-        ole_loss = OLELoss.apply(embedding, y)
+        # ole_loss = OLELoss.apply(embedding, y)
+        # rate = (current_epoch / self.args.total_epochs) ** 3
+        # loss = loss + rate * ole_loss
 
+        head = ArcFace(in_features=1200, out_features=self.args.num_classes_per_set)
+        # GPU 설정
+        head.cuda(0)
 
-        rate = (current_epoch / self.args.total_epochs) ** 2
+        outputs, original_logits = head(embedding, y)
+        print("outputs == ", outputs)
 
-        loss = loss #+ rate * ole_loss
+        loss = F.cross_entropy(outputs, y)
+        # criterion = nn.CrossEntropyLoss()
+        # loss = criterion(outputs, y)
 
         return loss, preds
 

@@ -37,6 +37,7 @@ class ArcFace(nn.Module):
         self.s = s
         self.m = m
 
+        # kernerl은 weight를 뜻한다
         self.kernel = Parameter(torch.FloatTensor(in_features, out_features))
         # nn.init.xavier_uniform_(self.kernel)
         nn.init.normal_(self.kernel, std=0.01)
@@ -59,7 +60,7 @@ class ArcFace(nn.Module):
         sin_theta = torch.sqrt(1.0 - torch.pow(target_logit, 2))
         cos_theta_m = target_logit * self.cos_m - sin_theta * self.sin_m  # cos(target+margin)
         if self.easy_margin:
-            final_target_logit = torch.where(target_logit > 0, cos_theta_m, target_loit)
+            final_target_logit = torch.where(target_logit > 0, cos_theta_m, target_logit)
         else:
             final_target_logit = torch.where(target_logit > self.th, cos_theta_m, target_logit - self.mm)
 
