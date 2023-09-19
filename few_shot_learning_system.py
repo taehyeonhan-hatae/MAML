@@ -137,6 +137,7 @@ class MAMLFewShotClassifier(nn.Module):
         :param current_step_idx: Current step's index.
         :return: A dictionary with the updated weights (name, param)
         """
+
         num_gpus = torch.cuda.device_count()
         if num_gpus > 1:
             self.classifier.module.zero_grad(params=names_weights_copy)
@@ -153,7 +154,6 @@ class MAMLFewShotClassifier(nn.Module):
             if grad is None:
                 print('Grads not found for inner loop parameter', key)
             names_grads_copy[key] = names_grads_copy[key].sum(dim=0)
-
 
         names_weights_copy = self.inner_loop_optimizer.update_params(names_weights_dict=names_weights_copy,
                                                                      names_grads_wrt_params_dict=names_grads_copy,
@@ -352,6 +352,12 @@ class MAMLFewShotClassifier(nn.Module):
         Applies an outer loop update on the meta-parameters of the model.
         :param loss: The current crossentropy loss.
         """
+
+        # 가중치 업데이트 확인용 변수
+        prev_weights = {}
+        for name, param in self.classifier.named_parameters():
+            prev_weights[name] = param.data.clone()
+
         self.optimizer.zero_grad()
         loss.backward()
         # if 'imagenet' in self.args.dataset_name:
@@ -359,6 +365,12 @@ class MAMLFewShotClassifier(nn.Module):
         #         if param.requires_grad:
         #             param.grad.data.clamp_(-10, 10)  # not sure if this is necessary, more experiments are needed
         self.optimizer.step()
+
+        # 가중치 업데이트 확인
+        for name, param in self.classifier.named_parameters():
+            if not torch.equal(prev_weights[name], param.data):
+                print(f"{name} 가중치가 업데이트되었습니다.")
+                prev_weights[name] = param.data.clone()
 
     def run_train_iter(self, data_batch, epoch):
         """
