@@ -933,21 +933,12 @@ class VGGReLUNormNetwork(nn.Module):
         self.encoder_features_shape = list(out.shape)
         out = out.view(out.shape[0], -1)
 
-        # print("out.shape[0] == ", out.shape[0]) #2
-        # print("out.shape[1] == ", out.shape[1]) #1200
-
         self.layer_dict['linear'] = MetaLinearLayer(input_shape=(out.shape[0], np.prod(out.shape[1:])),
                                                     num_filters=512, use_bias=True)
 
         out = self.layer_dict['linear'](out)
 
-        # print("out.shape[0] == ", out.shape[0]) #2
-        # print("out.shape[1] == ", out.shape[1]) #5
-
-        self.layer_dict['head'] = ArcFace(in_features=out.shape[1], out_features=self.args.num_classes_per_set, easy_margin=True).to(device=self.device)
-
-        print("out.shape[0] == ", out.shape[0]) #2
-        print("out.shape[1] == ", out.shape[1]) #5
+        self.layer_dict['head'] = ArcFace(in_features=out.shape[1], out_features=self.args.num_classes_per_set).to(device=self.device)
 
 
     def forward(self, x, num_step, label, params=None, training=False, backup_running_statistics=False, isDropout=False):
@@ -996,9 +987,9 @@ class VGGReLUNormNetwork(nn.Module):
         embedding = out
 
         out = self.layer_dict['linear'](out, param_dict['linear'])
-        out = self.layer_dict['head'](out, label, param_dict['head'])
+        out, original_logits = self.layer_dict['head'](out, label, param_dict['head'])
 
-        return out, embedding
+        return out, original_logits
 
 
     def re_init(self):

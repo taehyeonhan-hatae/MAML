@@ -289,11 +289,12 @@ class MAMLFewShotClassifier(nn.Module):
         :param num_step: An integer indicating the number of the step in the inner loop.
         :return: the crossentropy losses with respect to the given y, the predictions of the base model.
         """
-        preds, embedding = self.classifier.forward(x=x, label=y, params=weights,
+        preds, original_logits = self.classifier.forward(x=x, label=y, params=weights,
                                         training=training,
                                         backup_running_statistics=backup_running_statistics, num_step=num_step)
 
-        print("preds == ",preds)
+        # print("preds == ",preds)
+        # print("original_logits == ", original_logits)
 
         loss = F.cross_entropy(input=preds, target=y)
 
@@ -301,7 +302,8 @@ class MAMLFewShotClassifier(nn.Module):
         # rate = (current_epoch / self.args.total_epochs) ** 3
         # loss = loss + rate * ole_loss
 
-        return loss, preds
+        # return loss, preds
+        return loss, original_logits
 
     def trainable_parameters(self):
         """

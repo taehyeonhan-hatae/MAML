@@ -19,6 +19,32 @@ from meta_neural_network_architectures import extract_top_level_dict
 
 # Support: ['ArcFace', 'CurricularFace']
 
+class SoftmaxLoss(nn.Module):
+    def __init__(self, num_classes, embedding_size):
+        """
+        Regular softmax loss (1 fc layer without bias + CrossEntropyLoss)
+        Args:
+            num_classes: The number of classes in your training dataset
+            embedding_size: The size of the embeddings that you pass into
+        """
+        super().__init__()
+        self.num_classes = num_classes
+        self.embedding_size = embedding_size
+
+        self.W = torch.nn.Parameter(torch.Tensor(num_classes, embedding_size))
+        nn.init.xavier_normal_(self.W)
+
+    def forward(self, embeddings, labels):
+        """
+        Args:
+            embeddings: (None, embedding_size)
+            labels: (None,)
+        Returns:
+            loss: scalar
+        """
+        logits = F.linear(embeddings, self.W)
+        return nn.CrossEntropyLoss()(logits, labels)
+
 class ArcFace(nn.Module):
     r"""Implement of ArcFace (https://arxiv.org/pdf/1801.07698v1.pdf):
         Args:
@@ -31,7 +57,14 @@ class ArcFace(nn.Module):
             cos(theta+m)
         """
 
-    def __init__(self, in_features, out_features, s=64.0, m=0.50, easy_margin=False):
+    # 참고하자
+    # https://www.kaggle.com/code/kuposatina/arcface-test-2
+    # https://www.kaggle.com/code/debarshichanda/pytorch-arcface-gem-pooling-starter
+    # https://www.kaggle.com/code/nanguyen/arcface-loss
+
+
+    def __init__(self, in_features, out_features, s=10.0, m=0.30, easy_margin=False):
+    #def __init__(self, in_features, out_features, s=64.0, m=0.50, easy_margin=False):
         super(ArcFace, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
@@ -51,6 +84,7 @@ class ArcFace(nn.Module):
         self.mm = math.sin(math.pi - m) * m
 
     def forward(self, embbedings, label, params=None):
+
         embbedings = l2_norm(embbedings, axis=1)
 
         if params is not None:
@@ -58,14 +92,20 @@ class ArcFace(nn.Module):
             param_dict = extract_top_level_dict(current_dict=params)
             kernel = param_dict['kernel']
         else:
-            kernel = self.pad_dict['kernel']
+            kernel = self.kernel
 
         kernel_norm = l2_norm(kernel, axis=0)
 
         cos_theta = torch.mm(embbedings, kernel_norm)
+        # embbedings, kernel_norm 모두 l2 norm을 통해 scale을 1로 조정했기 때문에, 분모가 없는 것이다.
         cos_theta = cos_theta.clamp(-1, 1)  # for numerical stability
+
+        #print("cos_theta == ", cos_theta)
+        #print("embbedings.size(0) == ", embbedings.size(0)) #25
+
         with torch.no_grad():
             origin_cos = cos_theta.clone()
+
         target_logit = cos_theta[torch.arange(0, embbedings.size(0)), label].view(-1, 1)
 
         sin_theta = torch.sqrt(1.0 - torch.pow(target_logit, 2))
@@ -76,7 +116,9 @@ class ArcFace(nn.Module):
             final_target_logit = torch.where(target_logit > self.th, cos_theta_m, target_logit - self.mm)
 
         cos_theta.scatter_(1, label.view(-1, 1).long(), final_target_logit)
+
         output = cos_theta * self.s
+
         return output, origin_cos * self.s
 
 
@@ -102,9 +144,20 @@ class CurricularFace(nn.Module):
         self.register_buffer('t', torch.zeros(1))
         nn.init.normal_(self.kernel, std=0.01)
 
-    def forward(self, embbedings, label):
+    def forward(self, embbedings, label, params=None):
         embbedings = l2_norm(embbedings, axis=1)
-        kernel_norm = l2_norm(self.kernel, axis=0)
+
+
+        if params is not None:
+            # param이 지정될 경우 (inner-loop)
+            param_dict = extract_top_level_dict(current_dict=params)
+            kernel = param_dict['kernel']
+        else:
+            kernel = self.pad_dict['kernel']
+
+        kernel_norm = l2_norm(kernel, axis=0)
+
+
         cos_theta = torch.mm(embbedings, kernel_norm)
         cos_theta = cos_theta.clamp(-1, 1)  # for numerical stability
         with torch.no_grad():
