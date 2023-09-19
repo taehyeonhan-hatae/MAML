@@ -293,20 +293,13 @@ class MAMLFewShotClassifier(nn.Module):
                                         training=training,
                                         backup_running_statistics=backup_running_statistics, num_step=num_step)
 
-        #print("embedding size == ", embedding.size())
+        print("preds == ",preds)
 
         loss = F.cross_entropy(input=preds, target=y)
 
         # ole_loss = OLELoss.apply(embedding, y)
         # rate = (current_epoch / self.args.total_epochs) ** 3
         # loss = loss + rate * ole_loss
-
-        #outputs, original_logits = self.head(embedding, y)
-        #print("outputs == ", outputs)
-
-        #loss = F.cross_entropy(outputs, y)
-        # criterion = nn.CrossEntropyLoss()
-        # loss = criterion(outputs, y)
 
         return loss, preds
 

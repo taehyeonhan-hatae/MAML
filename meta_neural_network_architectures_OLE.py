@@ -993,12 +993,12 @@ class VGGReLUNormNetwork(nn.Module):
 
         out = out.view(out.size(0), -1)
 
-        #embedding = out
+        embedding = out
 
         out = self.layer_dict['linear'](out, param_dict['linear'])
         out = self.layer_dict['head'](out, label, param_dict['head'])
 
-        return out
+        return out, embedding
 
 
     def re_init(self):
