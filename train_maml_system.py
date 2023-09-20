@@ -15,7 +15,7 @@ from multiprocessing import freeze_support
 ## python train_maml_system.py --name_of_args_json_file experiment_config/my_experiment/PROMPT.json --gpu_to_use 0
 ## python train_maml_system.py --name_of_args_json_file experiment_config/my_experiment/MAML+OLE.json --gpu_to_use 0
 ## python train_maml_system.py --name_of_args_json_file experiment_config/my_experiment/MAML+ArcFace.json --gpu_to_use 0
-## python train_maml_system.py --name_of_args_json_file experiment_config/my_experiment/MAML+MAML+CurricularFace.json --gpu_to_use 0
+## python train_maml_system.py --name_of_args_json_file experiment_config/my_experiment/MAML+CurricularFace.json --gpu_to_use 0
 
 if __name__ == '__main__':
     freeze_support()
