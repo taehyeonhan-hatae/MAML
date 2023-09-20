@@ -65,6 +65,7 @@ class ArcFace(nn.Module):
 
 
     def __init__(self, in_features, out_features, s=64.0, m=0.50, easy_margin=False):
+        # 원본 : s=64.0, m=0.50
         super(ArcFace, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
