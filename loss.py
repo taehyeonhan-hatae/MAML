@@ -119,6 +119,7 @@ class ArcFace(nn.Module):
             final_target_logit = torch.where(target_logit > 0, cos_theta_m, target_logit)
         else:
             # torch.where(condition, x, y) → condition에 따라 x 또는 y에서 선택한 요소의 텐서를 반환
+            # 조건이 왜 target_logit > self.th일까?
             final_target_logit = torch.where(target_logit > self.th, cos_theta_m, target_logit - self.mm)
 
         cos_theta.scatter_(1, label.view(-1, 1).long(), final_target_logit)
