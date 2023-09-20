@@ -6,8 +6,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-from meta_neural_network_architectures_OLE import VGGReLUNormNetwork
+from meta_neural_network_architectures_OLE import ResNet12,VGGReLUNormNetwork
 from inner_loop_optimizers import LSLRGradientDescentLearningRule
+
+from utils.storage import save_statistics
 
 from loss import *
 
@@ -42,9 +44,20 @@ class MAMLFewShotClassifier(nn.Module):
         self.current_epoch = 0
 
         self.rng = set_torch_seed(seed=args.seed)
-        self.classifier = VGGReLUNormNetwork(im_shape=self.im_shape, num_output_classes=self.args.
-                                             num_classes_per_set,
-                                             args=args, device=device, meta_classifier=True).to(device=self.device)
+
+        self.experiment_name = self.args.experiment_name
+        self.comprehensive_loss_excel_create = True
+
+        if self.args.backbone == 'ResNet12':
+            self.classifier = ResNet12(im_shape=self.im_shape, num_output_classes=self.args.
+                                       num_classes_per_set,
+                                       args=args, device=device, meta_classifier=True).to(device=self.device)
+        else:  # Conv-4
+            self.classifier = VGGReLUNormNetwork(im_shape=self.im_shape, num_output_classes=self.args.
+                                                 num_classes_per_set,
+                                                 args=args, device=device, meta_classifier=True).to(device=self.device)
+
+
 
         #self.task_learning_rate = args.task_learning_rate
 
@@ -221,6 +234,21 @@ class MAMLFewShotClassifier(nn.Module):
             x_target_set_task = x_target_set_task.view(-1, c, h, w)
             y_target_set_task = y_target_set_task.view(-1)
 
+            comprehensive_losses = {}
+            comprehensive_losses["epoch"] = epoch
+            comprehensive_losses["task_id"] = task_id
+
+            comprehensive_losses["num_steps"] = self.args.number_of_training_steps_per_iter
+
+            for num_step in range(self.args.number_of_training_steps_per_iter):
+                comprehensive_losses["support_loss_" + str(num_step)] = "null"
+                comprehensive_losses["support_accuracy_" + str(num_step)] = "null"
+
+            if training_phase:
+                comprehensive_losses["phase"] = "train"
+            else:
+                comprehensive_losses["phase"] = "val"
+
             for num_step in range(num_steps):
 
                 support_loss, support_preds = self.net_forward(
@@ -232,6 +260,14 @@ class MAMLFewShotClassifier(nn.Module):
                     num_step=num_step,
                     current_epoch = epoch
                 )
+
+                # print("support_loss == " , support_loss)
+                comprehensive_losses["support_loss_" + str(num_step)] = support_loss.item()
+
+                _, support_predicted = torch.max(support_preds.data, 1)
+
+                support_accuracy = support_predicted.float().eq(y_support_set_task.data.float()).cpu().float()
+                comprehensive_losses["support_accuracy_" + str(num_step)] = np.mean(list(support_accuracy))
 
 
                 names_weights_copy = self.apply_inner_loop_update(loss=support_loss,
@@ -254,6 +290,27 @@ class MAMLFewShotClassifier(nn.Module):
                                                                  num_step=num_step,
                                                                  current_epoch = epoch)
                     task_losses.append(target_loss)
+
+                    comprehensive_losses["target_loss_" + str(num_step)] = target_loss.item()
+
+                    _, target_predicted = torch.max(target_preds.data, 1)
+                    target_accuracy = target_predicted.float().eq(y_target_set_task.data.float()).cpu().float()
+                    comprehensive_losses["target_accuracy_" + str(num_step)] = np.mean(list(target_accuracy))
+
+            # Inner-loop 결과를 csv로 생성한다.
+            if self.comprehensive_loss_excel_create:
+                save_statistics(experiment_name=self.experiment_name,
+                                line_to_add=list(comprehensive_losses.keys()),
+                                filename=self.experiment_name + ".csv", create=True)
+                self.comprehensive_loss_excel_create = False
+                save_statistics(experiment_name=self.experiment_name,
+                                line_to_add=list(comprehensive_losses.values()),
+                                filename=self.experiment_name + ".csv", create=False)
+            else:
+                save_statistics(experiment_name=self.experiment_name,
+                                line_to_add=list(comprehensive_losses.values()),
+                                filename=self.experiment_name + ".csv", create=False)
+
 
             per_task_target_preds[task_id] = target_preds.detach().cpu().numpy()
             _, predicted = torch.max(target_preds.data, 1)

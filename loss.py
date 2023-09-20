@@ -46,7 +46,13 @@ class SoftmaxLoss(nn.Module):
         return nn.CrossEntropyLoss()(logits, labels)
 
 class ArcFace(nn.Module):
-    r"""Implement of ArcFace (https://arxiv.org/pdf/1801.07698v1.pdf):
+
+    # 참고
+    # https://www.kaggle.com/code/kuposatina/arcface-test-2
+    # https://www.kaggle.com/code/debarshichanda/pytorch-arcface-gem-pooling-starter
+    # https://www.kaggle.com/code/nanguyen/arcface-loss
+
+    """Implement of ArcFace (https://arxiv.org/pdf/1801.07698v1.pdf):
         Args:
             in_features: size of each input sample
             out_features: size of each output sample
@@ -55,16 +61,10 @@ class ArcFace(nn.Module):
             s: norm of input feature
             m: margin
             cos(theta+m)
-        """
-
-    # 참고하자
-    # https://www.kaggle.com/code/kuposatina/arcface-test-2
-    # https://www.kaggle.com/code/debarshichanda/pytorch-arcface-gem-pooling-starter
-    # https://www.kaggle.com/code/nanguyen/arcface-loss
+    """
 
 
-    def __init__(self, in_features, out_features, s=10.0, m=0.30, easy_margin=False):
-    #def __init__(self, in_features, out_features, s=64.0, m=0.50, easy_margin=False):
+    def __init__(self, in_features, out_features, s=64.0, m=0.50, easy_margin=False):
         super(ArcFace, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
@@ -76,6 +76,7 @@ class ArcFace(nn.Module):
         self.kernel = Parameter(torch.FloatTensor(in_features, out_features))
         # nn.init.xavier_uniform_(self.kernel)
         nn.init.normal_(self.kernel, std=0.01)
+        nn.init.xavier_uniform_(self.kernel)
 
         self.easy_margin = easy_margin
         self.cos_m = math.cos(m)
@@ -96,6 +97,7 @@ class ArcFace(nn.Module):
 
         kernel_norm = l2_norm(kernel, axis=0)
 
+        # deep feature x weight
         cos_theta = torch.mm(embbedings, kernel_norm)
         # embbedings, kernel_norm 모두 l2 norm을 통해 scale을 1로 조정했기 때문에, 분모가 없는 것이다.
         cos_theta = cos_theta.clamp(-1, 1)  # for numerical stability
@@ -149,7 +151,6 @@ class CurricularFace(nn.Module):
 
     def forward(self, embbedings, label, params=None):
         embbedings = l2_norm(embbedings, axis=1)
-
 
         if params is not None:
             # param이 지정될 경우 (inner-loop)

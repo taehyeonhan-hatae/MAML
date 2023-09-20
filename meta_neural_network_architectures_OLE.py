@@ -934,10 +934,9 @@ class VGGReLUNormNetwork(nn.Module):
         out = out.view(out.shape[0], -1)
 
         if self.args.loss_function == "ArcFace":
-            self.layer_dict['linear'] = MetaLinearLayer(input_shape=(out.shape[0], np.prod(out.shape[1:])),
-                                                        num_filters=512, use_bias=True)
-            out = self.layer_dict['linear'](out)
-            self.layer_dict['head'] = ArcFace(in_features=out.shape[1], out_features=self.args.num_classes_per_set).to(device=self.device)
+
+            self.layer_dict['head'] = ArcFace(in_features=out.shape[1], out_features=self.args.num_classes_per_set).to(
+                device=self.device)
 
         elif self.args.loss_function == "Softmax":
             self.layer_dict['linear'] = MetaLinearLayer(input_shape=(out.shape[0], np.prod(out.shape[1:])),
@@ -991,9 +990,7 @@ class VGGReLUNormNetwork(nn.Module):
         embedding = out
 
         if self.args.loss_function == "ArcFace":
-            out = self.layer_dict['linear'](out, param_dict['linear'])
             out, original_logits = self.layer_dict['head'](out, label, param_dict['head'])
-
         elif self.args.loss_function == "Softmax":
             out = self.layer_dict['linear'](out, param_dict['linear'])
             original_logits = out
@@ -1105,13 +1102,17 @@ class ResNet12(nn.Module):
 
         out = out.view(out.shape[0], -1)
 
-        self.layer_dict['linear'] = MetaLinearLayer(input_shape=(out.shape[0], np.prod(out.shape[1:])),
-                                                    num_filters=self.num_output_classes, use_bias=True)
+        if self.args.loss_function == "ArcFace":
 
-        out = self.layer_dict['linear'](out)
-        print("ResNet12 build", out.shape)
+            self.layer_dict['head'] = ArcFace(in_features=out.shape[1], out_features=self.args.num_classes_per_set).to(
+                device=self.device)
 
-    def forward(self, x, num_step, params=None, training=False, backup_running_statistics=False):
+        elif self.args.loss_function == "Softmax":
+            self.layer_dict['linear'] = MetaLinearLayer(input_shape=(out.shape[0], np.prod(out.shape[1:])),
+                                                        num_filters=self.num_output_classes, use_bias=True)
+            out = self.layer_dict['linear'](out)
+
+    def forward(self, x, num_step, label, params=None, training=False, backup_running_statistics=False):
         """
         Forward propages through the network. If any params are passed then they are used instead of stored params.
         :param x: Input image batch.
@@ -1147,7 +1148,19 @@ class ResNet12(nn.Module):
 
         out = F.adaptive_avg_pool2d(out, (1, 1))
         out = out.view(out.size(0), -1)
-        out = self.layer_dict['linear'](out, param_dict['linear'])
+
+        embedding = out
+
+        if self.args.loss_function == "ArcFace":
+            out, original_logits = self.layer_dict['head'](out, label, param_dict['head'])
+        elif self.args.loss_function == "Softmax":
+            out = self.layer_dict['linear'](out, param_dict['linear'])
+            original_logits = out
+        else:
+            original_logits = "no selected loss function"
+            print(original_logits)
+
+        return out, original_logits
 
         return out
 
