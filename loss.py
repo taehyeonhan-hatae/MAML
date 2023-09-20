@@ -109,10 +109,13 @@ class ArcFace(nn.Module):
         target_logit = cos_theta[torch.arange(0, embbedings.size(0)), label].view(-1, 1)
 
         sin_theta = torch.sqrt(1.0 - torch.pow(target_logit, 2))
+
+        # cos(A+B) = cosA*CosB - SinA*SinB
         cos_theta_m = target_logit * self.cos_m - sin_theta * self.sin_m  # cos(target+margin)
         if self.easy_margin:
             final_target_logit = torch.where(target_logit > 0, cos_theta_m, target_logit)
         else:
+            # torch.where(condition, x, y) → condition에 따라 x 또는 y에서 선택한 요소의 텐서를 반환
             final_target_logit = torch.where(target_logit > self.th, cos_theta_m, target_logit - self.mm)
 
         cos_theta.scatter_(1, label.view(-1, 1).long(), final_target_logit)

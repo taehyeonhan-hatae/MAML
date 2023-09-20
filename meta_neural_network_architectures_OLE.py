@@ -936,9 +936,7 @@ class VGGReLUNormNetwork(nn.Module):
         if self.args.loss_function == "ArcFace":
             self.layer_dict['linear'] = MetaLinearLayer(input_shape=(out.shape[0], np.prod(out.shape[1:])),
                                                         num_filters=512, use_bias=True)
-
             out = self.layer_dict['linear'](out)
-
             self.layer_dict['head'] = ArcFace(in_features=out.shape[1], out_features=self.args.num_classes_per_set).to(device=self.device)
 
         elif self.args.loss_function == "Softmax":
@@ -993,7 +991,6 @@ class VGGReLUNormNetwork(nn.Module):
         embedding = out
 
         if self.args.loss_function == "ArcFace":
-
             out = self.layer_dict['linear'](out, param_dict['linear'])
             out, original_logits = self.layer_dict['head'](out, label, param_dict['head'])
 
@@ -1001,7 +998,7 @@ class VGGReLUNormNetwork(nn.Module):
             out = self.layer_dict['linear'](out, param_dict['linear'])
             original_logits = out
         else:
-            original_logits = "no seleted loss function"
+            original_logits = "no selected loss function"
             print(original_logits)
 
         return out, original_logits
