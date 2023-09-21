@@ -76,7 +76,7 @@ class ArcFace(nn.Module):
         # kernerl은 weight를 뜻한다
         self.kernel = Parameter(torch.FloatTensor(in_features, out_features))
         # nn.init.xavier_uniform_(self.kernel)
-        nn.init.normal_(self.kernel, std=0.01)
+        #nn.init.normal_(self.kernel, std=0.01)
         nn.init.xavier_uniform_(self.kernel)
 
         self.easy_margin = easy_margin
@@ -150,7 +150,8 @@ class CurricularFace(nn.Module):
         self.mm = math.sin(math.pi - m) * m
         self.kernel = Parameter(torch.Tensor(in_features, out_features))
         self.register_buffer('t', torch.zeros(1))
-        nn.init.normal_(self.kernel, std=0.01)
+        #nn.init.normal_(self.kernel, std=0.01)
+        nn.init.xavier_uniform_(self.kernel)
 
     def forward(self, embbedings, label, params=None):
         embbedings = l2_norm(embbedings, axis=1)
