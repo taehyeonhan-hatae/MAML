@@ -994,11 +994,14 @@ class VGGReLUNormNetwork(nn.Module):
         elif self.args.loss_function == "Softmax":
             out = self.layer_dict['linear'](out, param_dict['linear'])
             original_logits = out
+        elif self.args.loss_function == "CurricularFace":
+            out = self.layer_dict['linear'](out, param_dict['linear'])
+            original_logits = out
         else:
             original_logits = "no selected loss function"
             print(original_logits)
 
-        return out#, original_logits
+        return out, original_logits
 
 
     def re_init(self):
