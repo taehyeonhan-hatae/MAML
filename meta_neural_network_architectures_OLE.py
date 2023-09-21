@@ -989,14 +989,12 @@ class VGGReLUNormNetwork(nn.Module):
         embedding = out
 
         if self.args.loss_function == "ArcFace":
-            #out, original_logits = self.layer_dict['head'](out, label, param_dict['head'])
-            out = self.layer_dict['head'](out, label, param_dict['head'])
+            out, original_logits = self.layer_dict['head'](out, label, param_dict['head'])
         elif self.args.loss_function == "Softmax":
             out = self.layer_dict['linear'](out, param_dict['linear'])
             original_logits = out
         elif self.args.loss_function == "CurricularFace":
-            out = self.layer_dict['linear'](out, param_dict['linear'])
-            original_logits = out
+            out, original_logits = self.layer_dict['head'](out, label, param_dict['head'])
         else:
             original_logits = "no selected loss function"
             print(original_logits)

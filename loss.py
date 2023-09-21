@@ -115,6 +115,7 @@ class ArcFace(nn.Module):
 
         # cos(A+B) = cosA*CosB - SinA*SinB
         cos_theta_m = target_logit * self.cos_m - sin_theta * self.sin_m  # cos(target+margin)
+
         if self.easy_margin:
             final_target_logit = torch.where(target_logit > 0, cos_theta_m, target_logit)
         else:
