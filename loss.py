@@ -138,12 +138,12 @@ def l2_norm(input, axis=1):
 
 
 class CurricularFace(nn.Module):
-    def __init__(self, in_features, out_features, m=0.5, s=64.):
+    def __init__(self, in_features, out_features, args, m=0.5, s=24.):
         super(CurricularFace, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
-        self.m = m
-        self.s = s
+        self.m = args.margin
+        self.s = args.rescale
         self.cos_m = math.cos(m)
         self.sin_m = math.sin(m)
         self.threshold = math.cos(math.pi - m)
