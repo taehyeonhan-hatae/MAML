@@ -64,14 +64,18 @@ class ArcFace(nn.Module):
     """
 
 
-    def __init__(self, in_features, out_features, s=64.0, m=0.50, easy_margin=False):
+    def __init__(self, in_features, out_features, args, easy_margin=False):
         # 원본 : s=64.0, m=0.50
         super(ArcFace, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
 
-        self.s = s
-        self.m = m
+        self.m = args.margin
+        self.s = args.rescale
+
+        print("=====CurricularFace====")
+        print("margin == ", self.m)
+        print("rescale == ", self.s)
 
         # kernerl은 weight를 뜻한다
         self.kernel = Parameter(torch.FloatTensor(in_features, out_features))
@@ -80,10 +84,10 @@ class ArcFace(nn.Module):
         nn.init.xavier_uniform_(self.kernel)
 
         self.easy_margin = easy_margin
-        self.cos_m = math.cos(m)
-        self.sin_m = math.sin(m)
-        self.th = math.cos(math.pi - m)
-        self.mm = math.sin(math.pi - m) * m
+        self.cos_m = math.cos(self.m)
+        self.sin_m = math.sin(self.m)
+        self.th = math.cos(math.pi - self.m)
+        self.mm = math.sin(math.pi - self.m) * self.m
 
     def forward(self, embbedings, label, params=None):
 
@@ -138,16 +142,21 @@ def l2_norm(input, axis=1):
 
 
 class CurricularFace(nn.Module):
-    def __init__(self, in_features, out_features, args, m=0.5, s=24.):
+    def __init__(self, in_features, out_features, args):
         super(CurricularFace, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
         self.m = args.margin
         self.s = args.rescale
-        self.cos_m = math.cos(m)
-        self.sin_m = math.sin(m)
-        self.threshold = math.cos(math.pi - m)
-        self.mm = math.sin(math.pi - m) * m
+
+        print("=====CurricularFace====")
+        print("margin == ", self.m)
+        print("rescale == ", self.s)
+
+        self.cos_m = math.cos(self.m)
+        self.sin_m = math.sin(self.m)
+        self.threshold = math.cos(math.pi - self.m)
+        self.mm = math.sin(math.pi - self.m) * self.m
         self.kernel = Parameter(torch.Tensor(in_features, out_features))
         self.register_buffer('t', torch.zeros(1))
         #nn.init.normal_(self.kernel, std=0.01)

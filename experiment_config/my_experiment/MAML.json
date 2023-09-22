@@ -57,8 +57,11 @@
   "alfa": false,
   "random_init": false,
   "meta_loss": false,
-  "curriculum": false,
+  "arbiter": false,
   "backbone": "4-CONV",
-  "loss_function": "Softmax"
+  "loss_function": "Softmax",
+  "ole": false,
+  "rescale" : 24.0,
+  "margin" : 0.50
   
 }

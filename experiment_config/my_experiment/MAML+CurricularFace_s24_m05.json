@@ -57,7 +57,7 @@
   "alfa": false,
   "random_init": false,
   "meta_loss": false,
-  "curriculum": false,
+  "arbiter": false,
   "backbone": "4-CONV",
   "loss_function": "CurricularFace",
   "rescale" : 24.0,

@@ -59,5 +59,6 @@
   "meta_loss": false,
   "curriculum": false,
   "backbone": "4-CONV",
-  "loss_function": "Softmax"
+  "loss_function": "Softmax",
+  "ole": true
 }
