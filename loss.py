@@ -170,10 +170,9 @@ class CurricularFace(nn.Module):
             param_dict = extract_top_level_dict(current_dict=params)
             kernel = param_dict['kernel']
         else:
-            kernel = self.pad_dict['kernel']
+            kernel = self.kernel
 
         kernel_norm = l2_norm(kernel, axis=0)
-
 
         cos_theta = torch.mm(embbedings, kernel_norm)
         cos_theta = cos_theta.clamp(-1, 1)  # for numerical stability

@@ -942,7 +942,7 @@ class VGGReLUNormNetwork(nn.Module):
         elif self.args.loss_function == "CurricularFace":
             self.layer_dict['head'] = CurricularFace(in_features=out.shape[1], out_features=self.args.num_classes_per_set, args=self.args).to(device=self.device)
 
-    def forward(self, x, num_step, label, params=None, training=False, backup_running_statistics=False, isDropout=False):
+    def forward(self, x, num_step, label, params=None, training=False, backup_running_statistics=False):
         """
         Forward propages through the network. If any params are passed then they are used instead of stored params.
         :param x: Input image batch.
@@ -972,11 +972,6 @@ class VGGReLUNormNetwork(nn.Module):
             out = self.layer_dict['conv{}'.format(i)](out, params=param_dict['conv{}'.format(i)], training=training,
                                                       backup_running_statistics=backup_running_statistics,
                                                       num_step=num_step)
-            # JM 추가
-            if isDropout:
-                if i != self.num_stages:
-                    out = F.dropout(input=out, p=0.5)
-
             if self.args.max_pooling:
                 out = F.max_pool2d(input=out, kernel_size=(2, 2), stride=2, padding=0)
 
