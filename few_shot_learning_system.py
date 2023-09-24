@@ -151,7 +151,7 @@ class MAMLFewShotClassifier(nn.Module):
         :return: A dictionary with the updated weights (name, param)
         """
 
-        print("apply_inner_loop_update == ", current_step_idx)
+        #print("apply_inner_loop_update == ", current_step_idx)
 
         num_gpus = torch.cuda.device_count()
         if num_gpus > 1:
@@ -160,11 +160,11 @@ class MAMLFewShotClassifier(nn.Module):
             self.classifier.zero_grad(params=names_weights_copy)
 
         if self.args.ole:
-            print("cross entropy loss == ", loss.item())
             ole_loss = OLELoss.apply(embedding, label)
             rate = 1
-            print("ole_loss == ", ole_loss.item())
             loss = loss + rate * ole_loss
+            # print("cross entropy loss == ", loss.item())
+            #print("ole_loss == ", ole_loss.item())
 
         grads = torch.autograd.grad(loss, names_weights_copy.values(),
                                     create_graph=use_second_order, allow_unused=True)
