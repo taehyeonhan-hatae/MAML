@@ -416,8 +416,6 @@ class MAMLFewShotClassifier(nn.Module):
         :param loss: The current crossentropy loss.
         """
 
-        print("=== meta_update ===")
-
         # 가중치 업데이트 확인용 변수
         # prev_weights = {}
         # for name, param in self.classifier.named_parameters():
