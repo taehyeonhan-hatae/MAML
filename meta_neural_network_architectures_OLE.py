@@ -979,13 +979,11 @@ class VGGReLUNormNetwork(nn.Module):
             out = F.avg_pool2d(out, out.shape[2])
 
         out = out.view(out.size(0), -1)
+        embedding = out
 
         if self.args.loss_function == "Softmax":
-            embedding = out
             out = self.layer_dict['linear'](out, param_dict['linear'])
-            original_logits = out
-            if self.args.ole:
-                original_logits = embedding
+            original_logits = out # Softmax layer인 경우 preds와 original logit이 같다
         elif self.args.loss_function == "ArcFace":
             out, original_logits = self.layer_dict['head'](out, label, param_dict['head'])
         elif self.args.loss_function == "CurricularFace":
@@ -994,7 +992,7 @@ class VGGReLUNormNetwork(nn.Module):
             original_logits = "no selected loss function"
             print(original_logits)
 
-        return out, original_logits
+        return out, embedding, original_logits
 
 
     def re_init(self):

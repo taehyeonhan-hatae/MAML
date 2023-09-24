@@ -140,7 +140,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         return param_dict
 
-    def apply_inner_loop_update(self, loss, names_weights_copy, use_second_order, current_step_idx):
+    def apply_inner_loop_update(self, loss, embedding, label, names_weights_copy, use_second_order, current_step_idx):
         """
         Applies an inner loop update given current step's loss, the weights to update, a flag indicating whether to use
         second order derivatives and the current step's index.
@@ -151,11 +151,20 @@ class MAMLFewShotClassifier(nn.Module):
         :return: A dictionary with the updated weights (name, param)
         """
 
+        print("apply_inner_loop_update == ", current_step_idx)
+
         num_gpus = torch.cuda.device_count()
         if num_gpus > 1:
             self.classifier.module.zero_grad(params=names_weights_copy)
         else:
             self.classifier.zero_grad(params=names_weights_copy)
+
+        if self.args.ole:
+            print("cross entropy loss == ", loss.item())
+            ole_loss = OLELoss.apply(embedding, label)
+            rate = 1
+            print("ole_loss == ", ole_loss.item())
+            loss = loss + rate * ole_loss
 
         grads = torch.autograd.grad(loss, names_weights_copy.values(),
                                     create_graph=use_second_order, allow_unused=True)
@@ -251,7 +260,7 @@ class MAMLFewShotClassifier(nn.Module):
 
             for num_step in range(num_steps):
 
-                support_loss, support_preds = self.net_forward(
+                support_loss, embedding, support_preds = self.net_forward(
                     x=x_support_set_task,
                     y=y_support_set_task,
                     weights=names_weights_copy,
@@ -269,19 +278,21 @@ class MAMLFewShotClassifier(nn.Module):
 
 
                 names_weights_copy = self.apply_inner_loop_update(loss=support_loss,
+                                                                  embedding=embedding,
+                                                                  label=y_support_set_task,
                                                                   names_weights_copy=names_weights_copy,
                                                                   use_second_order=use_second_order,
                                                                   current_step_idx=num_step)
 
                 if use_multi_step_loss_optimization and training_phase and epoch < self.args.multi_step_loss_num_epochs:
-                    target_loss, target_preds = self.net_forward(x=x_target_set_task,
+                    target_loss, embedding, target_preds = self.net_forward(x=x_target_set_task,
                                                                  y=y_target_set_task, weights=names_weights_copy,
                                                                  backup_running_statistics=False, training=True,
                                                                  num_step=num_step)
 
                     task_losses.append(per_step_loss_importance_vectors[num_step] * target_loss)
                 elif num_step == (self.args.number_of_training_steps_per_iter - 1):
-                    target_loss, target_preds = self.net_forward(x=x_target_set_task,
+                    target_loss, embedding, target_preds = self.net_forward(x=x_target_set_task,
                                                                  y=y_target_set_task, weights=names_weights_copy,
                                                                  backup_running_statistics=False, training=True,
                                                                  num_step=num_step)
@@ -342,7 +353,7 @@ class MAMLFewShotClassifier(nn.Module):
         :param num_step: An integer indicating the number of the step in the inner loop.
         :return: the crossentropy losses with respect to the given y, the predictions of the base model.
         """
-        preds, original_logits = self.classifier.forward(x=x, label=y, params=weights,
+        preds, embedding, original_logits = self.classifier.forward(x=x, label=y, params=weights,
                                         training=training,
                                         backup_running_statistics=backup_running_statistics, num_step=num_step)
 
@@ -354,13 +365,13 @@ class MAMLFewShotClassifier(nn.Module):
         # if self.args.ole:
         #     embedding = original_logits
         #     ole_loss = OLELoss.apply(embedding, y)
-        #     #rate = (current_epoch / self.args.total_epochs) ** 2
-        #     rate = (self.args.total_epochs / current_epoch)
+        #     rate = 1
+        #     print("cross entropy loss == ", loss.item())
+        #     print("ole_loss == ", ole_loss.item())
         #     loss = loss + rate * ole_loss
-        #     original_logits = preds
 
         # return loss, preds
-        return loss, original_logits
+        return loss, embedding, original_logits
 
     def trainable_parameters(self):
         """
@@ -404,6 +415,8 @@ class MAMLFewShotClassifier(nn.Module):
         Applies an outer loop update on the meta-parameters of the model.
         :param loss: The current crossentropy loss.
         """
+
+        print("=== meta_update ===")
 
         # 가중치 업데이트 확인용 변수
         # prev_weights = {}
