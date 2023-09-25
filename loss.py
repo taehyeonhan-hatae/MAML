@@ -210,6 +210,8 @@ class OLELoss(Function):
     @staticmethod
     def forward(ctx, X, y):
 
+        print("OLELoss forward")
+
         X = X.cpu().numpy()
         y = y.cpu().numpy()
 
@@ -278,7 +280,5 @@ class OLELoss(Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-
         dX = ctx.saved_tensors[0]
-
         return dX.cuda(), None

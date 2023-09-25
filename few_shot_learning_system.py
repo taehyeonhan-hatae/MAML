@@ -150,25 +150,41 @@ class MAMLFewShotClassifier(nn.Module):
         :param current_step_idx: Current step's index.
         :return: A dictionary with the updated weights (name, param)
         """
-
-        #print("apply_inner_loop_update == ", current_step_idx)
-
         num_gpus = torch.cuda.device_count()
         if num_gpus > 1:
             self.classifier.module.zero_grad(params=names_weights_copy)
         else:
             self.classifier.zero_grad(params=names_weights_copy)
 
-        if self.args.ole:
-            ole_loss = OLELoss.apply(embedding, label)
-            rate = 3
-            loss = loss + rate * ole_loss
-            # print("cross entropy loss == ", loss.item())
-            #print("ole_loss == ", ole_loss.item())
+        # for name, param in names_weights_copy.items():
+        #     # 모두 0인것을 확인
+        #     print("name == ", name)
+        #     print("param == ", param.grad)
 
-        grads = torch.autograd.grad(loss, names_weights_copy.values(),
+        if self.args.ole:
+
+            #     ole_loss = OLELoss.apply(embedding, label)
+            #     rate = 3
+            #     loss = loss + rate * ole_loss
+            ce_grads = torch.autograd.grad(loss, names_weights_copy.values(),
+                                    create_graph=use_second_order, allow_unused=True, retain_graph=True)
+
+            ole_loss = OLELoss.apply(embedding, label)
+            ole_grads = torch.autograd.grad(ole_loss, names_weights_copy.values(),
                                     create_graph=use_second_order, allow_unused=True)
+            rate = 3
+            grads = ce_grads + rate * ole_grads
+        else:
+            grads = torch.autograd.grad(loss, names_weights_copy.values(),
+                                        create_graph=use_second_order, allow_unused=True)
+
         names_grads_copy = dict(zip(names_weights_copy.keys(), grads))
+
+        # for name, grad in names_grads_copy.items():
+        #     # CE loss의 비율을 0으로 하면 linear weight의 grad는 0이다
+        #     print("name == ", name)
+        #     print("param == ", grad)
+
 
         names_weights_copy = {key: value[0] for key, value in names_weights_copy.items()}
 
@@ -362,15 +378,6 @@ class MAMLFewShotClassifier(nn.Module):
 
         loss = F.cross_entropy(input=preds, target=y)
 
-        # if self.args.ole:
-        #     embedding = original_logits
-        #     ole_loss = OLELoss.apply(embedding, y)
-        #     rate = 1
-        #     print("cross entropy loss == ", loss.item())
-        #     print("ole_loss == ", ole_loss.item())
-        #     loss = loss + rate * ole_loss
-
-        # return loss, preds
         return loss, embedding, original_logits
 
     def trainable_parameters(self):
