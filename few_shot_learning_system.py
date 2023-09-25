@@ -161,7 +161,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         if self.args.ole:
             ole_loss = OLELoss.apply(embedding, label)
-            rate = 1
+            rate = 3
             loss = loss + rate * ole_loss
             # print("cross entropy loss == ", loss.item())
             #print("ole_loss == ", ole_loss.item())
