@@ -210,8 +210,6 @@ class OLELoss(Function):
     @staticmethod
     def forward(ctx, X, y):
 
-        print("OLELoss forward")
-
         X = X.cpu().numpy()
         y = y.cpu().numpy()
 
