@@ -172,32 +172,6 @@ class MAMLFewShotClassifier(nn.Module):
 
         names_grads_copy = {}
 
-        # if self.args.ole:
-        #     ole_loss = OLELoss.apply(embedding, label)
-        #
-        #     ce_grads = torch.autograd.grad(torch.tensor(1) * loss, names_weights_copy.values(),
-        #                                    create_graph=use_second_order, allow_unused=True, retain_graph=True)
-        #     ole_grads = torch.autograd.grad(torch.tensor(2) * ole_loss, names_weights_copy.values(),
-        #                                     create_graph=use_second_order, allow_unused=True)
-        #
-        #     grads =  ce_grads + ole_grads
-        #     names_grads_copy = dict(zip(names_weights_copy.keys(), grads))
-        #
-        # if self.args.arbiter:
-        #     ole_loss = OLELoss.apply(embedding, label)
-        #
-        #     ce_grads = torch.autograd.grad(loss, names_weights_copy.values(),
-        #                                        create_graph=use_second_order, allow_unused=True, retain_graph=True)
-        #     ole_grads = torch.autograd.grad(ole_loss, names_weights_copy.values(),
-        #                                     create_graph=use_second_order, allow_unused=True)
-        #
-        #     for param_name, ce_grad, ole_grad in zip(names_weights_copy.keys(), ce_grads, ole_grads):
-        #         #names_grads_copy[param_name] = alpha[param_name] * ce_grads + beta[param_name].item() * ole_grads
-        #         if not ole_grad == None:
-        #             names_grads_copy[param_name] = torch.tensor(1) * ce_grad + torch.tensor(2) * ole_grad
-        #         else:
-        #             names_grads_copy[param_name] = torch.tensor(1) * ce_grad
-
         if self.args.ole:
 
             # ole_loss = OLELoss.apply(embedding, label)
@@ -215,6 +189,8 @@ class MAMLFewShotClassifier(nn.Module):
 
             for param_name, ce_grad, ole_grad in zip(names_weights_copy.keys(), ce_grads, ole_grads):
 
+                print("param_name == ", param_name)
+
                 if self.args.arbiter:
                     if not ole_grad == None:
                         names_grads_copy[param_name] = alpha[param_name] * ce_grad + beta[param_name].item() * ole_grad
@@ -226,8 +202,6 @@ class MAMLFewShotClassifier(nn.Module):
                     else:
                         names_grads_copy[param_name] = torch.tensor(1) * ce_grad
 
-            grads =  ce_grads + ole_grads
-            names_grads_copy = dict(zip(names_weights_copy.keys(), grads))
         else:
             # retain_graph 때문에, else문을 해야한다
             grads = torch.autograd.grad(loss, names_weights_copy.values(),
@@ -506,7 +480,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         # 가중치 업데이트 확인용 변수
         # prev_weights = {}
-        # for name, param in self.classifier.named_parameters():
+        # for name, param in self.arbiter.named_parameters():
         #     prev_weights[name] = param.data.clone()
 
         self.optimizer.zero_grad()
@@ -518,7 +492,7 @@ class MAMLFewShotClassifier(nn.Module):
         self.optimizer.step()
 
         # 가중치 업데이트 확인
-        # for name, param in self.classifier.named_parameters():
+        # for name, param in self.arbiter.named_parameters():
         #     if not torch.equal(prev_weights[name], param.data):
         #         print(f"{name} 가중치가 업데이트되었습니다.")
         #         prev_weights[name] = param.data.clone()
