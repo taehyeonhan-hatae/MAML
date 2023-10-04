@@ -70,6 +70,16 @@ class MAMLFewShotClassifier(nn.Module):
 
         names_weights_copy = self.get_inner_loop_parameter_dict(self.classifier.named_parameters())
 
+        # Gradient Arbiter
+        if self.args.arbiter:
+            num_layers = len(names_weights_copy)
+            input_dim = num_layers * 2
+            self.arbiter = nn.Sequential(
+                nn.Linear(input_dim, input_dim),
+                nn.ReLU(inplace=True),
+                nn.Linear(input_dim, input_dim)
+            ).to(device=self.device)
+
         self.inner_loop_optimizer.initialise(
             names_weights_dict=names_weights_copy)
 
@@ -85,7 +95,6 @@ class MAMLFewShotClassifier(nn.Module):
         for name, param in self.named_parameters():
             if param.requires_grad:
                 print(name, param.shape, param.device, param.requires_grad)
-
 
         self.optimizer = optim.Adam(self.trainable_parameters(), lr=args.meta_learning_rate, amsgrad=False)
         self.scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer, T_max=self.args.total_epochs,
@@ -140,7 +149,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         return param_dict
 
-    def apply_inner_loop_update(self, loss, embedding, label, names_weights_copy, use_second_order, current_step_idx):
+    def apply_inner_loop_update(self, loss, embedding, label, names_weights_copy, alpha, beta, use_second_order, current_step_idx):
         """
         Applies an inner loop update given current step's loss, the weights to update, a flag indicating whether to use
         second order derivatives and the current step's index.
@@ -157,36 +166,74 @@ class MAMLFewShotClassifier(nn.Module):
             self.classifier.zero_grad(params=names_weights_copy)
 
         # for name, param in names_weights_copy.items():
-        #     # 모두 0인것을 확인
+        #     # 모든 gradient가 0인것을 확인
         #     print("name == ", name)
         #     print("param == ", param.grad)
 
+        names_grads_copy = {}
+
+        # if self.args.ole:
+        #     ole_loss = OLELoss.apply(embedding, label)
+        #
+        #     ce_grads = torch.autograd.grad(torch.tensor(1) * loss, names_weights_copy.values(),
+        #                                    create_graph=use_second_order, allow_unused=True, retain_graph=True)
+        #     ole_grads = torch.autograd.grad(torch.tensor(2) * ole_loss, names_weights_copy.values(),
+        #                                     create_graph=use_second_order, allow_unused=True)
+        #
+        #     grads =  ce_grads + ole_grads
+        #     names_grads_copy = dict(zip(names_weights_copy.keys(), grads))
+        #
+        # if self.args.arbiter:
+        #     ole_loss = OLELoss.apply(embedding, label)
+        #
+        #     ce_grads = torch.autograd.grad(loss, names_weights_copy.values(),
+        #                                        create_graph=use_second_order, allow_unused=True, retain_graph=True)
+        #     ole_grads = torch.autograd.grad(ole_loss, names_weights_copy.values(),
+        #                                     create_graph=use_second_order, allow_unused=True)
+        #
+        #     for param_name, ce_grad, ole_grad in zip(names_weights_copy.keys(), ce_grads, ole_grads):
+        #         #names_grads_copy[param_name] = alpha[param_name] * ce_grads + beta[param_name].item() * ole_grads
+        #         if not ole_grad == None:
+        #             names_grads_copy[param_name] = torch.tensor(1) * ce_grad + torch.tensor(2) * ole_grad
+        #         else:
+        #             names_grads_copy[param_name] = torch.tensor(1) * ce_grad
+
         if self.args.ole:
+
+            # ole_loss = OLELoss.apply(embedding, label)
+            # rate = 2
+            # loss = loss + rate * ole_loss
+            # grads = torch.autograd.grad(loss, names_weights_copy.values(),
+            #                             create_graph=use_second_order, allow_unused=True)
+
             ole_loss = OLELoss.apply(embedding, label)
-            rate = 3
-            loss = loss + rate * ole_loss
-            grads = torch.autograd.grad(loss, names_weights_copy.values(),
-                                        create_graph=use_second_order, allow_unused=True)
 
+            ce_grads = torch.autograd.grad(loss, names_weights_copy.values(),
+                                               create_graph=use_second_order, allow_unused=True, retain_graph=True)
+            ole_grads = torch.autograd.grad(ole_loss, names_weights_copy.values(),
+                                            create_graph=use_second_order, allow_unused=True)
 
-            #ole_loss = OLELoss.apply(embedding, label) # 순서 바꿈
-            #ce_grads = torch.autograd.grad(loss, names_weights_copy.values(),
-             #                       create_graph=use_second_order, allow_unused=True, retain_graph=True)
+            for param_name, ce_grad, ole_grad in zip(names_weights_copy.keys(), ce_grads, ole_grads):
 
-           # ole_grads = torch.autograd.grad(ole_loss, names_weights_copy.values(),
-                      #              create_graph=use_second_order, allow_unused=True)
-           # rate = 3
-            #grads = ce_grads + rate * ole_grads
+                if self.args.arbiter:
+                    if not ole_grad == None:
+                        names_grads_copy[param_name] = alpha[param_name] * ce_grad + beta[param_name].item() * ole_grad
+                    else:
+                        names_grads_copy[param_name] = alpha[param_name] * ce_grad
+                else:
+                    if not ole_grad == None:
+                        names_grads_copy[param_name] = torch.tensor(1) * ce_grad + torch.tensor(2) * ole_grad
+                    else:
+                        names_grads_copy[param_name] = torch.tensor(1) * ce_grad
+
+            grads =  ce_grads + ole_grads
+            names_grads_copy = dict(zip(names_weights_copy.keys(), grads))
         else:
+            # retain_graph 때문에, else문을 해야한다
             grads = torch.autograd.grad(loss, names_weights_copy.values(),
                                         create_graph=use_second_order, allow_unused=True)
 
-        names_grads_copy = dict(zip(names_weights_copy.keys(), grads))
-
-        # for name, grad in names_grads_copy.items():
-        #     # CE loss의 비율을 0으로 하면 linear weight의 grad는 0이다
-        #     print("name == ", name)
-        #     print("param == ", grad)
+            names_grads_copy = dict(zip(names_weights_copy.keys(), grads))
 
 
         names_weights_copy = {key: value[0] for key, value in names_weights_copy.items()}
@@ -287,6 +334,9 @@ class MAMLFewShotClassifier(nn.Module):
                     training=True,
                     num_step=num_step)
 
+                generated_alpha_params = {}
+                generated_beta_params = {}
+
                 # print("support_loss == " , support_loss)
                 comprehensive_losses["support_loss_" + str(num_step)] = support_loss.item()
 
@@ -295,11 +345,39 @@ class MAMLFewShotClassifier(nn.Module):
                 support_accuracy = support_predicted.float().eq(y_support_set_task.data.float()).cpu().float()
                 comprehensive_losses["support_accuracy_" + str(num_step)] = np.mean(list(support_accuracy))
 
+                alpha = {}
+                beta = {}
+
+                if self.args.arbiter:
+                    support_loss_grad = torch.autograd.grad(support_loss, names_weights_copy.values(),
+                                                            retain_graph=True)
+
+                    per_step_task_embedding = []
+                    for k, v in names_weights_copy.items():
+                        per_step_task_embedding.append(v.mean())
+
+                    for i in range(len(support_loss_grad)):
+                        per_step_task_embedding.append(support_loss_grad[i].mean())
+
+                    per_step_task_embedding = torch.stack(per_step_task_embedding)
+
+                    generated_params = self.arbiter(per_step_task_embedding)
+                    num_layers = len(names_weights_copy)
+
+                    alpha, beta = torch.split(generated_params, split_size_or_sections=num_layers)
+                    g = 0
+                    for key in names_weights_copy.keys():
+                        generated_alpha_params[key] = alpha[g]
+                        generated_beta_params[key] = beta[g]
+                        g += 1
+
 
                 names_weights_copy = self.apply_inner_loop_update(loss=support_loss,
                                                                   embedding=embedding,
                                                                   label=y_support_set_task,
                                                                   names_weights_copy=names_weights_copy,
+                                                                  alpha=generated_alpha_params,
+                                                                  beta=generated_beta_params,
                                                                   use_second_order=use_second_order,
                                                                   current_step_idx=num_step)
 

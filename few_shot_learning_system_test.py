@@ -172,65 +172,68 @@ class MAMLFewShotClassifier(nn.Module):
 
         names_grads_copy = {}
 
+        # if self.args.ole:
+        #     ole_loss = OLELoss.apply(embedding, label)
+        #
+        #     ce_grads = torch.autograd.grad(torch.tensor(1) * loss, names_weights_copy.values(),
+        #                                    create_graph=use_second_order, allow_unused=True, retain_graph=True)
+        #     ole_grads = torch.autograd.grad(torch.tensor(2) * ole_loss, names_weights_copy.values(),
+        #                                     create_graph=use_second_order, allow_unused=True)
+        #
+        #     grads =  ce_grads + ole_grads
+        #     names_grads_copy = dict(zip(names_weights_copy.keys(), grads))
+        #
+        # if self.args.arbiter:
+        #     ole_loss = OLELoss.apply(embedding, label)
+        #
+        #     ce_grads = torch.autograd.grad(loss, names_weights_copy.values(),
+        #                                        create_graph=use_second_order, allow_unused=True, retain_graph=True)
+        #     ole_grads = torch.autograd.grad(ole_loss, names_weights_copy.values(),
+        #                                     create_graph=use_second_order, allow_unused=True)
+        #
+        #     for param_name, ce_grad, ole_grad in zip(names_weights_copy.keys(), ce_grads, ole_grads):
+        #         #names_grads_copy[param_name] = alpha[param_name] * ce_grads + beta[param_name].item() * ole_grads
+        #         if not ole_grad == None:
+        #             names_grads_copy[param_name] = torch.tensor(1) * ce_grad + torch.tensor(2) * ole_grad
+        #         else:
+        #             names_grads_copy[param_name] = torch.tensor(1) * ce_grad
+
         if self.args.ole:
-            ce_grads = torch.autograd.grad(loss, names_weights_copy.values(),
-                                           create_graph=use_second_order, allow_unused=True, retain_graph=True)
+
+            # ole_loss = OLELoss.apply(embedding, label)
+            # rate = 2
+            # loss = loss + rate * ole_loss
+            # grads = torch.autograd.grad(loss, names_weights_copy.values(),
+            #                             create_graph=use_second_order, allow_unused=True)
 
             ole_loss = OLELoss.apply(embedding, label)
+
+            ce_grads = torch.autograd.grad(loss, names_weights_copy.values(),
+                                               create_graph=use_second_order, allow_unused=True, retain_graph=True)
             ole_grads = torch.autograd.grad(ole_loss, names_weights_copy.values(),
                                             create_graph=use_second_order, allow_unused=True)
 
-            grads = torch.tensor(1) * ce_grads + torch.tensor(2) * ole_grads
-            names_grads_copy1 = dict(zip(names_weights_copy.keys(), grads))
+            for param_name, ce_grad, ole_grad in zip(names_weights_copy.keys(), ce_grads, ole_grads):
 
-            # for key, value in names_grads_copy1.items():
-            #     print("key == ", key)
-            # print("+" * 10 )
-
-            if self.args.arbiter:
-
-                for param_name, ce_grad, kl_grad in zip(names_weights_copy.keys(), ce_grads, ole_grads):
-                    #names_grads_copy[param_name] = alpha[param_name] * ce_grads + beta[param_name].item() * ole_grads
-                    names_grads_copy[param_name] = torch.tensor(1) * ce_grads + torch.tensor(2) * ole_grads
-
-                # for key, value in names_grads_copy.items():
-                #     print("key == ", key)
-
-                if names_grads_copy == names_grads_copy1:
-                    print("두 dictionary는 같습니다.")
+                if self.args.arbiter:
+                    if not ole_grad == None:
+                        names_grads_copy[param_name] = alpha[param_name] * ce_grad + beta[param_name].item() * ole_grad
+                    else:
+                        names_grads_copy[param_name] = alpha[param_name] * ce_grad
                 else:
-                    print("두 dictionary는 다릅니다.")
+                    if not ole_grad == None:
+                        names_grads_copy[param_name] = torch.tensor(1) * ce_grad + torch.tensor(2) * ole_grad
+                    else:
+                        names_grads_copy[param_name] = torch.tensor(1) * ce_grad
 
-                # names_ce_grads_copy = dict(zip(names_weights_copy.keys(), ce_grads))
-                # names_ole_grads_copy = dict(zip(names_weights_copy.keys(), ole_grads))
-                # ## beta[key], alpha[key] =2 로 설정해도 같은 결과가 나와야한다
-                # for key in names_ce_grads_copy.keys():
-                #     alpha[key] = torch.tensor(1)
-                #     names_ce_grads_copy[key] = alpha[key] * names_ce_grads_copy[key]
-                #
-                # for key in names_ole_grads_copy.keys():
-                #     if not names_ole_grads_copy[key] == None:
-                #         beta[key] = torch.tensor(2)
-                #         names_ole_grads_copy[key] = beta[key] * names_ole_grads_copy[key]
-                #
-                # for name, param in names_ce_grads_copy.items():
-                #     if not names_ole_grads_copy[name] == None:
-                #         names_grads_copy[name] = names_ce_grads_copy[name] + names_ole_grads_copy[name]
-                #     else:
-                #         names_grads_copy[name] = names_ce_grads_copy[name]
-
-
+            grads =  ce_grads + ole_grads
+            names_grads_copy = dict(zip(names_weights_copy.keys(), grads))
         else:
             # retain_graph 때문에, else문을 해야한다
             grads = torch.autograd.grad(loss, names_weights_copy.values(),
                                         create_graph=use_second_order, allow_unused=True)
 
             names_grads_copy = dict(zip(names_weights_copy.keys(), grads))
-
-        # for name, grad in names_grads_copy.items():
-        #     # CE loss의 비율을 0으로 하면 linear weight의 grad는 0이다
-        #     print("name == ", name)
-        #     print("param == ", grad)
 
 
         names_weights_copy = {key: value[0] for key, value in names_weights_copy.items()}
