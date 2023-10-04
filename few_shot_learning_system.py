@@ -162,18 +162,21 @@ class MAMLFewShotClassifier(nn.Module):
         #     print("param == ", param.grad)
 
         if self.args.ole:
-
-            #     ole_loss = OLELoss.apply(embedding, label)
-            #     rate = 3
-            #     loss = loss + rate * ole_loss
-            ce_grads = torch.autograd.grad(loss, names_weights_copy.values(),
-                                    create_graph=use_second_order, allow_unused=True, retain_graph=True)
-
             ole_loss = OLELoss.apply(embedding, label)
-            ole_grads = torch.autograd.grad(ole_loss, names_weights_copy.values(),
-                                    create_graph=use_second_order, allow_unused=True)
             rate = 3
-            grads = ce_grads + rate * ole_grads
+            loss = loss + rate * ole_loss
+            grads = torch.autograd.grad(loss, names_weights_copy.values(),
+                                        create_graph=use_second_order, allow_unused=True)
+
+
+            #ole_loss = OLELoss.apply(embedding, label) # 순서 바꿈
+            #ce_grads = torch.autograd.grad(loss, names_weights_copy.values(),
+             #                       create_graph=use_second_order, allow_unused=True, retain_graph=True)
+
+           # ole_grads = torch.autograd.grad(ole_loss, names_weights_copy.values(),
+                      #              create_graph=use_second_order, allow_unused=True)
+           # rate = 3
+            #grads = ce_grads + rate * ole_grads
         else:
             grads = torch.autograd.grad(loss, names_weights_copy.values(),
                                         create_graph=use_second_order, allow_unused=True)
