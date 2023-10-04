@@ -60,5 +60,6 @@
   "curriculum": false,
   "backbone": "4-CONV",
   "loss_function": "Softmax",
-  "ole": true
+  "ole": true,
+  "arbiter": false
 }
