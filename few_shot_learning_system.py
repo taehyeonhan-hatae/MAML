@@ -189,8 +189,6 @@ class MAMLFewShotClassifier(nn.Module):
 
             for param_name, ce_grad, ole_grad in zip(names_weights_copy.keys(), ce_grads, ole_grads):
 
-                print("param_name == ", param_name)
-
                 if self.args.arbiter:
                     if not ole_grad == None:
                         names_grads_copy[param_name] = alpha[param_name] * ce_grad + beta[param_name].item() * ole_grad
