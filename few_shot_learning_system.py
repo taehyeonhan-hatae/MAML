@@ -198,13 +198,13 @@ class MAMLFewShotClassifier(nn.Module):
             ce_grads = torch.autograd.grad(softmax_loss, names_weights_copy.values(),
                                                create_graph=use_second_order, allow_unused=True)
 
-            for param_name, ce_grad, ole_grad in zip(names_weights_copy.keys(), ce_grads, ole_grads):
-                if not ole_grad == None:
-                    names_grads_copy1[param_name] = ce_grad + ole_grad
-                else:
-                    names_grads_copy1[param_name] = ce_grad
-
-            print("names_grads_copy1[param_name] == ", names_grads_copy1["layer_dict.conv0.conv.weight"])
+            # for param_name, ce_grad, ole_grad in zip(names_weights_copy.keys(), ce_grads, ole_grads):
+            #     if not ole_grad == None:
+            #         names_grads_copy1[param_name] = ce_grad + ole_grad
+            #     else:
+            #         names_grads_copy1[param_name] = ce_grad
+            #
+            # print("names_grads_copy1[param_name] == ", names_grads_copy1["layer_dict.conv0.conv.weight"])
 
 
             for param_name, ce_grad, ole_grad in zip(names_weights_copy.keys(), ce_grads, ole_grads):
@@ -219,7 +219,7 @@ class MAMLFewShotClassifier(nn.Module):
                     else:
                         names_grads_copy[param_name] = 1 * ce_grad
 
-            print("names_grads_copy[param_name] == ", names_grads_copy["layer_dict.conv0.conv.weight"])
+            #print("names_grads_copy[param_name] == ", names_grads_copy["layer_dict.conv0.conv.weight"])
             # different_keys = [key for key in names_grads_copy.keys() if not torch.equal(names_grads_copy[key], names_grads_copy2[key])]
             # print("different_keys == ", different_keys)
         else:
