@@ -279,4 +279,7 @@ class OLELoss(Function):
     @staticmethod
     def backward(ctx, grad_output):
         dX = ctx.saved_tensors[0]
+
+        print(dX)
+
         return dX.cuda(), None

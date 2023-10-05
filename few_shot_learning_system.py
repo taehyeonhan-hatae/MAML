@@ -149,7 +149,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         return param_dict
 
-    def apply_inner_loop_update(self, loss, embedding, label, names_weights_copy, alpha, beta, use_second_order, current_step_idx):
+    def apply_inner_loop_update(self, softmax_loss, embedding, label, names_weights_copy, alpha, beta, use_second_order, current_step_idx):
         """
         Applies an inner loop update given current step's loss, the weights to update, a flag indicating whether to use
         second order derivatives and the current step's index.
@@ -174,18 +174,27 @@ class MAMLFewShotClassifier(nn.Module):
 
         if self.args.ole:
 
-            # ole_loss = OLELoss.apply(embedding, label)
-            # rate = 2
-            # loss = loss + rate * ole_loss
-            # grads = torch.autograd.grad(loss, names_weights_copy.values(),
-            #                             create_graph=use_second_order, allow_unused=True)
+            print("="*20)
+            print("step == ", current_step_idx)
 
+            print("+++" * 10 + " OLELoss.apply(embedding, label)" + "+++" * 10)
             ole_loss = OLELoss.apply(embedding, label)
+            loss = torch.tensor(1) * softmax_loss + torch.tensor(2) * ole_loss
+
+            print("+++" * 10 + " grads = torch.autograd.grad" + "+++" * 10)
+            grads = torch.autograd.grad(loss, names_weights_copy.values(),
+                                        create_graph=use_second_order, allow_unused=True, retain_graph=True)
+            names_grads_copy2 = dict(zip(names_weights_copy.keys(), grads))
+
+            print("+++" * 10 + " ole_grads = torch.autograd.grad" + "+++" * 10)
+            ole_grads = torch.autograd.grad(ole_loss, names_weights_copy.values(),
+                                            create_graph=use_second_order, allow_unused=True, retain_graph=True)
 
             ce_grads = torch.autograd.grad(loss, names_weights_copy.values(),
-                                               create_graph=use_second_order, allow_unused=True, retain_graph=True)
-            ole_grads = torch.autograd.grad(ole_loss, names_weights_copy.values(),
-                                            create_graph=use_second_order, allow_unused=True)
+                                               create_graph=use_second_order, allow_unused=True)
+
+            print("ce_grads == ", ce_grads)
+            print("ole_grads count == ", len(ole_grads))
 
             for param_name, ce_grad, ole_grad in zip(names_weights_copy.keys(), ce_grads, ole_grads):
 
@@ -200,9 +209,12 @@ class MAMLFewShotClassifier(nn.Module):
                     else:
                         names_grads_copy[param_name] = torch.tensor(1) * ce_grad
 
+            different_keys = [key for key in names_grads_copy.keys() if not torch.equal(names_grads_copy[key], names_grads_copy2[key])]
+
+            print("different_keys == ", different_keys)
         else:
             # retain_graph 때문에, else문을 해야한다
-            grads = torch.autograd.grad(loss, names_weights_copy.values(),
+            grads = torch.autograd.grad(softmax_loss, names_weights_copy.values(),
                                         create_graph=use_second_order, allow_unused=True)
 
             names_grads_copy = dict(zip(names_weights_copy.keys(), grads))
@@ -344,7 +356,7 @@ class MAMLFewShotClassifier(nn.Module):
                         g += 1
 
 
-                names_weights_copy = self.apply_inner_loop_update(loss=support_loss,
+                names_weights_copy = self.apply_inner_loop_update(softmax_loss=support_loss,
                                                                   embedding=embedding,
                                                                   label=y_support_set_task,
                                                                   names_weights_copy=names_weights_copy,
@@ -430,6 +442,8 @@ class MAMLFewShotClassifier(nn.Module):
         # print("original_logits == ", original_logits)
 
         loss = F.cross_entropy(input=preds, target=y)
+
+        # print('loss == ', loss)
 
         return loss, embedding, original_logits
 
