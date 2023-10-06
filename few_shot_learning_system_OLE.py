@@ -64,6 +64,7 @@ class MAMLFewShotClassifier(nn.Module):
         self.task_learning_rate = args.init_inner_loop_learning_rate
 
         self.inner_loop_optimizer = LSLRGradientDescentLearningRule(device=device,
+                                                                    args=self.args,
                                                                     init_learning_rate=self.task_learning_rate,
                                                                     total_num_inner_loop_steps=self.args.number_of_training_steps_per_iter,
                                                                     use_learnable_learning_rates=self.args.learnable_per_layer_per_step_inner_loop_learning_rate)

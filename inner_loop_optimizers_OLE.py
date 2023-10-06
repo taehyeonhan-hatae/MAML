@@ -54,7 +54,7 @@ class GradientDescentLearningRule(nn.Module):
 
 class LSLRGradientDescentLearningRule(nn.Module):
 
-    def __init__(self, device, total_num_inner_loop_steps, use_learnable_learning_rates, init_learning_rate=1e-3):
+    def __init__(self, device, args, total_num_inner_loop_steps, use_learnable_learning_rates, init_learning_rate=1e-3):
 
         super(LSLRGradientDescentLearningRule, self).__init__()
         print(init_learning_rate)
@@ -64,6 +64,8 @@ class LSLRGradientDescentLearningRule(nn.Module):
         self.init_learning_rate.to(device)
         self.total_num_inner_loop_steps = total_num_inner_loop_steps
         self.use_learnable_learning_rates = use_learnable_learning_rates
+
+        self.args = args
 
     def initialise(self, names_weights_dict):
 
@@ -94,26 +96,35 @@ class LSLRGradientDescentLearningRule(nn.Module):
 
         names_grads_wrt_params_dict = {} # Learning rate와 gradient가 모두 포함되어있다
 
-        for param_name, ce_grad, ole_grad in zip(names_weights_dict.keys(), ce_grads, ole_grads):
-            if self.args.arbiter:
-                if not ole_grad == None:
-                    # per-step per-layer meta-learnable learning rate bias term (for more stable training and better performance by 2~3%)
-                    names_grads_wrt_params_dict[param_name] = alpha[param_name] * self.names_alpha_dict[param_name.replace(".", "-")][num_step] * ce_grad \
-                                                              + beta[param_name] * self.names_beta_dict[param_name.replace(".", "-")][num_step] * ole_grad
-                    # names_grads_copy[param_name] = alpha[param_name] * ce_grad + beta[param_name] * ole_grad
+        if self.args.ole:
+            for param_name, ce_grad, ole_grad in zip(names_weights_dict.keys(), ce_grads, ole_grads):
+                if self.args.arbiter:
+                    if not ole_grad == None:
+                        # per-step per-layer meta-learnable learning rate bias term (for more stable training and better performance by 2~3%)
+                        names_grads_wrt_params_dict[param_name] = alpha[param_name] * self.names_alpha_dict[param_name.replace(".", "-")][num_step] * ce_grad \
+                                                                  + beta[param_name] * self.names_beta_dict[param_name.replace(".", "-")][num_step] * ole_grad
+                        # names_grads_copy[param_name] = alpha[param_name] * ce_grad + beta[param_name] * ole_grad
+                    else:
+                        names_grads_wrt_params_dict[param_name] = alpha[param_name] * self.names_alpha_dict[param_name.replace(".", "-")][num_step] * ce_grad
+                        # names_grads_copy[param_name] = alpha[param_name] * ce_grad
                 else:
-                    names_grads_wrt_params_dict[param_name] = alpha[param_name] * self.names_alpha_dict[param_name.replace(".", "-")][num_step] * ce_grad
-                    # names_grads_copy[param_name] = alpha[param_name] * ce_grad
-            else:
-                if not ole_grad == None:
-                    names_grads_wrt_params_dict[param_name] = self.names_alpha_dict[param_name.replace(".", "-")][num_step] * ce_grad + self.names_beta_dict[param_name.replace(".", "-")][num_step] * ole_grad
-                else:
-                    names_grads_wrt_params_dict[param_name] = self.names_alpha_dict[param_name.replace(".", "-")][num_step] * ce_grad
+                    if not ole_grad == None:
+                        names_grads_wrt_params_dict[param_name] = self.names_alpha_dict[param_name.replace(".", "-")][num_step] * ce_grad + self.names_beta_dict[param_name.replace(".", "-")][num_step] * ole_grad
+                    else:
+                        names_grads_wrt_params_dict[param_name] = self.names_alpha_dict[param_name.replace(".", "-")][num_step] * ce_grad
+        else:
+            names_grads_wrt_params_dict = dict(zip(names_weights_dict.keys(), ce_grads))
+            # for param_name, ce_grad, ole_grad in zip(names_weights_dict.keys(), ce_grads, ole_grads):
+            #     names_grads_wrt_params_dict[param_name] = self.names_alpha_dict[param_name.replace(".", "-")][
+            #                                                   num_step] * ce_grad
+
 
         for key in names_grads_wrt_params_dict.keys():
-            # updated_names_weights_dict[key] = names_weights_dict[key] - \
-            #                                   self.names_learning_rates_dict[key.replace(".", "-")][num_step] * names_grads_wrt_params_dict[key]
-            updated_names_weights_dict[key] = names_weights_dict[key] - names_grads_wrt_params_dict[key]
+            if self.args.arbiter:
+                updated_names_weights_dict[key] = names_weights_dict[key] - names_grads_wrt_params_dict[key]
+            else:
+                updated_names_weights_dict[key] = names_weights_dict[key] - \
+                                                  self.names_learning_rates_dict[key.replace(".", "-")][num_step] * names_grads_wrt_params_dict[key]
 
 
         return updated_names_weights_dict
