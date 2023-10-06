@@ -165,52 +165,23 @@ class MAMLFewShotClassifier(nn.Module):
         else:
             self.classifier.zero_grad(params=names_weights_copy)
 
-        # for name, param in names_weights_copy.items():
-        #     # 모든 gradient가 0인것을 확인
-        #     print("name == ", name)
-        #     print("param == ", param.grad)
-
         names_grads_copy = {}
-        names_grads_copy1 = {}
 
         if self.args.ole:
 
-            #print("="*20)
-            # print("step == ", current_step_idx)
-
-            #print("+++" * 10 + " OLELoss.apply(embedding, label)" + "+++" * 10)
             ole_loss = OLELoss.apply(embedding, label)
 
-            # ole_loss *= 2
-            # loss = softmax_loss + ole_loss
-            #
-            # print("+++" * 10 + " grads = torch.autograd.grad" + "+++" * 10)
-            # grads = torch.autograd.grad(loss, names_weights_copy.values(),
-            #                             create_graph=use_second_order, allow_unused=True, retain_graph=True)
-            # names_grads_copy2 = dict(zip(names_weights_copy.keys(), grads))
-            # # 여기서 grad 값이 2배가 되어야하는데 되지 않는다?
-
-
-            #print("+++" * 10 + " ole_grads = torch.autograd.grad" + "+++" * 10)
             ole_grads = torch.autograd.grad(ole_loss, names_weights_copy.values(),
                                             create_graph=use_second_order, allow_unused=True, retain_graph=True)
 
             ce_grads = torch.autograd.grad(softmax_loss, names_weights_copy.values(),
                                                create_graph=use_second_order, allow_unused=True)
 
-            # for param_name, ce_grad, ole_grad in zip(names_weights_copy.keys(), ce_grads, ole_grads):
-            #     if not ole_grad == None:
-            #         names_grads_copy1[param_name] = ce_grad + ole_grad
-            #     else:
-            #         names_grads_copy1[param_name] = ce_grad
-            #
-            # print("names_grads_copy1[param_name] == ", names_grads_copy1["layer_dict.conv0.conv.weight"])
-
 
             for param_name, ce_grad, ole_grad in zip(names_weights_copy.keys(), ce_grads, ole_grads):
                 if self.args.arbiter:
                     if not ole_grad == None:
-                        names_grads_copy[param_name] = alpha[param_name] * ce_grad + beta[param_name].item() * ole_grad
+                        names_grads_copy[param_name] = alpha[param_name] * ce_grad + beta[param_name] * ole_grad
                     else:
                         names_grads_copy[param_name] = alpha[param_name] * ce_grad
                 else:
@@ -219,9 +190,6 @@ class MAMLFewShotClassifier(nn.Module):
                     else:
                         names_grads_copy[param_name] = 1 * ce_grad
 
-            #print("names_grads_copy[param_name] == ", names_grads_copy["layer_dict.conv0.conv.weight"])
-            # different_keys = [key for key in names_grads_copy.keys() if not torch.equal(names_grads_copy[key], names_grads_copy2[key])]
-            # print("different_keys == ", different_keys)
         else:
             # retain_graph 때문에, else문을 해야한다
             grads = torch.autograd.grad(softmax_loss, names_weights_copy.values(),

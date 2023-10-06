@@ -217,7 +217,7 @@ class ExperimentBuilder(object):
         one marked as "latest" to be used by the system for the next epoch training. Useful when the training/val
         process is interrupted or stopped. Leads to fault tolerant training and validation systems that can continue
         from where they left off before.
-        :param model: Current meta learning model of any instance within the few_shot_learning_system_for_MeTAL.py
+        :param model: Current meta learning model of any instance within the few_shot_learning_system_MeTAL.py
         :param epoch: Current epoch
         :param state: Current model and experiment state dict.
         """
