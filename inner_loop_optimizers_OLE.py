@@ -94,13 +94,14 @@ class LSLRGradientDescentLearningRule(nn.Module):
 
         updated_names_weights_dict = dict()
 
-        names_grads_wrt_params_dict = {} # Learning rate와 gradient가 모두 포함되어있다
+        names_grads_wrt_params_dict = {}
 
         if self.args.ole:
             for param_name, ce_grad, ole_grad in zip(names_weights_dict.keys(), ce_grads, ole_grads):
                 if self.args.arbiter:
                     if not ole_grad == None:
                         # per-step per-layer meta-learnable learning rate bias term (for more stable training and better performance by 2~3%)
+                        # Learning rate와 gradient가 모두 포함되어있다
                         names_grads_wrt_params_dict[param_name] = alpha[param_name] * self.names_alpha_dict[param_name.replace(".", "-")][num_step] * ce_grad \
                                                                   + beta[param_name] * self.names_beta_dict[param_name.replace(".", "-")][num_step] * ole_grad
                         # names_grads_copy[param_name] = alpha[param_name] * ce_grad + beta[param_name] * ole_grad
@@ -117,6 +118,11 @@ class LSLRGradientDescentLearningRule(nn.Module):
             # for param_name, ce_grad, ole_grad in zip(names_weights_dict.keys(), ce_grads, ole_grads):
             #     names_grads_wrt_params_dict[param_name] = self.names_alpha_dict[param_name.replace(".", "-")][
             #                                                   num_step] * ce_grad
+
+        for key, grad in names_grads_wrt_params_dict.items():
+            if grad is None:
+                print('Grads not found for inner loop parameter', key)
+            names_grads_wrt_params_dict[key] = names_grads_wrt_params_dict[key].sum(dim=0)
 
 
         for key in names_grads_wrt_params_dict.keys():
