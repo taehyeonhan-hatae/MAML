@@ -251,7 +251,6 @@ class MAMLFewShotClassifier(nn.Module):
                 )
 
                 generated_alpha_params = {}
-                generated_beta_params = {}
 
                 if self.args.arbiter:
                     support_loss_grad = torch.autograd.grad(support_loss, names_weights_copy.values(),
