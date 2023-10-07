@@ -104,19 +104,20 @@ class LSLRGradientDescentLearningRule(nn.Module):
                         # Learning rate와 gradient가 모두 포함되어있다
                         names_grads_wrt_params_dict[param_name] = alpha[param_name] * self.names_alpha_dict[param_name.replace(".", "-")][num_step] * ce_grad \
                                                                   + beta[param_name] * self.names_beta_dict[param_name.replace(".", "-")][num_step] * ole_grad
+                        # names_grads_copy[param_name] = alpha[param_name] * ce_grad + beta[param_name] * ole_grad
                     else:
                         names_grads_wrt_params_dict[param_name] = alpha[param_name] * self.names_alpha_dict[param_name.replace(".", "-")][num_step] * ce_grad
+                        # names_grads_copy[param_name] = alpha[param_name] * ce_grad
                 else:
                     if not ole_grad == None:
                         names_grads_wrt_params_dict[param_name] = self.names_alpha_dict[param_name.replace(".", "-")][num_step] * ce_grad + self.names_beta_dict[param_name.replace(".", "-")][num_step] * ole_grad
                     else:
                         names_grads_wrt_params_dict[param_name] = self.names_alpha_dict[param_name.replace(".", "-")][num_step] * ce_grad
         else:
-            if self.args.arbiter:
-                for param_name, ce_grad, ole_grad in zip(names_weights_dict.keys(), ce_grads, ole_grads):
-                    names_grads_wrt_params_dict[param_name] = self.names_alpha_dict[param_name.replace(".", "-")][num_step] * ce_grad
-            else:
-                names_grads_wrt_params_dict = dict(zip(names_weights_dict.keys(), ce_grads))
+            names_grads_wrt_params_dict = dict(zip(names_weights_dict.keys(), ce_grads))
+            # for param_name, ce_grad, ole_grad in zip(names_weights_dict.keys(), ce_grads, ole_grads):
+            #     names_grads_wrt_params_dict[param_name] = self.names_alpha_dict[param_name.replace(".", "-")][
+            #                                                   num_step] * ce_grad
 
         for key, grad in names_grads_wrt_params_dict.items():
             if grad is None:
