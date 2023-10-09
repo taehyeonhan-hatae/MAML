@@ -105,12 +105,6 @@ class LSLRGradientDescentLearningRule(nn.Module):
 
         updated_names_weights_dict = dict()
 
-        # print("====")
-        # for key, value in generated_alpha_params.items():
-        #     print(key)
-        #     print(value)
-        # print("====")
-
         for key in names_grads_wrt_params_dict.keys():
 
             if self.args.arbiter:

@@ -65,11 +65,12 @@ class MAMLFewShotClassifier(nn.Module):
         # Gradient Arbiter
         if self.args.arbiter:
             num_layers = len(names_weights_copy)
-            input_dim = num_layers #* 2
+            input_dim = num_layers * 2
+            output_dim = num_layers
             self.arbiter = nn.Sequential(
                 nn.Linear(input_dim, input_dim),
                 nn.ReLU(inplace=True),
-                nn.Linear(input_dim, input_dim)
+                nn.Linear(input_dim, output_dim)
             ).to(device=self.device)
 
         self.inner_loop_optimizer.initialise(
@@ -271,7 +272,6 @@ class MAMLFewShotClassifier(nn.Module):
                     for key in names_weights_copy.keys():
                         generated_alpha_params[key] = generated_gradient_rate[g]
                         g += 1
-
 
                 names_weights_copy = self.apply_inner_loop_update(loss=support_loss,
                                                                   names_weights_copy=names_weights_copy,

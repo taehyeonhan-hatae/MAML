@@ -61,5 +61,5 @@
   "backbone": "4-CONV",
   "loss_function": "Softmax",
   "ole": false,
-  "arbiter": false
+  "arbiter": true
 }
