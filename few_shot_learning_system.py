@@ -259,10 +259,14 @@ class MAMLFewShotClassifier(nn.Module):
 
                     per_step_task_embedding = []
                     for k, v in names_weights_copy.items():
-                        per_step_task_embedding.append(v.mean())
+                        # per_step_task_embedding.append(v.mean())
+                        per_step_task_embedding.append(v.norm())
 
                     for i in range(len(support_loss_grad)):
-                        per_step_task_embedding.append(support_loss_grad[i].mean())
+                        # print("support_loss_grad[i].mean() == ", support_loss_grad[i].mean())
+                        # print("support_loss_grad[i].norm() == ", support_loss_grad[i].norm())
+                        # per_step_task_embedding.append(support_loss_grad[i].mean())
+                        per_step_task_embedding.append(support_loss_grad[i].norm())
 
                     per_step_task_embedding = torch.stack(per_step_task_embedding)
 
