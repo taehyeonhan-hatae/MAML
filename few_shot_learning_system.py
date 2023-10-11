@@ -263,12 +263,15 @@ class MAMLFewShotClassifier(nn.Module):
                         per_step_task_embedding.append(v.norm())
 
                     for i in range(len(support_loss_grad)):
-                        # print("support_loss_grad[i].mean() == ", support_loss_grad[i].mean())
-                        # print("support_loss_grad[i].norm() == ", support_loss_grad[i].norm())
                         # per_step_task_embedding.append(support_loss_grad[i].mean())
                         per_step_task_embedding.append(support_loss_grad[i].norm())
 
                     per_step_task_embedding = torch.stack(per_step_task_embedding)
+
+                    ## 추가
+                    ## - 성능이 더 떨어짐..
+                    # per_step_task_embedding = (per_step_task_embedding - per_step_task_embedding.mean()) / (
+                    #             per_step_task_embedding.std() + 1e-12)
 
                     generated_gradient_rate = self.arbiter(per_step_task_embedding)
 
