@@ -65,12 +65,12 @@ class MAMLFewShotClassifier(nn.Module):
         if self.args.arbiter:
             num_layers = len(names_weights_copy)
             input_dim = num_layers * 2
-            output_dim = num_layers
+            output_dim = num_layers #  5
             self.arbiter = nn.Sequential(
                 nn.Linear(input_dim, input_dim),
                 nn.ReLU(inplace=True),
                 nn.Linear(input_dim, output_dim),
-                #nn.Softplus(beta=2)
+                nn.Softplus(beta=2)
             ).to(device=self.device)
 
         self.inner_loop_optimizer.initialise(
@@ -172,7 +172,6 @@ class MAMLFewShotClassifier(nn.Module):
                         rescale_weight = rescale_weight.view(param.size())
                         names_weights_copy[name] = rescale_weight
                     else:
-                        print(name)
                         rescale_weight = generated_alpha_params[name] * param
                         names_weights_copy[name] = rescale_weight
 
