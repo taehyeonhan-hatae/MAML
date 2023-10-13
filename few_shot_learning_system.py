@@ -171,6 +171,10 @@ class MAMLFewShotClassifier(nn.Module):
                         rescale_weight = u @ s_diag @ v.T
                         rescale_weight = rescale_weight.view(param.size())
                         names_weights_copy[name] = rescale_weight
+                    else:
+                        print(name)
+                        rescale_weight = generated_alpha_params[name] * param
+                        names_weights_copy[name] = rescale_weight
 
         return names_weights_copy
 
@@ -297,13 +301,13 @@ class MAMLFewShotClassifier(nn.Module):
             x_target_set_task = x_target_set_task.view(-1, c, h, w)
             y_target_set_task = y_target_set_task.view(-1)
 
-            # if self.args.arbiter:
-            #     task_embeddings = self.get_task_embeddings(x_support_set_task=x_support_set_task,
-            #                                                y_support_set_task=y_support_set_task,
-            #                                                names_weights_copy=names_weights_copy)
-            #
-            #     names_weights_copy = self.weight_scaling(task_embeddings=task_embeddings,
-            #                                              names_weights_copy=names_weights_copy)
+            if self.args.arbiter:
+                task_embeddings = self.get_task_embeddings(x_support_set_task=x_support_set_task,
+                                                           y_support_set_task=y_support_set_task,
+                                                           names_weights_copy=names_weights_copy)
+
+                names_weights_copy = self.weight_scaling(task_embeddings=task_embeddings,
+                                                         names_weights_copy=names_weights_copy)
 
             for num_step in range(num_steps):
 
@@ -329,13 +333,13 @@ class MAMLFewShotClassifier(nn.Module):
                                                                   use_second_order=use_second_order,
                                                                   current_step_idx=num_step)
 
-                if self.args.arbiter:
-                    task_embeddings = self.get_task_embeddings(x_support_set_task=x_support_set_task,
-                                                               y_support_set_task=y_support_set_task,
-                                                               names_weights_copy=names_weights_copy)
-
-                    names_weights_copy = self.weight_scaling(task_embeddings=task_embeddings,
-                                                             names_weights_copy=names_weights_copy)
+                # if self.args.arbiter:
+                #     task_embeddings = self.get_task_embeddings(x_support_set_task=x_support_set_task,
+                #                                                y_support_set_task=y_support_set_task,
+                #                                                names_weights_copy=names_weights_copy)
+                #
+                #     names_weights_copy = self.weight_scaling(task_embeddings=task_embeddings,
+                #                                              names_weights_copy=names_weights_copy)
 
                 if use_multi_step_loss_optimization and training_phase and epoch < self.args.multi_step_loss_num_epochs:
                     target_loss, target_preds = self.net_forward(x=x_target_set_task,
