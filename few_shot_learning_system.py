@@ -197,13 +197,15 @@ class MAMLFewShotClassifier(nn.Module):
         per_step_task_embedding = []
         for k, v in names_weights_copy.items():
             # per_step_task_embedding.append(v.mean())
-            per_step_task_embedding.append(v.norm())
+            # per_step_task_embedding.append(v.norm())
             # per_step_task_embedding.append(v.clone().detach().norm())
+            per_step_task_embedding.append(torch.norm(v))
 
         for i in range(len(support_loss_grad)):
             # per_step_task_embedding.append(support_loss_grad[i].mean())
-            per_step_task_embedding.append(support_loss_grad[i].norm())
+            # per_step_task_embedding.append(support_loss_grad[i].norm())
             # per_step_task_embedding.append(support_loss_grad[i].clone().detach().norm())
+            per_step_task_embedding.append(torch.norm(support_loss_grad[i]))
 
         per_step_task_embedding = torch.stack(per_step_task_embedding)
 
