@@ -314,6 +314,14 @@ class MAMLFewShotClassifier(nn.Module):
 
             for num_step in range(num_steps):
 
+                if self.args.arbiter:
+                    task_embeddings = self.get_task_embeddings(x_support_set_task=x_support_set_task,
+                                                               y_support_set_task=y_support_set_task,
+                                                               names_weights_copy=names_weights_copy)
+
+                    names_weights_copy = self.weight_scaling(task_embeddings=task_embeddings,
+                                                             names_weights_copy=names_weights_copy)
+
                 support_loss, support_preds = self.net_forward(
                     x=x_support_set_task,
                     y=y_support_set_task,
@@ -322,14 +330,6 @@ class MAMLFewShotClassifier(nn.Module):
                     training=True,
                     num_step=num_step,
                 )
-
-                if self.args.arbiter:
-                    task_embeddings = self.get_task_embeddings(x_support_set_task=x_support_set_task,
-                                                               y_support_set_task=y_support_set_task,
-                                                               names_weights_copy=names_weights_copy)
-
-                    names_weights_copy = self.weight_scaling(task_embeddings=task_embeddings,
-                                                             names_weights_copy=names_weights_copy)
 
                 names_weights_copy = self.apply_inner_loop_update(loss=support_loss,
                                                                   names_weights_copy=names_weights_copy,
