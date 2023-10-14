@@ -200,14 +200,14 @@ class MAMLFewShotClassifier(nn.Module):
 
         per_step_task_embedding = []
         for k, v in names_weights_copy.items():
-            per_step_task_embedding.append(v.mean())
+            # per_step_task_embedding.append(v.mean())
             # per_step_task_embedding.append(v.norm())
-            # per_step_task_embedding.append(v.clone().detach().norm())
+            per_step_task_embedding.append(v.clone().detach().norm())
 
         for i in range(len(support_loss_grad)):
-            per_step_task_embedding.append(support_loss_grad[i].mean())
+            # per_step_task_embedding.append(support_loss_grad[i].mean())
             # per_step_task_embedding.append(support_loss_grad[i].norm())
-            # per_step_task_embedding.append(support_loss_grad[i].clone().detach().norm())
+            per_step_task_embedding.append(support_loss_grad[i].clone().detach().norm())
 
         per_step_task_embedding = torch.stack(per_step_task_embedding)
 
@@ -317,13 +317,14 @@ class MAMLFewShotClassifier(nn.Module):
 
             for num_step in range(num_steps):
 
-                if self.args.arbiter:
-                    task_embeddings = self.get_task_embeddings(x_support_set_task=x_support_set_task,
-                                                               y_support_set_task=y_support_set_task,
-                                                               names_weights_copy=names_weights_copy)
-
-                    names_weights_copy = self.weight_scaling(task_embeddings=task_embeddings,
-                                                             names_weights_copy=names_weights_copy)
+                # error
+                # if self.args.arbiter:
+                #     task_embeddings = self.get_task_embeddings(x_support_set_task=x_support_set_task,
+                #                                                y_support_set_task=y_support_set_task,
+                #                                                names_weights_copy=names_weights_copy)
+                #
+                #     names_weights_copy = self.weight_scaling(task_embeddings=task_embeddings,
+                #                                              names_weights_copy=names_weights_copy)
 
                 support_loss, support_preds = self.net_forward(
                     x=x_support_set_task,
@@ -356,13 +357,13 @@ class MAMLFewShotClassifier(nn.Module):
                     task_losses.append(per_step_loss_importance_vectors[num_step] * target_loss)
                 elif num_step == (self.args.number_of_training_steps_per_iter - 1):
 
-                    # if self.args.arbiter:
-                    #     task_embeddings = self.get_task_embeddings(x_support_set_task=x_support_set_task,
-                    #                                                y_support_set_task=y_support_set_task,
-                    #                                                names_weights_copy=names_weights_copy)
-                    #
-                    #     names_weights_copy = self.weight_scaling(task_embeddings=task_embeddings,
-                    #                                              names_weights_copy=names_weights_copy)
+                    if self.args.arbiter:
+                        task_embeddings = self.get_task_embeddings(x_support_set_task=x_support_set_task,
+                                                                   y_support_set_task=y_support_set_task,
+                                                                   names_weights_copy=names_weights_copy)
+
+                        names_weights_copy = self.weight_scaling(task_embeddings=task_embeddings,
+                                                                 names_weights_copy=names_weights_copy)
 
 
                     target_loss, target_preds = self.net_forward(x=x_target_set_task,
