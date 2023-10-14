@@ -183,17 +183,17 @@ class MAMLFewShotClassifier(nn.Module):
 
     def get_task_embeddings(self, x_support_set_task, y_support_set_task, names_weights_copy):
 
+        self.classifier.zero_grad(names_weights_copy)
+
         support_loss, support_preds = self.net_forward(x=x_support_set_task,
                                                        y=y_support_set_task,
                                                        weights=names_weights_copy,
                                                        backup_running_statistics=True,
                                                        training=True, num_step=0)
 
-        self.classifier.zero_grad(names_weights_copy)
-
         # 둘 중 하나를 선택해야한다...
-        # support_loss_grad = torch.autograd.grad(support_loss, names_weights_copy.values(), create_graph=False)
-        support_loss_grad = torch.autograd.grad(support_loss, names_weights_copy.values(), retain_graph=True)
+        support_loss_grad = torch.autograd.grad(support_loss, names_weights_copy.values(), create_graph=False)
+        # support_loss_grad = torch.autograd.grad(support_loss, names_weights_copy.values(), retain_graph=True)
 
         per_step_task_embedding = []
         for k, v in names_weights_copy.items():
