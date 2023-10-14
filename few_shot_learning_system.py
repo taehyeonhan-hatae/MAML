@@ -192,8 +192,8 @@ class MAMLFewShotClassifier(nn.Module):
         self.classifier.zero_grad(names_weights_copy)
 
         # 둘 중 하나를 선택해야한다...
-        support_loss_grad = torch.autograd.grad(support_loss, names_weights_copy.values(), create_graph=False)
-        # support_loss_grad = torch.autograd.grad(support_loss, names_weights_copy.values(), retain_graph=True)
+        # support_loss_grad = torch.autograd.grad(support_loss, names_weights_copy.values(), create_graph=False)
+        support_loss_grad = torch.autograd.grad(support_loss, names_weights_copy.values(), retain_graph=True)
 
         per_step_task_embedding = []
         for k, v in names_weights_copy.items():
