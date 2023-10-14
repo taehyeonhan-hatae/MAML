@@ -167,14 +167,18 @@ class MAMLFewShotClassifier(nn.Module):
                         # rescale_weight = u @ torch.diag_embed(s) @ v
                         # names_weights_copy[name] = rescale_weight
 
-                        param_matrix = param.view(param.data.size(0), -1)  # 텐서를 2D로 변환하여 특이값 분해 수행
-                        u, s, v = torch.svd(param_matrix)
-                        s = s * generated_alpha_params[name]
-                        s_diag = torch.diag(s)
+                        # param_matrix = param.view(param.data.size(0), -1)  # 텐서를 2D로 변환하여 특이값 분해 수행
+                        # u, s, v = torch.svd(param_matrix)
+                        # s = s * generated_alpha_params[name]
+                        # s_diag = torch.diag(s)
+                        #
+                        # rescale_weight = u @ s_diag @ v.T
+                        # rescale_weight = rescale_weight.view(param.size())
+                        # names_weights_copy[name] = rescale_weight
 
-                        rescale_weight = u @ s_diag @ v.T
-                        rescale_weight = rescale_weight.view(param.size())
+                        rescale_weight = generated_alpha_params[name] * param
                         names_weights_copy[name] = rescale_weight
+
                     else:
                         rescale_weight = generated_alpha_params[name] * param
                         names_weights_copy[name] = rescale_weight
@@ -196,16 +200,14 @@ class MAMLFewShotClassifier(nn.Module):
 
         per_step_task_embedding = []
         for k, v in names_weights_copy.items():
-            # per_step_task_embedding.append(v.mean())
+            per_step_task_embedding.append(v.mean())
             # per_step_task_embedding.append(v.norm())
             # per_step_task_embedding.append(v.clone().detach().norm())
-            per_step_task_embedding.append(torch.norm(v))
 
         for i in range(len(support_loss_grad)):
-            # per_step_task_embedding.append(support_loss_grad[i].mean())
+            per_step_task_embedding.append(support_loss_grad[i].mean())
             # per_step_task_embedding.append(support_loss_grad[i].norm())
             # per_step_task_embedding.append(support_loss_grad[i].clone().detach().norm())
-            per_step_task_embedding.append(torch.norm(support_loss_grad[i]))
 
         per_step_task_embedding = torch.stack(per_step_task_embedding)
 
