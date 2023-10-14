@@ -167,17 +167,17 @@ class MAMLFewShotClassifier(nn.Module):
                         # rescale_weight = u @ torch.diag_embed(s) @ v
                         # names_weights_copy[name] = rescale_weight
 
-                        # param_matrix = param.view(param.data.size(0), -1)  # 텐서를 2D로 변환하여 특이값 분해 수행
-                        # u, s, v = torch.svd(param_matrix)
-                        # s = s * generated_alpha_params[name]
-                        # s_diag = torch.diag(s)
-                        #
-                        # rescale_weight = u @ s_diag @ v.T
-                        # rescale_weight = rescale_weight.view(param.size())
-                        # names_weights_copy[name] = rescale_weight
+                        param_matrix = param.view(param.data.size(0), -1)  # 텐서를 2D로 변환하여 특이값 분해 수행
+                        u, s, v = torch.svd(param_matrix)
+                        s = s * generated_alpha_params[name]
+                        s_diag = torch.diag(s)
 
-                        rescale_weight = generated_alpha_params[name] * param
+                        rescale_weight = u @ s_diag @ v.T
+                        rescale_weight = rescale_weight.view(param.size())
                         names_weights_copy[name] = rescale_weight
+
+                        # rescale_weight = generated_alpha_params[name] * param
+                        # names_weights_copy[name] = rescale_weight
 
                     else:
                         rescale_weight = generated_alpha_params[name] * param
