@@ -309,13 +309,14 @@ class MAMLFewShotClassifier(nn.Module):
             x_target_set_task = x_target_set_task.view(-1, c, h, w)
             y_target_set_task = y_target_set_task.view(-1)
 
-            if self.args.arbiter:
-                task_embeddings = self.get_task_embeddings(x_support_set_task=x_support_set_task,
-                                                           y_support_set_task=y_support_set_task,
-                                                           names_weights_copy=names_weights_copy)
-
-                names_weights_copy = self.weight_scaling(task_embeddings=task_embeddings,
-                                                         names_weights_copy=names_weights_copy)
+            # # epoch 100 0.697222222 0.4594598949437572
+            # if self.args.arbiter:
+            #     task_embeddings = self.get_task_embeddings(x_support_set_task=x_support_set_task,
+            #                                                y_support_set_task=y_support_set_task,
+            #                                                names_weights_copy=names_weights_copy)
+            #
+            #     names_weights_copy = self.weight_scaling(task_embeddings=task_embeddings,
+            #                                              names_weights_copy=names_weights_copy)
 
             for num_step in range(num_steps):
 
@@ -359,13 +360,13 @@ class MAMLFewShotClassifier(nn.Module):
                     task_losses.append(per_step_loss_importance_vectors[num_step] * target_loss)
                 elif num_step == (self.args.number_of_training_steps_per_iter - 1):
 
-                    # if self.args.arbiter:
-                    #     task_embeddings = self.get_task_embeddings(x_support_set_task=x_support_set_task,
-                    #                                                y_support_set_task=y_support_set_task,
-                    #                                                names_weights_copy=names_weights_copy)
-                    #
-                    #     names_weights_copy = self.weight_scaling(task_embeddings=task_embeddings,
-                    #                                              names_weights_copy=names_weights_copy)
+                    if self.args.arbiter:
+                        task_embeddings = self.get_task_embeddings(x_support_set_task=x_support_set_task,
+                                                                   y_support_set_task=y_support_set_task,
+                                                                   names_weights_copy=names_weights_copy)
+
+                        names_weights_copy = self.weight_scaling(task_embeddings=task_embeddings,
+                                                                 names_weights_copy=names_weights_copy)
 
 
                     target_loss, target_preds = self.net_forward(x=x_target_set_task,
