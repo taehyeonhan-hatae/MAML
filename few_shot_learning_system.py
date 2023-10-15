@@ -70,7 +70,7 @@ class MAMLFewShotClassifier(nn.Module):
                 nn.Linear(input_dim, input_dim),
                 nn.ReLU(inplace=True),
                 nn.Linear(input_dim, output_dim),
-                # nn.Softplus(beta=2) softplus를 미분하면 sigmoid 함수로 미분값이 0이 될 수 잇다
+                nn.Softplus(beta=2) #softplus를 미분하면 sigmoid 함수로 미분값이 0이 될 수 잇다
             ).to(device=self.device)
 
         self.inner_loop_optimizer.initialise(
@@ -149,8 +149,6 @@ class MAMLFewShotClassifier(nn.Module):
 
         gamma = self.arbiter(task_embeddings)
 
-        # 추가...
-        gamma = torch.nn.Softplus()(gamma)
 
         g = 0
         # for key in names_weights_copy.keys():
@@ -323,7 +321,7 @@ class MAMLFewShotClassifier(nn.Module):
 
             for num_step in range(num_steps):
 
-                # error
+                # softplus 추가 시 error
                 if self.args.arbiter:
                     task_embeddings = self.get_task_embeddings(x_support_set_task=x_support_set_task,
                                                                y_support_set_task=y_support_set_task,
@@ -346,14 +344,6 @@ class MAMLFewShotClassifier(nn.Module):
                                                                   use_second_order=use_second_order,
                                                                   current_step_idx=num_step)
 
-                # if self.args.arbiter:
-                #     task_embeddings = self.get_task_embeddings(x_support_set_task=x_support_set_task,
-                #                                                y_support_set_task=y_support_set_task,
-                #                                                names_weights_copy=names_weights_copy)
-                #
-                #     names_weights_copy = self.weight_scaling(task_embeddings=task_embeddings,
-                #                                              names_weights_copy=names_weights_copy)
-
                 if use_multi_step_loss_optimization and training_phase and epoch < self.args.multi_step_loss_num_epochs:
                     target_loss, target_preds = self.net_forward(x=x_target_set_task,
                                                                  y=y_target_set_task, weights=names_weights_copy,
@@ -363,13 +353,13 @@ class MAMLFewShotClassifier(nn.Module):
                     task_losses.append(per_step_loss_importance_vectors[num_step] * target_loss)
                 elif num_step == (self.args.number_of_training_steps_per_iter - 1):
 
-                    if self.args.arbiter:
-                        task_embeddings = self.get_task_embeddings(x_support_set_task=x_support_set_task,
-                                                                   y_support_set_task=y_support_set_task,
-                                                                   names_weights_copy=names_weights_copy)
-
-                        names_weights_copy = self.weight_scaling(task_embeddings=task_embeddings,
-                                                                 names_weights_copy=names_weights_copy)
+                    # if self.args.arbiter:
+                    #     task_embeddings = self.get_task_embeddings(x_support_set_task=x_support_set_task,
+                    #                                                y_support_set_task=y_support_set_task,
+                    #                                                names_weights_copy=names_weights_copy)
+                    #
+                    #     names_weights_copy = self.weight_scaling(task_embeddings=task_embeddings,
+                    #                                              names_weights_copy=names_weights_copy)
 
 
                     target_loss, target_preds = self.net_forward(x=x_target_set_task,
