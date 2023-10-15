@@ -70,7 +70,7 @@ class MAMLFewShotClassifier(nn.Module):
                 nn.Linear(input_dim, input_dim),
                 nn.ReLU(inplace=True),
                 nn.Linear(input_dim, output_dim),
-                nn.Softplus(beta=2)
+                # nn.Softplus(beta=2) softplus를 미분하면 sigmoid 함수로 미분값이 0이 될 수 잇다
             ).to(device=self.device)
 
         self.inner_loop_optimizer.initialise(
@@ -161,27 +161,27 @@ class MAMLFewShotClassifier(nn.Module):
         for name, param in names_weights_copy.items():
             if 'weight' in name:  # weight에 대해서만 SVD를 수행
                 if "norm_layer" not in name:
-                    if "linear" not in name:
-                        # u, s, v = torch.svd(param, some=False)  # SVD 수행
-                        # s = s * generated_alpha_params[name]
-                        # rescale_weight = u @ torch.diag_embed(s) @ v
-                        # names_weights_copy[name] = rescale_weight
+                    #if "linear" not in name:
+                    # u, s, v = torch.svd(param, some=False)  # SVD 수행
+                    # s = s * generated_alpha_params[name]
+                    # rescale_weight = u @ torch.diag_embed(s) @ v
+                    # names_weights_copy[name] = rescale_weight
 
-                        param_matrix = param.view(param.data.size(0), -1)  # 텐서를 2D로 변환하여 특이값 분해 수행
-                        u, s, v = torch.svd(param_matrix)
-                        s = s * generated_alpha_params[name]
-                        s_diag = torch.diag(s)
+                    param_matrix = param.view(param.data.size(0), -1)  # 텐서를 2D로 변환하여 특이값 분해 수행
+                    u, s, v = torch.svd(param_matrix)
+                    s = s * generated_alpha_params[name]
+                    s_diag = torch.diag(s)
 
-                        rescale_weight = u @ s_diag @ v.T
-                        rescale_weight = rescale_weight.view(param.size())
-                        names_weights_copy[name] = rescale_weight
+                    rescale_weight = u @ s_diag @ v.T
+                    rescale_weight = rescale_weight.view(param.size())
+                    names_weights_copy[name] = rescale_weight
 
-                        # rescale_weight = generated_alpha_params[name] * param
-                        # names_weights_copy[name] = rescale_weight
+                    # rescale_weight = generated_alpha_params[name] * param
+                    # names_weights_copy[name] = rescale_weight
 
-                    else:
-                        rescale_weight = generated_alpha_params[name] * param
-                        names_weights_copy[name] = rescale_weight
+                    # else:
+                    #     rescale_weight = generated_alpha_params[name] * param
+                    #     names_weights_copy[name] = rescale_weight
 
         return names_weights_copy
 
@@ -321,13 +321,13 @@ class MAMLFewShotClassifier(nn.Module):
             for num_step in range(num_steps):
 
                 # error
-                # if self.args.arbiter:
-                #     task_embeddings = self.get_task_embeddings(x_support_set_task=x_support_set_task,
-                #                                                y_support_set_task=y_support_set_task,
-                #                                                names_weights_copy=names_weights_copy)
-                #
-                #     names_weights_copy = self.weight_scaling(task_embeddings=task_embeddings,
-                #                                              names_weights_copy=names_weights_copy)
+                if self.args.arbiter:
+                    task_embeddings = self.get_task_embeddings(x_support_set_task=x_support_set_task,
+                                                               y_support_set_task=y_support_set_task,
+                                                               names_weights_copy=names_weights_copy)
+
+                    names_weights_copy = self.weight_scaling(task_embeddings=task_embeddings,
+                                                             names_weights_copy=names_weights_copy)
 
                 support_loss, support_preds = self.net_forward(
                     x=x_support_set_task,
