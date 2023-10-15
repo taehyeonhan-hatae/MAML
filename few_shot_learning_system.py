@@ -149,6 +149,9 @@ class MAMLFewShotClassifier(nn.Module):
 
         gamma = self.arbiter(task_embeddings)
 
+        # 추가...
+        gamma = torch.nn.Softplus()(gamma)
+
         g = 0
         # for key in names_weights_copy.keys():
         #     generated_alpha_params[key] = gamma[g]
