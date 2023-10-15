@@ -311,24 +311,24 @@ class MAMLFewShotClassifier(nn.Module):
             y_target_set_task = y_target_set_task.view(-1)
 
             # # epoch 100 0.697222222 0.4594598949437572
-            # if self.args.arbiter:
-            #     task_embeddings = self.get_task_embeddings(x_support_set_task=x_support_set_task,
-            #                                                y_support_set_task=y_support_set_task,
-            #                                                names_weights_copy=names_weights_copy)
-            #
-            #     names_weights_copy = self.weight_scaling(task_embeddings=task_embeddings,
-            #                                              names_weights_copy=names_weights_copy)
+            if self.args.arbiter:
+                task_embeddings = self.get_task_embeddings(x_support_set_task=x_support_set_task,
+                                                           y_support_set_task=y_support_set_task,
+                                                           names_weights_copy=names_weights_copy)
+
+                names_weights_copy = self.weight_scaling(task_embeddings=task_embeddings,
+                                                         names_weights_copy=names_weights_copy)
 
             for num_step in range(num_steps):
 
                 # softplus 추가 시 error
-                if self.args.arbiter:
-                    task_embeddings = self.get_task_embeddings(x_support_set_task=x_support_set_task,
-                                                               y_support_set_task=y_support_set_task,
-                                                               names_weights_copy=names_weights_copy)
-
-                    names_weights_copy = self.weight_scaling(task_embeddings=task_embeddings,
-                                                             names_weights_copy=names_weights_copy)
+                # if self.args.arbiter:
+                #     task_embeddings = self.get_task_embeddings(x_support_set_task=x_support_set_task,
+                #                                                y_support_set_task=y_support_set_task,
+                #                                                names_weights_copy=names_weights_copy)
+                #
+                #     names_weights_copy = self.weight_scaling(task_embeddings=task_embeddings,
+                #                                              names_weights_copy=names_weights_copy)
 
                 support_loss, support_preds = self.net_forward(
                     x=x_support_set_task,
