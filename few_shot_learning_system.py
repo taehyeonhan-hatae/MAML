@@ -310,7 +310,7 @@ class MAMLFewShotClassifier(nn.Module):
             x_target_set_task = x_target_set_task.view(-1, c, h, w)
             y_target_set_task = y_target_set_task.view(-1)
 
-            ## epoch 100 0.697222222 0.4594598949437572 (softplus)
+            ## epoch 100 0.697222222 0.4594598949437572 (softplus) linear layer는 특이값 분해를 하지 않음
             if self.args.arbiter:
                 task_embeddings = self.get_task_embeddings(x_support_set_task=x_support_set_task,
                                                            y_support_set_task=y_support_set_task,
