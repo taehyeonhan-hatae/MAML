@@ -61,12 +61,11 @@ class MAMLFewShotClassifier(nn.Module):
 
         names_weights_copy = self.get_inner_loop_parameter_dict(self.classifier.named_parameters())
 
-
-        # Gradient Arbiter
+        # Weight Arbiter
         if self.args.arbiter:
             num_layers = len(names_weights_copy)
-            input_dim = num_layers # bias 제외이므로
-            output_dim = 5 #num_layers / 2
+            input_dim = num_layers * 2
+            output_dim = num_layers
             self.arbiter = nn.Sequential(
                 nn.Linear(input_dim, input_dim),
                 nn.ReLU(inplace=True),
@@ -163,23 +162,17 @@ class MAMLFewShotClassifier(nn.Module):
         for name, param in names_weights_copy.items():
             if 'weight' in name:  # weight에 대해서만 SVD를 수행
                 if "norm_layer" not in name:
-                    # if "linear" not in name:
-                    #     # u, s, v = torch.svd(param, some=False)  # SVD 수행
-                    #     # s = s * generated_alpha_params[name]
-                    #     # rescale_weight = u @ torch.diag_embed(s) @ v
-                    #     # names_weights_copy[name] = rescale_weight
 
-                    param_matrix = param.view(param.data.size(0), -1)  # 텐서를 2D로 변환하여 특이값 분해 수행
-                    u, s, v = torch.svd(param_matrix)
-                    s = s * generated_alpha_params[name]
-                    s_diag = torch.diag(s)
-
-                    rescale_weight = u @ s_diag @ v.T
-                    rescale_weight = rescale_weight.view(param.size())
-                    names_weights_copy[name] = rescale_weight
-
-                    # rescale_weight = generated_alpha_params[name] * param
+                    # param_matrix = param.view(param.data.size(0), -1)  # 텐서를 2D로 변환하여 특이값 분해 수행
+                    # u, s, v = torch.svd(param_matrix)
+                    # s = s * generated_alpha_params[name]
+                    # s_diag = torch.diag(s)
+                    # rescale_weight = u @ s_diag @ v.T
+                    # rescale_weight = rescale_weight.view(param.size())
                     # names_weights_copy[name] = rescale_weight
+
+                    rescale_weight = generated_alpha_params[name] * param
+                    names_weights_copy[name] = rescale_weight
 
                     # else:
                     #     rescale_weight = generated_alpha_params[name] * param
@@ -199,26 +192,19 @@ class MAMLFewShotClassifier(nn.Module):
 
         support_loss_grad = torch.autograd.grad(support_loss, names_weights_copy.values(), create_graph=False)
         # support_loss_grad = torch.autograd.grad(support_loss, names_weights_copy.values(), retain_graph=True)
-        names_grads_copy = dict(zip(names_weights_copy.keys(), support_loss_grad))
 
         per_step_task_embedding = []
         for k, v in names_weights_copy.items():
-            if 'weight' in k:
-                # per_step_task_embedding.append(v.mean())
-                # per_step_task_embedding.append(v.norm())
-                per_step_task_embedding.append(v.norm())
+            # per_step_task_embedding.append(v.mean())
+            # per_step_task_embedding.append(v.clone().detach().norm())
+            per_step_task_embedding.append(v.norm())
 
-        for k, v in names_grads_copy.items():
-            if 'weight' in k:
-                per_step_task_embedding.append(v.norm())
-
-        # for i in range(len(support_loss_grad)):
-        #         # per_step_task_embedding.append(support_loss_grad[i].mean())
-        #         # per_step_task_embedding.append(support_loss_grad[i].norm())
-        #         per_step_task_embedding.append(support_loss_grad[i].clone().detach().norm())
+        for i in range(len(support_loss_grad)):
+            # per_step_task_embedding.append(support_loss_grad[i].mean())
+            # per_step_task_embedding.append(support_loss_grad[i].clone().detach().norm())
+            per_step_task_embedding.append(support_loss_grad[i].norm())
 
         per_step_task_embedding = torch.stack(per_step_task_embedding)
-
         # per_step_task_embedding = (per_step_task_embedding - per_step_task_embedding.mean()) / (
         #             per_step_task_embedding.std() + 1e-12)
 
@@ -318,14 +304,14 @@ class MAMLFewShotClassifier(nn.Module):
             x_target_set_task = x_target_set_task.view(-1, c, h, w)
             y_target_set_task = y_target_set_task.view(-1)
 
-            ## epoch 100 0.697222222 0.4594598949437572 (softplus) linear layer는 특이값 분해를 하지 않음
-            if self.args.arbiter:
-                task_embeddings = self.get_task_embeddings(x_support_set_task=x_support_set_task,
-                                                           y_support_set_task=y_support_set_task,
-                                                           names_weights_copy=names_weights_copy)
-
-                names_weights_copy = self.weight_scaling(task_embeddings=task_embeddings,
-                                                         names_weights_copy=names_weights_copy)
+            # # epoch 100 0.697222222 0.4594598949437572
+            # if self.args.arbiter:
+            #     task_embeddings = self.get_task_embeddings(x_support_set_task=x_support_set_task,
+            #                                                y_support_set_task=y_support_set_task,
+            #                                                names_weights_copy=names_weights_copy)
+            #
+            #     names_weights_copy = self.weight_scaling(task_embeddings=task_embeddings,
+            #                                              names_weights_copy=names_weights_copy)
 
             for num_step in range(num_steps):
 
@@ -361,13 +347,13 @@ class MAMLFewShotClassifier(nn.Module):
                     task_losses.append(per_step_loss_importance_vectors[num_step] * target_loss)
                 elif num_step == (self.args.number_of_training_steps_per_iter - 1):
 
-                    # if self.args.arbiter:
-                    #     task_embeddings = self.get_task_embeddings(x_support_set_task=x_support_set_task,
-                    #                                                y_support_set_task=y_support_set_task,
-                    #                                                names_weights_copy=names_weights_copy)
-                    #
-                    #     names_weights_copy = self.weight_scaling(task_embeddings=task_embeddings,
-                    #                                              names_weights_copy=names_weights_copy)
+                    if self.args.arbiter:
+                        task_embeddings = self.get_task_embeddings(x_support_set_task=x_support_set_task,
+                                                                   y_support_set_task=y_support_set_task,
+                                                                   names_weights_copy=names_weights_copy)
+
+                        names_weights_copy = self.weight_scaling(task_embeddings=task_embeddings,
+                                                                 names_weights_copy=names_weights_copy)
 
 
                     target_loss, target_preds = self.net_forward(x=x_target_set_task,
