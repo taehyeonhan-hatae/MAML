@@ -283,3 +283,16 @@ class OLELoss(Function):
         # print(dX)
 
         return dX.cuda(), None
+
+# 특정 레이어의 그래디언트 norm 값을 크게 만들기 위한 커스텀 손실 함수 정의
+class CustomLoss(nn.Module):
+    def __init__(self, model, layer_name, weight=0.1):
+        super(CustomLoss, self).__init__()
+        self.layer_name = layer_name
+        self.weight = weight
+        self.model = model
+
+    def forward(self, output, target):
+        layer_output = self.model._modules[self.layer_name].out_features
+        custom_loss = self.weight * torch.norm(layer_output, p=2)  # L2 노름을 사용하고, 가중치를 곱하여 반환합니다.
+        return custom_loss

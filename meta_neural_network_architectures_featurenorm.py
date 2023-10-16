@@ -23,6 +23,7 @@ def extract_top_level_dict(current_dict):
         name = key.replace("layer_dict.", "")
         name = name.replace("layer_dict.", "")
         name = name.replace("block_dict.", "")
+        name = name.replace("pad_dict.", "")
         name = name.replace("module-", "")
 
         # print("extract_top_level_dict  name == ", name)
@@ -699,7 +700,7 @@ class MetaConvNormLayerReLU(nn.Module):
 
         out = F.leaky_relu(out)
 
-        print(out.shape)
+        # print(out.shape)
 
     def forward(self, x, num_step, params=None, training=False, backup_running_statistics=False):
         """
@@ -880,6 +881,7 @@ class VGGReLUNormNetwork(nn.Module):
         self.num_stages = args.num_stages
         self.num_output_classes = num_output_classes
 
+
         if args.max_pooling:
             print("Using max pooling")
             self.conv_stride = 1
@@ -904,8 +906,6 @@ class VGGReLUNormNetwork(nn.Module):
         self.layer_dict = nn.ModuleDict()
         self.upscale_shapes.append(x.shape)
 
-        ## num_stages를 늘려가면, Conv4 -> Conv5 -> Conv6 -> Conv7을 구현할 수 있겠다
-        ## 참고로 args.number_of_training_steps_per_iter가 Inner loop step이다
         for i in range(self.num_stages):
             self.layer_dict['conv{}'.format(i)] = MetaConvNormLayerReLU(input_shape=out.shape,
                                                                         num_filters=self.cnn_filters,
@@ -923,8 +923,6 @@ class VGGReLUNormNetwork(nn.Module):
             if self.args.max_pooling:
                 out = F.max_pool2d(input=out, kernel_size=(2, 2), stride=2, padding=0)
 
-        # Task-specific knowledge absorption을 위한 layer
-        # self.layer_dict['conv_absorption'] =
 
         if not self.args.max_pooling:
             out = F.avg_pool2d(out, out.shape[2])
@@ -963,6 +961,8 @@ class VGGReLUNormNetwork(nn.Module):
 
         out = x
 
+        out_feature_dict = dict()
+
         for i in range(self.num_stages):
             out = self.layer_dict['conv{}'.format(i)](out, params=param_dict['conv{}'.format(i)], training=training,
                                                       backup_running_statistics=backup_running_statistics,
@@ -971,6 +971,8 @@ class VGGReLUNormNetwork(nn.Module):
             if self.args.max_pooling:
                 out = F.max_pool2d(input=out, kernel_size=(2, 2), stride=2, padding=0)
 
+            out_feature_dict['layer_dict.conv{}'.format(i)] = out
+
         if not self.args.max_pooling:
             out = F.avg_pool2d(out, out.shape[2])
 
@@ -978,7 +980,10 @@ class VGGReLUNormNetwork(nn.Module):
 
         out = self.layer_dict['linear'](out, param_dict['linear'])
 
-        return out
+        # out_feature_dict['layer_dict.linear'] = out
+
+        return out, out_feature_dict
+
 
     def re_init(self):
         # for param in self.parameters():
@@ -992,14 +997,14 @@ class VGGReLUNormNetwork(nn.Module):
                 if param.requires_grad == True:
                     if param.grad is not None:
                         if torch.sum(param.grad) > 0:
-                            print(param.grad)
+                            #print(param.grad)
                             param.grad.zero_()
         else:
             for name, param in params.items():
                 if param.requires_grad == True:
                     if param.grad is not None:
                         if torch.sum(param.grad) > 0:
-                            print(param.grad)
+                            #print(param.grad)
                             param.grad.zero_()
                             params[name].grad = None
 
@@ -1151,60 +1156,6 @@ class ResNet12(nn.Module):
         # self.layer_dict['conv0'].restore_backup_stats()
         for i in range(self.num_stages):
             self.layer_dict['layer{}'.format(i)].restore_backup_stats()
-
-
-
-class MetaCurriculumNetwork(nn.Module):
-    def __init__(self, input_dim, args, device):
-        super(MetaCurriculumNetwork, self).__init__()
-
-        self.device = device
-        self.args = args
-        self.input_dim = input_dim
-        self.input_shape = (1, input_dim)
-
-        self.build_network()
-
-        print("MetaCurriculumNetwork params")
-        for name, param in self.named_parameters():
-            print(name, param.shape)
-
-    def build_network(self):
-
-        x = torch.zeros(self.input_shape)
-        out = x
-
-        self.linear1 = MetaLinearLayer(input_shape=self.input_shape,
-                                       num_filters=self.input_dim, use_bias=True)
-
-        self.linear2 = MetaLinearLayer(input_shape=self.input_shape,
-                                       num_filters=self.input_dim, use_bias=True)
-
-        # self.linear2 = MetaLinearLayer(input_shape=(1, self.input_dim),
-        #                                num_filters=1, use_bias=True)
-
-        out = self.linear1(out)
-        out = F.relu_(out)
-        out = self.linear2(out)
-
-    def forward(self, x, params=None):
-        linear1_params = None
-        linear2_params = None
-
-        if params is not None:
-            params = extract_top_level_dict(current_dict=params)
-
-            linear1_params = params['linear1']
-            linear2_params = params['linear2']
-
-        out = x
-
-        out = self.linear1(out, linear1_params)
-        out = F.relu_(out)
-        out = self.linear2(out, linear2_params)
-
-        return out
-
 
 class MetaStepLossNetwork(nn.Module):
     def __init__(self, input_dim, args, device):
