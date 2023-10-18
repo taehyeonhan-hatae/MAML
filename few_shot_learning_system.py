@@ -258,7 +258,7 @@ class MAMLFewShotClassifier(nn.Module):
                     support_loss_grad = torch.autograd.grad(support_loss, names_weights_copy.values(),
                                                             retain_graph=True)
 
-                    # per_step_task_embedding = []
+                    per_step_task_embedding = []
                     # for k, v in names_weights_copy.items():
                     #     # per_step_task_embedding.append(v.mean())
                     #     per_step_task_embedding.append(v.norm())
