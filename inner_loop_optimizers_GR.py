@@ -109,8 +109,13 @@ class LSLRGradientDescentLearningRule(nn.Module):
 
             if self.args.arbiter:
                 ## classifier의 Gradient는 건들지 않는 실험을 해보자
-                updated_names_weights_dict[key] = names_weights_dict[key] - \
-                                                  self.names_learning_rates_dict[key.replace(".", "-")][num_step] * generated_alpha_params[key] * names_grads_wrt_params_dict[key]
+                if not 'linear' in key:
+                    updated_names_weights_dict[key] = names_weights_dict[key] - \
+                                                      self.names_learning_rates_dict[key.replace(".", "-")][num_step] * generated_alpha_params[key] * names_grads_wrt_params_dict[key]
+                else:
+                    updated_names_weights_dict[key] = names_weights_dict[key] - \
+                                                      self.names_learning_rates_dict[key.replace(".", "-")][num_step] * \
+                                                      names_grads_wrt_params_dict[key]
             else:
                 updated_names_weights_dict[key] = names_weights_dict[key] - \
                                                   self.names_learning_rates_dict[key.replace(".", "-")][num_step] * \
