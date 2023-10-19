@@ -386,7 +386,11 @@ class FewShotLearningDatasetParallel(Dataset):
         :param filepath: The image's filepath
         :return: A human understandable label.
         """
-        label_bits = filepath.split("/")
+        # 종민 수정
+        # label_bits = filepath.split("/")
+        label_bits = filepath.split("\\")
+
+
         label = "/".join([label_bits[idx] for idx in self.indexes_of_folders_indicating_class])
         if self.labels_as_int:
             label = int(label)
@@ -664,4 +668,3 @@ class MetaLearningSystemDataLoader(object):
         self.dataset.set_augmentation(augment_images=augment_images)
         for sample_id, sample_batched in enumerate(self.get_dataloader()):
             yield sample_batched
-

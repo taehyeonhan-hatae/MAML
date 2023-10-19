@@ -21,14 +21,17 @@ def CIFAR_FS():
     phase_list = ['train', 'val', 'test']
     with zipfile.ZipFile('cifar100.zip', 'r') as zip_ref:
         zip_ref.extractall()
+
     for phase in phase_list:
         os.makedirs('CIFAR_FS/{}'.format(phase))
+
     for phase in phase_list:
         classes_info_dir = 'cifar100/splits/bertinetto/{}.txt'.format(phase)
         f = open(classes_info_dir, 'r')
         for line in f.readlines():
             class_name = line.strip()
             shutil.move('cifar100/data/{}'.format(class_name), 'CIFAR_FS/{}/{}'.format(phase, class_name))
+
     shutil.rmtree('cifar100')
 
 
