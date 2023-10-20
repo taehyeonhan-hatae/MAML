@@ -41,7 +41,7 @@
   "weight_decay": 0.0,
 
   "norm_layer":"batch_norm",
-  "cnn_num_filters":48,
+  "cnn_num_filters":64,
   "num_stages":4,
   "conv_padding": true,
   "number_of_training_steps_per_iter":5,

@@ -70,7 +70,8 @@ class MAMLFewShotClassifier(nn.Module):
             self.arbiter = nn.Sequential(
                 nn.Linear(input_dim, input_dim),
                 nn.ReLU(inplace=True),
-                nn.Linear(input_dim, output_dim)
+                nn.Linear(input_dim, output_dim),
+                nn.Softplus(beta=2)
             ).to(device=self.device)
 
         self.inner_loop_optimizer.initialise(
@@ -258,9 +259,13 @@ class MAMLFewShotClassifier(nn.Module):
                                                             retain_graph=True)
 
                     per_step_task_embedding = []
-                    for k, v in names_weights_copy.items():
-                        # per_step_task_embedding.append(v.mean())
-                        per_step_task_embedding.append(v.norm())
+                    # for k, v in names_weights_copy.items():
+                    #     # per_step_task_embedding.append(v.mean())
+                    #     per_step_task_embedding.append(v.norm())
+
+                    for i in range(len(support_loss_grad)):
+                        per_step_task_embedding.append(support_loss_grad[i].mean())
+                        #per_step_task_embedding.append(support_loss_grad[i].norm())
 
                     for i in range(len(support_loss_grad)):
                         # per_step_task_embedding.append(support_loss_grad[i].mean())
@@ -269,9 +274,9 @@ class MAMLFewShotClassifier(nn.Module):
                     per_step_task_embedding = torch.stack(per_step_task_embedding)
 
                     ## 추가
-                    ## - 성능이 더 떨어짐..
-                    # per_step_task_embedding = (per_step_task_embedding - per_step_task_embedding.mean()) / (
-                    #             per_step_task_embedding.std() + 1e-12)
+                    ## - 성능이 더 떨어짐.. 69.7+0.45 -? 69.49+0.46
+                    per_step_task_embedding = (per_step_task_embedding - per_step_task_embedding.mean()) / (
+                                per_step_task_embedding.std() + 1e-12)
 
                     generated_gradient_rate = self.arbiter(per_step_task_embedding)
 
