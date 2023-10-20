@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 from meta_neural_network_architectures import VGGReLUNormNetwork,ResNet12
-from inner_loop_optimizers import LSLRGradientDescentLearningRule
+from inner_loop_optimizers_GR import LSLRGradientDescentLearningRule
 
 
 def set_torch_seed(seed):
@@ -66,7 +66,7 @@ class MAMLFewShotClassifier(nn.Module):
         if self.args.arbiter:
             num_layers = len(names_weights_copy)
             input_dim = num_layers * 2
-            output_dim = 1 # num_layers
+            output_dim = num_layers
             self.arbiter = nn.Sequential(
                 nn.Linear(input_dim, input_dim),
                 nn.ReLU(inplace=True),
@@ -252,6 +252,39 @@ class MAMLFewShotClassifier(nn.Module):
                     num_step=num_step,
                 )
 
+                generated_alpha_params = {}
+
+                if self.args.arbiter:
+                    support_loss_grad = torch.autograd.grad(support_loss, names_weights_copy.values(),
+                                                            retain_graph=True)
+
+                    per_step_task_embedding = []
+                    # for k, v in names_weights_copy.items():
+                    #     # per_step_task_embedding.append(v.mean())
+                    #     per_step_task_embedding.append(v.norm())
+
+                    for i in range(len(support_loss_grad)):
+                        per_step_task_embedding.append(support_loss_grad[i].mean())
+                        #per_step_task_embedding.append(support_loss_grad[i].norm())
+
+                    for i in range(len(support_loss_grad)):
+                        # per_step_task_embedding.append(support_loss_grad[i].mean())
+                        per_step_task_embedding.append(support_loss_grad[i].norm())
+
+                    per_step_task_embedding = torch.stack(per_step_task_embedding)
+
+                    ## 추가
+                    ## - 성능이 더 떨어짐.. 69.7+0.45 -? 69.49+0.46
+                    per_step_task_embedding = (per_step_task_embedding - per_step_task_embedding.mean()) / (
+                                per_step_task_embedding.std() + 1e-12)
+
+                    generated_gradient_rate = self.arbiter(per_step_task_embedding)
+
+                    g = 0
+                    for key in names_weights_copy.keys():
+                        generated_alpha_params[key] = generated_gradient_rate[g]
+                        g += 1
+
                 names_weights_copy = self.apply_inner_loop_update(loss=support_loss,
                                                                   names_weights_copy=names_weights_copy,
                                                                   alpha=generated_alpha_params,
@@ -270,43 +303,6 @@ class MAMLFewShotClassifier(nn.Module):
                                                                  y=y_target_set_task, weights=names_weights_copy,
                                                                  backup_running_statistics=False, training=True,
                                                                  num_step=num_step)
-
-                    generated_alpha_params = {}
-
-                    if self.args.arbiter:
-                        target_loss_grad = torch.autograd.grad(target_loss, names_weights_copy.values(),
-                                                                retain_graph=True)
-
-                        per_step_task_embedding = []
-                        # for k, v in names_weights_copy.items():
-                        #     # per_step_task_embedding.append(v.mean())
-                        #     per_step_task_embedding.append(v.norm())
-
-                        for i in range(len(target_loss_grad)):
-                            per_step_task_embedding.append(target_loss_grad[i].mean())
-                            # per_step_task_embedding.append(support_loss_grad[i].norm())
-
-                        for i in range(len(target_loss_grad)):
-                            # per_step_task_embedding.append(support_loss_grad[i].mean())
-                            per_step_task_embedding.append(target_loss_grad[i].norm())
-
-                        per_step_task_embedding = torch.stack(per_step_task_embedding)
-
-                        ## 추가
-                        ## - 성능이 더 떨어짐.. 69.7+0.45 -? 69.49+0.46
-                        per_step_task_embedding = (per_step_task_embedding - per_step_task_embedding.mean()) / (
-                                per_step_task_embedding.std() + 1e-12)
-
-                        generated_gradient_rate = self.arbiter(per_step_task_embedding)
-
-                        # g = 0
-                        # for key in names_weights_copy.keys():
-                        #     generated_alpha_params[key] = generated_gradient_rate[g]
-                        #     g += 1
-
-                        target_loss = target_loss * generated_gradient_rate
-
-
                     task_losses.append(target_loss)
 
             per_task_target_preds[task_id] = target_preds.detach().cpu().numpy()
