@@ -65,7 +65,7 @@ class MAMLFewShotClassifier(nn.Module):
         # Gradient Arbiter
         if self.args.arbiter:
             num_layers = len(names_weights_copy)
-            input_dim = num_layers * 2
+            input_dim = num_layers * 4
             output_dim = num_layers
             self.arbiter = nn.Sequential(
                 nn.Linear(input_dim, input_dim),
@@ -268,13 +268,13 @@ class MAMLFewShotClassifier(nn.Module):
                         # per_step_task_embedding.append(v.mean())
                         per_step_task_embedding.append(v.norm())
 
-                    # for i in range(len(support_loss_grad)):
-                    #     per_step_task_embedding.append(support_loss_grad[i].mean())
-                    #     #per_step_task_embedding.append(support_loss_grad[i].norm())
-                    #
-                    # for i in range(len(support_loss_grad)):
-                    #     # per_step_task_embedding.append(support_loss_grad[i].mean())
-                    #     per_step_task_embedding.append(support_loss_grad[i].norm())
+                    for i in range(len(support_loss_grad)):
+                        per_step_task_embedding.append(support_loss_grad[i].mean())
+                        #per_step_task_embedding.append(support_loss_grad[i].norm())
+
+                    for i in range(len(support_loss_grad)):
+                        # per_step_task_embedding.append(support_loss_grad[i].mean())
+                        per_step_task_embedding.append(support_loss_grad[i].norm())
 
                     per_step_task_embedding = torch.stack(per_step_task_embedding)
 
