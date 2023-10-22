@@ -151,8 +151,18 @@ class FewShotLearningDatasetParallel(Dataset):
         data-provider. For transparency and readability reasons to explicitly set as self.object_name all arguments
         required for the data provider, such that the reader knows exactly what is necessary for the data provider/
         """
+
         self.data_path = args.dataset_path
         self.dataset_name = args.dataset_name
+
+        try:
+            self.data_path = 'datasets/' + os.environ['TEST_DATASET']
+            self.dataset_name = os.environ['TEST_DATASET']
+        except:
+            self.data_path = args.dataset_path
+            self.dataset_name = args.dataset_name
+
+
         self.data_loaded_in_memory = False
         self.image_height, self.image_width, self.image_channel = args.image_height, args.image_width, args.image_channels
         self.args = args

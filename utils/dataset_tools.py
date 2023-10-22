@@ -5,6 +5,15 @@ def maybe_unzip_dataset(args):
 
     datasets = [args.dataset_name]
     dataset_paths = [args.dataset_path]
+
+
+    try:
+        datasets = [os.environ['TEST_DATASET']]
+        dataset_paths = [os.path.join(os.environ['DATASET_DIR'], os.environ['TEST_DATASET'])]
+    except:
+        datasets = [args.dataset_name]
+        dataset_paths = [args.dataset_path]
+
     done = False
 
     for dataset_idx, dataset_path in enumerate(dataset_paths):

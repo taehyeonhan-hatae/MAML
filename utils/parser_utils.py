@@ -11,6 +11,9 @@ def get_args():
     os.environ['DATASET_DIR'] = os.path.join(os.getcwd(), "datasets")
     print("os.environ['DATASET_DIR'] === ", os.environ['DATASET_DIR'])
 
+    # os.environ['TEST_DATASET'] = "CUB"
+    # print("os.environ['TEST_DATASET'] === ", os.environ['DATASET_DIR'])
+
     parser = argparse.ArgumentParser(description='Welcome to the L2F training and inference system')
 
     parser.add_argument('--batch_size', nargs="?", type=int, default=32, help='Batch_size for experiment')
