@@ -105,12 +105,12 @@ def get_transforms_for_dataset(dataset_name, args, k):
         transform_train = [transforms.Compose([
 
             transforms.ToTensor(), transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))])]
-        '''
+
         transform_evaluate = [transforms.Compose([
 
             transforms.ToTensor(), transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))])]
-        '''
-        transform_evaluate = [transforms.ToTensor()]
+
+        # transform_evaluate = [transforms.ToTensor()]
 
     elif 'CUB' in dataset_name:
         transform_train = [transforms.Compose([
