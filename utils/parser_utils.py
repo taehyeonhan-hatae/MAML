@@ -13,6 +13,7 @@ def get_args():
 
     # os.environ['TEST_DATASET'] = "CUB"
     # os.environ['TEST_DATASET'] = "tiered_imagenet"
+    # os.environ['TEST_DATASET'] = "CIFA_FS"
 
     parser = argparse.ArgumentParser(description='Welcome to the L2F training and inference system')
 
