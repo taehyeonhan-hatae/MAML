@@ -273,8 +273,7 @@ class MAMLFewShotClassifier(nn.Module):
 
                     per_step_task_embedding = torch.stack(per_step_task_embedding)
 
-                    ## 추가
-                    ## - 성능이 더 떨어짐.. 69.7+0.45 -? 69.49+0.46
+                    ## Standardization
                     per_step_task_embedding = (per_step_task_embedding - per_step_task_embedding.mean()) / (
                                 per_step_task_embedding.std() + 1e-12)
 
