@@ -73,7 +73,8 @@ class MAMLFewShotClassifier(nn.Module):
                 nn.Linear(input_dim, output_dim),
                 ## nn.Sigmoid()
                 ## nn.Tanh()
-                nn.Softplus(beta=2)
+                ## nn.Softplus(beta=2) # GAP
+                nn.Softplus() # CxGrad
             ).to(device=self.device)
 
         self.inner_loop_optimizer.initialise(
