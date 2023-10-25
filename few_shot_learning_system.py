@@ -71,9 +71,9 @@ class MAMLFewShotClassifier(nn.Module):
                 nn.Linear(input_dim, input_dim),
                 nn.ReLU(inplace=True),
                 nn.Linear(input_dim, output_dim),
-                ##nn.Sigmoid()
-                nn.Tanh()
-                #nn.Softplus(beta=2)
+                ## nn.Sigmoid()
+                ## nn.Tanh()
+                nn.Softplus(beta=2)
             ).to(device=self.device)
 
         self.inner_loop_optimizer.initialise(
