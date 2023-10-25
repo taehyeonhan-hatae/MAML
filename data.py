@@ -78,7 +78,7 @@ def augment_image(image, k, channels, augment_bool, args, dataset_name):
 
 
 def get_transforms_for_dataset(dataset_name, args, k):
-    if "cifar10" in dataset_name or "cifar100" in dataset_name or "FC100" in dataset_name:
+    if "cifar10" in dataset_name or "cifar100" in dataset_name or "FC100" in dataset_name or "CIFAR_FS" in dataset_name:
         transform_train = [
             transforms.ToTensor(),
             transforms.Normalize((0.5071, 0.4847, 0.4408), (0.2675, 0.2565, 0.2761))]
