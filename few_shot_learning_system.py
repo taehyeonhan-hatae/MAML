@@ -73,8 +73,8 @@ class MAMLFewShotClassifier(nn.Module):
                 nn.Linear(input_dim, output_dim),
                 ## nn.Sigmoid()
                 ## nn.Tanh()
-                ## nn.Softplus(beta=2) # GAP 이것으로 했을때 성능이 떨어졌다는 것은 beta를 작게하면 성능이 더 높아지는 것 아닌가?
-                nn.Softplus() # CxGrad
+                nn.Softplus(beta=2) # GAP 이것으로 했을때 성능이 떨어졌다는 것은 beta를 작게하면 성능이 더 높아지는 것 아닌가?
+                ## nn.Softplus() # CxGrad
             ).to(device=self.device)
 
         self.inner_loop_optimizer.initialise(
@@ -267,11 +267,11 @@ class MAMLFewShotClassifier(nn.Module):
                     #     per_step_task_embedding.append(v.mean())
 
                     for i in range(len(support_loss_grad)):
-                        # per_step_task_embedding.append(support_loss_grad[i].mean())
-                        per_step_task_embedding.append(support_loss_grad[i].clone().detach().mean())
+                        per_step_task_embedding.append(support_loss_grad[i].mean())
+                        # per_step_task_embedding.append(support_loss_grad[i].clone().detach().mean())
 
                     for i in range(len(support_loss_grad)):
-                        # per_step_task_embedding.append(support_loss_grad[i].norm()) # 반드시 detach 해줘야한다. 평균도?
+                        # per_step_task_embedding.append(support_loss_grad[i].norm()) # 반드시 detach 해줘야한다. 평균도?67.98 0.46
                         per_step_task_embedding.append(support_loss_grad[i].clone().detach().norm())
 
                     per_step_task_embedding = torch.stack(per_step_task_embedding)
