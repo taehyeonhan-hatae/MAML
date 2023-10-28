@@ -53,15 +53,6 @@
 
   "second_order": true,
   "use_multi_step_loss_optimization":false,
-  "attenuate": false,
-  "alfa": false,
-  "random_init": false,
-  "meta_loss": false,
-  "arbiter": false,
   "backbone": "4-CONV",
-  "loss_function": "Softmax",
-  "ole": false,
-  "rescale" : 24.0,
-  "margin" : 0.50
-  
+  "arbiter": false
 }
