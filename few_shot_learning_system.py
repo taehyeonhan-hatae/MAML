@@ -267,12 +267,16 @@ class MAMLFewShotClassifier(nn.Module):
                     #     per_step_task_embedding.append(v.mean())
 
                     for i in range(len(support_loss_grad)):
-                        per_step_task_embedding.append(support_loss_grad[i].mean())
+                        # per_step_task_embedding.append(support_loss_grad[i].mean())
                         # per_step_task_embedding.append(support_loss_grad[i].clone().detach().mean())
+                        gradient_mean = torch.mean(support_loss_grad[i])
+                        per_step_task_embedding.append(gradient_mean)
 
                     for i in range(len(support_loss_grad)):
                         # per_step_task_embedding.append(support_loss_grad[i].norm()) # 반드시 detach 해줘야한다. 평균도?67.98 0.46
-                        per_step_task_embedding.append(support_loss_grad[i].clone().detach().norm())
+                        # per_step_task_embedding.append(support_loss_grad[i].clone().detach().norm())
+                        gradient_norm = torch.norm(support_loss_grad[i])
+                        per_step_task_embedding.append(gradient_norm)
 
                     per_step_task_embedding = torch.stack(per_step_task_embedding)
 
