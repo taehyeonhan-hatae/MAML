@@ -21,7 +21,7 @@
   "num_evaluation_tasks":600,
   "multi_step_loss_num_epochs": 15,
   "minimum_per_task_contribution": 0.01,
-  "learnable_per_layer_per_step_inner_loop_learning_rate": false,
+  "learnable_per_layer_per_step_inner_loop_learning_rate": true,
   "enable_inner_loop_optimizable_bn_params": false,
   "evalute_on_test_set_only": false,
 

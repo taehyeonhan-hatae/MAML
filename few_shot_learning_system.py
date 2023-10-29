@@ -73,7 +73,7 @@ class MAMLFewShotClassifier(nn.Module):
                 nn.Linear(input_dim, output_dim),
                 ## nn.Sigmoid()
                 ## nn.Tanh()
-                ## nn.Softplus(beta=2) # GAP 이것으로 했을때 성능이 떨어졌다는 것은 beta를 작게하면 성능이 더 높아지는 것 아닌가?
+                ## nn.Softplus(beta=2) # GAP
                 nn.Softplus() # CxGrad
             ).to(device=self.device)
 
