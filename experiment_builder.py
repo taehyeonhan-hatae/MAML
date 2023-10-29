@@ -139,7 +139,7 @@ class ExperimentBuilder(object):
 
         # 지정한 크기의 data_batch만큼 iteration을 돌린다.
         # MAMLFewShotClassifier을 통해서..
-        losses, _ = self.model.run_train_iter(data_batch=data_batch, epoch=epoch_idx)
+        losses, _ = self.model.run_train_iter(data_batch=data_batch, epoch=epoch_idx, current_iter=current_iter)
 
         for key, value in zip(list(losses.keys()), list(losses.values())):
             if key not in total_losses:
@@ -152,7 +152,6 @@ class ExperimentBuilder(object):
 
         pbar_train.update(1)
         pbar_train.set_description("training phase {} -> {}".format(self.epoch, train_output_update))
-        # pbar_train.set_description("training phase {} -> {}".format(epoch_idx, train_output_update)) 위 코드와 일치한다, 다만 epoch_idx는 소수점으로 나타난다
 
         # iteration 크기 증가
         current_iter += 1

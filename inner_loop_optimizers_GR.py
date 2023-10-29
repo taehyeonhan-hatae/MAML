@@ -8,6 +8,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
+from utils.storage import save_statistics
+
 
 class GradientDescentLearningRule(nn.Module):
     """Simple (stochastic) gradient descent learning rule.
@@ -85,6 +87,9 @@ class LSLRGradientDescentLearningRule(nn.Module):
 
         self.args = args
 
+        self.norm_information = {}
+        self.comprehensive_loss_excel_create = True
+
     def initialise(self, names_weights_dict):
         self.names_learning_rates_dict = nn.ParameterDict()
         for idx, (key, param) in enumerate(names_weights_dict.items()):
@@ -93,7 +98,7 @@ class LSLRGradientDescentLearningRule(nn.Module):
                 requires_grad=self.use_learnable_learning_rates)
 
 
-    def update_params(self, names_weights_dict, names_grads_wrt_params_dict, generated_alpha_params, num_step, tau=0.1):
+    def update_params(self, names_weights_dict, names_grads_wrt_params_dict, generated_alpha_params, num_step, current_iter, tau=0.1):
         """Applies a single gradient descent update to all parameters.
         All parameter updates are performed using in-place operations and so
         nothing is returned.
@@ -105,20 +110,35 @@ class LSLRGradientDescentLearningRule(nn.Module):
 
         updated_names_weights_dict = dict()
 
+        self.norm_information['current_iter'] = current_iter
+        self.norm_information['num_step'] = num_step
+
         for key in names_grads_wrt_params_dict.keys():
 
+            self.norm_information[key + "_l2norm"] = torch.norm(names_grads_wrt_params_dict[key]).item()
+
             if self.args.arbiter:
-                ## classifier의 Gradient는 건들지 않는 실험을 해보자
-                ## if not 'linear' in key:
+
+                self.norm_information[key + "_alpha"] = generated_alpha_params[key].item()
+
                 updated_names_weights_dict[key] = names_weights_dict[key] - \
                                                   self.names_learning_rates_dict[key.replace(".", "-")][num_step] * generated_alpha_params[key] * names_grads_wrt_params_dict[key]
-                # else:
-                #     updated_names_weights_dict[key] = names_weights_dict[key] - \
-                #                                       self.names_learning_rates_dict[key.replace(".", "-")][num_step] * \
-                #                                       names_grads_wrt_params_dict[key] #/ names_grads_wrt_params_dict[key].norm()
             else:
                 updated_names_weights_dict[key] = names_weights_dict[key] - \
                                                   self.names_learning_rates_dict[key.replace(".", "-")][num_step] * \
                                                   names_grads_wrt_params_dict[key]
+
+        if self.comprehensive_loss_excel_create:
+            save_statistics(experiment_name=self.args.experiment_name,
+                            line_to_add=list(self.norm_information.keys()),
+                            filename=self.args.experiment_name + ".csv", create=True)
+            self.comprehensive_loss_excel_create = False
+            save_statistics(experiment_name=self.args.experiment_name,
+                            line_to_add=list(self.norm_information.values()),
+                            filename=self.args.experiment_name + ".csv", create=False)
+        else:
+            save_statistics(experiment_name=self.args.experiment_name,
+                            line_to_add=list(self.norm_information.values()),
+                            filename=self.args.experiment_name + ".csv", create=False)
 
         return updated_names_weights_dict
