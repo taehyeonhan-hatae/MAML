@@ -9,6 +9,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 from utils.storage import save_statistics
+import os
 
 
 class GradientDescentLearningRule(nn.Module):
@@ -89,6 +90,9 @@ class LSLRGradientDescentLearningRule(nn.Module):
 
         self.norm_information = {}
         self.comprehensive_loss_excel_create = True
+
+        if os.path.exists('../' + self.args.experiment_name + ".csv"):
+            self.comprehensive_loss_excel_create = False
 
     def initialise(self, names_weights_dict):
         self.names_learning_rates_dict = nn.ParameterDict()
