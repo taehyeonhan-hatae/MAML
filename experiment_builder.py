@@ -139,7 +139,7 @@ class ExperimentBuilder(object):
 
         # 지정한 크기의 data_batch만큼 iteration을 돌린다.
         # MAMLFewShotClassifier을 통해서..
-        losses, _ = self.model.run_train_iter(data_batch=data_batch, epoch=epoch_idx, current_iter=current_iter)
+        losses, _ = self.model.run_train_iter(data_batch=data_batch, epoch=epoch_idx, current_iter=self.state['current_iter'])
 
         for key, value in zip(list(losses.keys()), list(losses.values())):
             if key not in total_losses:
@@ -198,7 +198,7 @@ class ExperimentBuilder(object):
         data_batch = (
             x_support_set, x_target_set, y_support_set, y_target_set)
 
-        losses, per_task_preds = self.model.run_validation_iter(data_batch=data_batch)
+        losses, per_task_preds = self.model.run_validation_iter(data_batch=data_batch, current_iter='test')
 
         per_model_per_batch_preds[model_idx].extend(list(per_task_preds))
 
