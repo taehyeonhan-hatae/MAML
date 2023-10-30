@@ -65,7 +65,7 @@ class MAMLFewShotClassifier(nn.Module):
         # Gradient Arbiter
         if self.args.arbiter:
             num_layers = len(names_weights_copy)
-            input_dim = num_layers * 2
+            input_dim = num_layers * 0.5 * 2
             output_dim = num_layers
             self.arbiter = nn.Sequential(
                 nn.Linear(input_dim, input_dim),
@@ -263,22 +263,17 @@ class MAMLFewShotClassifier(nn.Module):
                     support_loss_grad = torch.autograd.grad(support_loss, names_weights_copy.values(),
                                                             retain_graph=True)
 
+                    names_grads_copy = dict(zip(names_weights_copy.keys(), support_loss_grad))
+
                     per_step_task_embedding = []
 
-                    # for k, v in names_weights_copy.items():
-                    #     per_step_task_embedding.append(v.mean())
 
-                    for i in range(len(support_loss_grad)):
-                        # per_step_task_embedding.append(support_loss_grad[i].mean())
-                        # per_step_task_embedding.append(support_loss_grad[i].clone().detach().mean())
-                        gradient_mean = torch.mean(support_loss_grad[i])
-                        per_step_task_embedding.append(gradient_mean)
-
-                    for i in range(len(support_loss_grad)):
-                        # per_step_task_embedding.append(support_loss_grad[i].norm())
-                        # per_step_task_embedding.append(support_loss_grad[i].clone().detach().norm())
-                        gradient_norm = torch.norm(support_loss_grad[i])
-                        per_step_task_embedding.append(gradient_norm)
+                    for key, grad in names_grads_copy.items():
+                        if "bias" not in key:
+                            gradient_mean = torch.mean(grad)
+                            gradient_norm = torch.norm(grad)
+                            per_step_task_embedding.append(gradient_mean)
+                            per_step_task_embedding.append(gradient_norm)
 
                     per_step_task_embedding = torch.stack(per_step_task_embedding)
 
