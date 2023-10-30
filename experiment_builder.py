@@ -158,7 +158,7 @@ class ExperimentBuilder(object):
 
         return train_losses, total_losses, current_iter
 
-    def evaluation_iteration(self, val_sample, total_losses, pbar_val, phase):
+    def evaluation_iteration(self, val_sample, total_losses, pbar_val, phase, current_iter):
         """
         Runs a validation iteration, updates the progress bar and returns the total and current epoch val losses.
         :param val_sample: A sample from the data provider
@@ -170,7 +170,7 @@ class ExperimentBuilder(object):
         data_batch = (
             x_support_set, x_target_set, y_support_set, y_target_set)
 
-        losses, _ = self.model.run_validation_iter(data_batch=data_batch)
+        losses, _ = self.model.run_validation_iter(data_batch=data_batch, current_iter=current_iter)
         for key, value in zip(list(losses.keys()), list(losses.values())):
             if key not in total_losses:
                 total_losses[key] = [float(value)]
@@ -365,7 +365,8 @@ class ExperimentBuilder(object):
                                 # val_sample로 평가를 진행하는 부분
                                 val_losses, total_losses = self.evaluation_iteration(val_sample=val_sample,
                                                                                      total_losses=total_losses,
-                                                                                     pbar_val=pbar_val, phase='val')
+                                                                                     pbar_val=pbar_val, phase='val',
+                                                                                     current_iter=self.state['current_iter'])
 
                             if val_losses["val_accuracy_mean"] > self.state['best_val_acc']:
                                 print("Best validation accuracy", val_losses["val_accuracy_mean"])
