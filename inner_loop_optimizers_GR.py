@@ -121,9 +121,9 @@ class LSLRGradientDescentLearningRule(nn.Module):
 
         for key in names_grads_wrt_params_dict.keys():
 
-            self.norm_information[key + "grad_mean"] = torch.mean(names_grads_wrt_params_dict[key]).item()
-            self.norm_information[key + "grad_L1norm"] = torch.norm(names_grads_wrt_params_dict[key], p=1).item()
-            self.norm_information[key + "grad_L2norm"] = torch.norm(names_grads_wrt_params_dict[key], p=2).item()
+            self.norm_information[key + "_grad_mean"] = torch.mean(names_grads_wrt_params_dict[key]).item()
+            self.norm_information[key + "_grad_L1norm"] = torch.norm(names_grads_wrt_params_dict[key], p=1).item()
+            self.norm_information[key + "_grad_L2norm"] = torch.norm(names_grads_wrt_params_dict[key], p=2).item()
 
             if self.args.arbiter:
 
@@ -136,9 +136,9 @@ class LSLRGradientDescentLearningRule(nn.Module):
                                                   self.names_learning_rates_dict[key.replace(".", "-")][num_step] * \
                                                   names_grads_wrt_params_dict[key]
 
-            self.norm_information[key + "weight_mean"] = torch.mean(updated_names_weights_dict[key]).item()
-            self.norm_information[key + "weight_L1norm"] = torch.norm(updated_names_weights_dict[key], p=1).item()
-            self.norm_information[key + "weight_L2norm"] = torch.norm(updated_names_weights_dict[key], p=2).item()
+            self.norm_information[key + "_weight_mean"] = torch.mean(updated_names_weights_dict[key]).item()
+            self.norm_information[key + "_weight_L1norm"] = torch.norm(updated_names_weights_dict[key], p=1).item()
+            self.norm_information[key + "_weight_L2norm"] = torch.norm(updated_names_weights_dict[key], p=2).item()
 
         if self.comprehensive_loss_excel_create:
             save_statistics(experiment_name=self.args.experiment_name,
