@@ -269,12 +269,12 @@ class MAMLFewShotClassifier(nn.Module):
 
 
                     for key, grad in names_grads_copy.items():
-                        if "bias" not in key:
-                            gradient_mean = torch.mean(grad)
-                            # gradient_l1norm = torch.norm(grad, p=1)
-                            gradient_l2norm = torch.norm(grad)
-                            per_step_task_embedding.append(gradient_mean)
-                            per_step_task_embedding.append(gradient_l2norm)
+                        #if "bias" not in key:
+                        gradient_mean = torch.mean(grad)
+                        # gradient_l1norm = torch.norm(grad, p=1)
+                        gradient_l2norm = torch.norm(grad)
+                        per_step_task_embedding.append(gradient_mean)
+                        per_step_task_embedding.append(gradient_l2norm)
 
                     per_step_task_embedding = torch.stack(per_step_task_embedding)
 
