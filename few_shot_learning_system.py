@@ -43,8 +43,6 @@ class MAMLFewShotClassifier(nn.Module):
 
         self.rng = set_torch_seed(seed=args.seed)
 
-        self.outerloop_excel = True
-
         if self.args.backbone == 'ResNet12':
             self.classifier = ResNet12(im_shape=self.im_shape, num_output_classes=self.args.
                                        num_classes_per_set,
@@ -416,38 +414,6 @@ class MAMLFewShotClassifier(nn.Module):
         #     for name, param in self.classifier.named_parameters():
         #         if param.requires_grad:
         #             param.grad.data.clamp_(-10, 10)  # not sure if this is necessary, more experiments are needed
-
-        outerloop_info = {}
-        outerloop_info[current_iter] = current_iter
-        for name, param in self.classifier.named_parameters():
-
-            if "norm_layer" not in name:
-                weight = param
-                outerloop_info[name + "_weight_mean"] = torch.mean(weight).item()
-                outerloop_info[name + "_weight_L1norm"] = torch.norm(weight, p=1).item()
-                outerloop_info[name + "_weight_L2norm"] = torch.norm(weight, p=2).item()
-
-                gradient = param.grad
-                outerloop_info[name + "_gradmean"] = torch.mean(gradient).item()
-                outerloop_info[name + "_grad_L1norm"] = torch.norm(gradient, p=1).item()
-                outerloop_info[name + "_grad_L2norm"] = torch.norm(gradient, p=2).item()
-
-
-        if os.path.exists(self.args.experiment_name + '/' + self.args.experiment_name + "_outer_loop.csv"):
-            self.outerloop_excel = False
-
-        if self.outerloop_excel:
-            save_statistics(experiment_name=self.args.experiment_name,
-                            line_to_add=list(outerloop_info.keys()),
-                            filename=self.args.experiment_name + "_outer_loop.csv", create=True)
-            self.outerloop_excel = False
-            save_statistics(experiment_name=self.args.experiment_name,
-                            line_to_add=list(outerloop_info.values()),
-                            filename=self.args.experiment_name + "_outer_loop.csv", create=False)
-        else:
-            save_statistics(experiment_name=self.args.experiment_name,
-                            line_to_add=list(outerloop_info.values()),
-                            filename=self.args.experiment_name + "_outer_loop.csv", create=False)
 
         self.optimizer.step()
 
