@@ -65,7 +65,7 @@ class MAMLFewShotClassifier(nn.Module):
         # Gradient Arbiter
         if self.args.arbiter:
             num_layers = len(names_weights_copy)
-            input_dim = num_layers * 0.5 * 2
+            input_dim = num_layers * 2
             output_dim = num_layers
             self.arbiter = nn.Sequential(
                 nn.Linear(input_dim, input_dim),
@@ -271,9 +271,10 @@ class MAMLFewShotClassifier(nn.Module):
                     for key, grad in names_grads_copy.items():
                         if "bias" not in key:
                             gradient_mean = torch.mean(grad)
-                            gradient_norm = torch.norm(grad)
+                            # gradient_l1norm = torch.norm(grad, p=1)
+                            gradient_l2norm = torch.norm(grad)
                             per_step_task_embedding.append(gradient_mean)
-                            per_step_task_embedding.append(gradient_norm)
+                            per_step_task_embedding.append(gradient_l2norm)
 
                     per_step_task_embedding = torch.stack(per_step_task_embedding)
 
@@ -285,7 +286,10 @@ class MAMLFewShotClassifier(nn.Module):
 
                     g = 0
                     for key in names_weights_copy.keys():
-                        generated_alpha_params[key] = generated_gradient_rate[g]
+                        if "bias" not in key:
+                            generated_alpha_params[key] = generated_gradient_rate[g]
+                        else:
+                            generated_alpha_params[key] = torch.tensor(1)
                         g += 1
 
                 names_weights_copy = self.apply_inner_loop_update(loss=support_loss,

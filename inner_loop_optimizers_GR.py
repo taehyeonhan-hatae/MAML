@@ -91,7 +91,7 @@ class LSLRGradientDescentLearningRule(nn.Module):
         self.norm_information = {}
         self.comprehensive_loss_excel_create = True
 
-        if os.path.exists('../' + self.args.experiment_name + ".csv"):
+        if os.path.exists('../' + self.args.experiment_name + '/' + self.args.experiment_name + ".csv"):
             self.comprehensive_loss_excel_create = False
 
     def initialise(self, names_weights_dict):
