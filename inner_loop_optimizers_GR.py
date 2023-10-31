@@ -89,10 +89,7 @@ class LSLRGradientDescentLearningRule(nn.Module):
         self.args = args
 
         self.norm_information = {}
-        self.comprehensive_loss_excel_create = True
-
-        if os.path.exists('../' + self.args.experiment_name + ".csv"):
-            self.comprehensive_loss_excel_create = False
+        self.innerloop_excel = True
 
     def initialise(self, names_weights_dict):
         self.names_learning_rates_dict = nn.ParameterDict()
@@ -144,17 +141,20 @@ class LSLRGradientDescentLearningRule(nn.Module):
             self.norm_information[key + "_weight_L1norm"] = torch.norm(updated_names_weights_dict[key], p=1).item()
             self.norm_information[key + "_weight_L2norm"] = torch.norm(updated_names_weights_dict[key], p=2).item()
 
-        if self.comprehensive_loss_excel_create:
+        if os.path.exists(self.args.experiment_name + '/' + self.args.experiment_name + "_inner_loop.csv"):
+            self.innerloop_excel = False
+
+        if self.innerloop_excel:
             save_statistics(experiment_name=self.args.experiment_name,
                             line_to_add=list(self.norm_information.keys()),
-                            filename=self.args.experiment_name + ".csv", create=True)
-            self.comprehensive_loss_excel_create = False
+                            filename=self.args.experiment_name + "_inner_loop.csv", create=True)
+            self.innerloop_excel = False
             save_statistics(experiment_name=self.args.experiment_name,
                             line_to_add=list(self.norm_information.values()),
-                            filename=self.args.experiment_name + ".csv", create=False)
+                            filename=self.args.experiment_name + "_inner_loop.csv", create=False)
         else:
             save_statistics(experiment_name=self.args.experiment_name,
                             line_to_add=list(self.norm_information.values()),
-                            filename=self.args.experiment_name + ".csv", create=False)
+                            filename=self.args.experiment_name + "_inner_loop.csv", create=False)
 
         return updated_names_weights_dict
