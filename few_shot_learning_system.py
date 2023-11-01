@@ -267,18 +267,22 @@ class MAMLFewShotClassifier(nn.Module):
 
                     per_step_task_embedding = []
 
+                    for key, weight in names_weights_copy.items():
+                        weight_norm = torch.norm(weight, p=2)
+                        per_step_task_embedding.append(weight_norm)
 
                     for key, grad in names_grads_copy.items():
-                        #if "bias" not in key:
-                        gradient_mean = torch.mean(grad)
-                        # gradient_l1norm = torch.norm(grad, p=1)
-                        gradient_l2norm = torch.norm(grad)
-                        per_step_task_embedding.append(gradient_mean)
+                        # if "bias" not in key:
+                        #gradient_mean = torch.mean(grad)
+                        #gradient_l1norm = torch.norm(grad, p=1)
+                        #per_step_task_embedding.append(gradient_mean)
+                        #per_step_task_embedding.append(gradient_l1norm)
+                        gradient_l2norm = torch.norm(grad, p=2)
                         per_step_task_embedding.append(gradient_l2norm)
 
                     per_step_task_embedding = torch.stack(per_step_task_embedding)
 
-                    ## Standardization
+                    ## Standardization/ torch norm으로 계산할까..?
                     per_step_task_embedding = (per_step_task_embedding - per_step_task_embedding.mean()) / (
                                 per_step_task_embedding.std() + 1e-12)
 
@@ -287,11 +291,12 @@ class MAMLFewShotClassifier(nn.Module):
                     g = 0
                     for key in names_weights_copy.keys():
                         generated_alpha_params[key] = generated_gradient_rate[g]
+                        g += 1
                         # if "bias" not in key:
                         #     generated_alpha_params[key] = generated_gradient_rate[g]
+                        #     g += 1
                         # else:
                         #     generated_alpha_params[key] = torch.tensor(1)
-                        g += 1
 
                 names_weights_copy = self.apply_inner_loop_update(loss=support_loss,
                                                                   names_weights_copy=names_weights_copy,
