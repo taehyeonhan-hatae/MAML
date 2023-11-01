@@ -99,7 +99,7 @@ class LSLRGradientDescentLearningRule(nn.Module):
                 requires_grad=self.use_learnable_learning_rates)
 
 
-    def update_params(self, names_weights_dict, names_grads_wrt_params_dict, generated_alpha_params, num_step, current_iter, training_phase, tau=0.1):
+    def update_params(self, names_weights_dict, names_grads_wrt_params_dict, out_feature_dict, generated_alpha_params, num_step, current_iter, training_phase, tau=0.1):
         """Applies a single gradient descent update to all parameters.
         All parameter updates are performed using in-place operations and so
         nothing is returned.
@@ -120,11 +120,17 @@ class LSLRGradientDescentLearningRule(nn.Module):
 
         self.norm_information['num_step'] = num_step
 
+        for key, value in out_feature_dict.items():
+            self.norm_information[key + "_feature_L2norm"] = torch.norm(out_feature_dict[key], p=2).item()
+
         for key in names_grads_wrt_params_dict.keys():
 
             self.norm_information[key + "_grad_mean"] = torch.mean(names_grads_wrt_params_dict[key]).item()
             self.norm_information[key + "_grad_L1norm"] = torch.norm(names_grads_wrt_params_dict[key], p=1).item()
             self.norm_information[key + "_grad_L2norm"] = torch.norm(names_grads_wrt_params_dict[key], p=2).item()
+            self.norm_information[key + "_weight_mean"] = torch.mean(names_weights_dict[key]).item()
+            self.norm_information[key + "_weight_L1norm"] = torch.norm(names_weights_dict[key], p=1).item()
+            self.norm_information[key + "_weight_L2norm"] = torch.norm(names_weights_dict[key], p=2).item()
 
             if self.args.arbiter:
 
@@ -136,10 +142,6 @@ class LSLRGradientDescentLearningRule(nn.Module):
                 updated_names_weights_dict[key] = names_weights_dict[key] - \
                                                   self.names_learning_rates_dict[key.replace(".", "-")][num_step] * \
                                                   names_grads_wrt_params_dict[key]
-
-            self.norm_information[key + "_weight_mean"] = torch.mean(updated_names_weights_dict[key]).item()
-            self.norm_information[key + "_weight_L1norm"] = torch.norm(updated_names_weights_dict[key], p=1).item()
-            self.norm_information[key + "_weight_L2norm"] = torch.norm(updated_names_weights_dict[key], p=2).item()
 
         if os.path.exists(self.args.experiment_name + '/' + self.args.experiment_name + "_inner_loop.csv"):
             self.innerloop_excel = False
