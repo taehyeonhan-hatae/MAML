@@ -98,16 +98,6 @@ class LSLRGradientDescentLearningRule(nn.Module):
                 data=torch.ones(self.total_num_inner_loop_steps + 1) * self.init_learning_rate,
                 requires_grad=self.use_learnable_learning_rates)
 
-    def moving_average(self, weight_dict, update_weight_dict, count, alpha=1.0):
-
-        SWA_weight = {}
-
-        for key in weight_dict.keys():
-            weight_dict[key] = weight_dict[key] * (1.0 - alpha)
-            SWA_weight[key] = (update_weight_dict[key] + weight_dict[key]) * 1 / count
-
-        return SWA_weight
-
     def update_params(self, names_weights_dict, names_grads_wrt_params_dict, out_feature_dict, generated_alpha_params, num_step, current_iter, training_phase, tau=0.1):
         """Applies a single gradient descent update to all parameters.
         All parameter updates are performed using in-place operations and so
@@ -149,7 +139,11 @@ class LSLRGradientDescentLearningRule(nn.Module):
                                                   self.names_learning_rates_dict[key.replace(".", "-")][num_step] * generated_alpha_params[key] * names_grads_wrt_params_dict[key]
 
                 if self.args.SWA:
-                    updated_names_weights_dict = self.moving_average(names_weights_dict, updated_names_weights_dict, count=num_step+1, alpha=0.5)
+                    count = num_step + 1
+                    alpha = 0.5
+                    names_weights_dict[key] = names_weights_dict[key] * (1.0 - alpha)
+                    updated_names_weights_dict[key] = (updated_names_weights_dict[key] + names_weights_dict[key]) * 1 / count
+
 
             else:
                 updated_names_weights_dict[key] = names_weights_dict[key] - \
