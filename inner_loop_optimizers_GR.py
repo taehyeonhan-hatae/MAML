@@ -100,13 +100,13 @@ class LSLRGradientDescentLearningRule(nn.Module):
 
     def moving_average(self, weight_dict, update_weight_dict, count, alpha=1.0):
 
-        result = {}
+        SWA_weight = {}
 
         for key in weight_dict.keys():
-            weight_dict = weight_dict * (1.0 - alpha)
-            result[key] = (update_weight_dict + weight_dict) * 1 / count
+            weight_dict = weight_dict[key] * (1.0 - alpha)
+            SWA_weight[key] = (update_weight_dict[key] + weight_dict[key]) * 1 / count
 
-        return result
+        return SWA_weight
 
     def update_params(self, names_weights_dict, names_grads_wrt_params_dict, out_feature_dict, generated_alpha_params, num_step, current_iter, training_phase, tau=0.1):
         """Applies a single gradient descent update to all parameters.
@@ -149,8 +149,7 @@ class LSLRGradientDescentLearningRule(nn.Module):
                                                   self.names_learning_rates_dict[key.replace(".", "-")][num_step] * generated_alpha_params[key] * names_grads_wrt_params_dict[key]
 
                 if self.args.SWA:
-                    SWA_weight = self.moving_average(names_weights_dict, updated_names_weights_dict, count=num_step+1, alpha=0.5)
-                    updated_names_weights_dict = SWA_weight
+                    updated_names_weights_dict = self.moving_average(names_weights_dict, updated_names_weights_dict, count=num_step+1, alpha=0.5)
 
             else:
                 updated_names_weights_dict[key] = names_weights_dict[key] - \
