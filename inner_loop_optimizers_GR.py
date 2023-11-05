@@ -139,10 +139,9 @@ class LSLRGradientDescentLearningRule(nn.Module):
                                                   self.names_learning_rates_dict[key.replace(".", "-")][num_step] * generated_alpha_params[key] * names_grads_wrt_params_dict[key]
 
                 if self.args.SWA:
-                    count = num_step + 1
-                    alpha = 0.5
-                    names_weights_dict[key] = names_weights_dict[key] * (1.0 - alpha)
-                    updated_names_weights_dict[key] = (updated_names_weights_dict[key] + names_weights_dict[key]) * 1 / count
+                    alpha = 1.0 / num_step + 1
+                    names_weights_dict[key] = names_weights_dict[key] * alpha
+                    updated_names_weights_dict[key] = (updated_names_weights_dict[key] + names_weights_dict[key]) / 2
 
 
             else:
