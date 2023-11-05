@@ -103,7 +103,7 @@ class LSLRGradientDescentLearningRule(nn.Module):
         SWA_weight = {}
 
         for key in weight_dict.keys():
-            weight_dict = weight_dict[key] * (1.0 - alpha)
+            weight_dict[key] = weight_dict[key] * (1.0 - alpha)
             SWA_weight[key] = (update_weight_dict[key] + weight_dict[key]) * 1 / count
 
         return SWA_weight
