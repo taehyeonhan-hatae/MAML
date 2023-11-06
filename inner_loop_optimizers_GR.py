@@ -139,19 +139,20 @@ class LSLRGradientDescentLearningRule(nn.Module):
                                                   self.names_learning_rates_dict[key.replace(".", "-")][num_step] * generated_alpha_params[key] * names_grads_wrt_params_dict[key]
 
                 if self.args.SWA:
+                    #if num_step % 2 == 0:
                     alpha = 1.0 / (num_step + 1)
                     updated_names_weights_dict[key] = updated_names_weights_dict[key] * (1.0 - alpha)
                     updated_names_weights_dict[key] = updated_names_weights_dict[key] + (names_weights_dict[key] * alpha)
-
-
-                    # names_weights_dict[key] = names_weights_dict[key] * (1.0 - alpha)
-                    # updated_names_weights_dict[key] = (updated_names_weights_dict[key] + names_weights_dict[key]) / 2
-
 
             else:
                 updated_names_weights_dict[key] = names_weights_dict[key] - \
                                                   self.names_learning_rates_dict[key.replace(".", "-")][num_step] * \
                                                   names_grads_wrt_params_dict[key]
+                if self.args.SWA:
+                    #if num_step % 2 == 0:
+                    alpha = 1.0 / (num_step + 1)
+                    updated_names_weights_dict[key] = updated_names_weights_dict[key] * (1.0 - alpha)
+                    updated_names_weights_dict[key] = updated_names_weights_dict[key] + (names_weights_dict[key] * alpha)
 
         if os.path.exists(self.args.experiment_name + '/' + self.args.experiment_name + "_inner_loop.csv"):
             self.innerloop_excel = False
