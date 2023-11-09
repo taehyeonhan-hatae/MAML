@@ -136,7 +136,7 @@ class LSLRGradientDescentLearningRule(nn.Module):
                 self.norm_information[key + "_alpha"] = generated_alpha_params[key].item()
 
                 updated_names_weights_dict[key] = names_weights_dict[key] - \
-                                                  self.names_learning_rates_dict[key.replace(".", "-")][num_step] * generated_alpha_params[key] * names_grads_wrt_params_dict[key]
+                                                  self.names_learning_rates_dict[key.replace(".", "-")][num_step] * generated_alpha_params[key] * (names_grads_wrt_params_dict[key] / torch.norm(names_grads_wrt_params_dict[key]))
 
                 if self.args.SWA:
                     #if num_step % 2 == 0:

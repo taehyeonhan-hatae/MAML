@@ -55,5 +55,5 @@
   "use_multi_step_loss_optimization":false,
   "backbone": "4-CONV",
   "arbiter": true,
-  "SWA": true
+  "SWA": false
 }
