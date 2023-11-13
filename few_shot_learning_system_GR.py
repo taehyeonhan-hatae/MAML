@@ -9,6 +9,8 @@ import torch.optim as optim
 from meta_neural_network_architectures import VGGReLUNormNetwork,ResNet12
 from inner_loop_optimizers_GR import LSLRGradientDescentLearningRule
 
+from utils.storage import save_statistics
+
 
 def set_torch_seed(seed):
     """
@@ -71,7 +73,8 @@ class MAMLFewShotClassifier(nn.Module):
                 nn.Linear(input_dim, input_dim),
                 nn.ReLU(inplace=True),
                 nn.Linear(input_dim, output_dim),
-                nn.Softplus(beta=2)
+                ## nn.Softplus(beta=2) # GAP
+                nn.Softplus() # CxGrad
             ).to(device=self.device)
 
         self.inner_loop_optimizer.initialise(
@@ -144,7 +147,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         return param_dict
 
-    def apply_inner_loop_update(self, loss, names_weights_copy, alpha, use_second_order, current_step_idx):
+    def apply_inner_loop_update(self, loss, names_weights_copy, out_feature_dict, alpha, use_second_order, current_step_idx, current_iter, training_phase):
         """
         Applies an inner loop update given current step's loss, the weights to update, a flag indicating whether to use
         second order derivatives and the current step's index.
@@ -176,8 +179,11 @@ class MAMLFewShotClassifier(nn.Module):
 
         names_weights_copy = self.inner_loop_optimizer.update_params(names_weights_dict=names_weights_copy,
                                                                      names_grads_wrt_params_dict=names_grads_copy,
+                                                                     out_feature_dict=out_feature_dict,
                                                                      generated_alpha_params=alpha,
-                                                                     num_step=current_step_idx)
+                                                                     num_step=current_step_idx,
+                                                                     current_iter=current_iter,
+                                                                     training_phase=training_phase)
 
         num_devices = torch.cuda.device_count() if torch.cuda.is_available() else 1
         names_weights_copy = {
@@ -196,7 +202,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         return losses
 
-    def forward(self, data_batch, epoch, use_second_order, use_multi_step_loss_optimization, num_steps, training_phase):
+    def forward(self, data_batch, epoch, use_second_order, use_multi_step_loss_optimization, num_steps, training_phase, current_iter):
         """
         Runs a forward outer loop pass on the batch of tasks using the MAML/++ framework.
         :param data_batch: A data batch containing the support and target sets.
@@ -243,7 +249,7 @@ class MAMLFewShotClassifier(nn.Module):
 
             for num_step in range(num_steps):
 
-                support_loss, support_preds = self.net_forward(
+                support_loss, support_preds, out_feature_dict  = self.net_forward(
                     x=x_support_set_task,
                     y=y_support_set_task,
                     weights=names_weights_copy,
@@ -258,27 +264,26 @@ class MAMLFewShotClassifier(nn.Module):
                     support_loss_grad = torch.autograd.grad(support_loss, names_weights_copy.values(),
                                                             retain_graph=True)
 
+                    names_grads_copy = dict(zip(names_weights_copy.keys(), support_loss_grad))
+
                     per_step_task_embedding = []
-                    # for k, v in names_weights_copy.items():
-                    #     # per_step_task_embedding.append(v.mean())
-                    #     per_step_task_embedding.append(v.norm())
 
-                    for i in range(len(support_loss_grad)):
-                        # per_step_task_embedding.append(support_loss_grad[i].mean())
-                        # per_step_task_embedding.append(support_loss_grad[i].clone().detach().mean())
-                        gradient_mean = torch.mean(support_loss_grad[i])
-                        per_step_task_embedding.append(gradient_mean)
+                    for key, weight in names_weights_copy.items():
+                        weight_norm = torch.norm(weight, p=2)
+                        per_step_task_embedding.append(weight_norm)
 
-                    for i in range(len(support_loss_grad)):
-                        # per_step_task_embedding.append(support_loss_grad[i].norm())
-                        # per_step_task_embedding.append(support_loss_grad[i].clone().detach().norm())
-                        gradient_norm = torch.norm(support_loss_grad[i])
-                        per_step_task_embedding.append(gradient_norm)
+                    for key, grad in names_grads_copy.items():
+                        # if "bias" not in key:
+                        #gradient_mean = torch.mean(grad)
+                        #gradient_l1norm = torch.norm(grad, p=1)
+                        #per_step_task_embedding.append(gradient_mean)
+                        #per_step_task_embedding.append(gradient_l1norm)
+                        gradient_l2norm = torch.norm(grad, p=2)
+                        per_step_task_embedding.append(gradient_l2norm)
 
                     per_step_task_embedding = torch.stack(per_step_task_embedding)
 
-                    ## 추가
-                    ## - 성능이 더 떨어짐.. 69.7+0.45 -? 69.49+0.46
+                    ## Standardization/ torch norm으로 계산할까..?
                     per_step_task_embedding = (per_step_task_embedding - per_step_task_embedding.mean()) / (
                                 per_step_task_embedding.std() + 1e-12)
 
@@ -288,26 +293,35 @@ class MAMLFewShotClassifier(nn.Module):
                     for key in names_weights_copy.keys():
                         generated_alpha_params[key] = generated_gradient_rate[g]
                         g += 1
+                        # if "bias" not in key:
+                        #     generated_alpha_params[key] = generated_gradient_rate[g]
+                        #     g += 1
+                        # else:
+                        #     generated_alpha_params[key] = torch.tensor(1)
 
                 names_weights_copy = self.apply_inner_loop_update(loss=support_loss,
                                                                   names_weights_copy=names_weights_copy,
+                                                                  out_feature_dict=out_feature_dict,
                                                                   alpha=generated_alpha_params,
                                                                   use_second_order=use_second_order,
-                                                                  current_step_idx=num_step)
+                                                                  current_step_idx=num_step,
+                                                                  current_iter=current_iter,
+                                                                  training_phase=training_phase)
 
                 if use_multi_step_loss_optimization and training_phase and epoch < self.args.multi_step_loss_num_epochs:
-                    target_loss, target_preds = self.net_forward(x=x_target_set_task,
+                    target_loss, target_preds, _ = self.net_forward(x=x_target_set_task,
                                                                  y=y_target_set_task, weights=names_weights_copy,
                                                                  backup_running_statistics=False, training=True,
                                                                  num_step=num_step)
 
                     task_losses.append(per_step_loss_importance_vectors[num_step] * target_loss)
                 elif num_step == (self.args.number_of_training_steps_per_iter - 1):
-                    target_loss, target_preds = self.net_forward(x=x_target_set_task,
+                    target_loss, target_preds, _ = self.net_forward(x=x_target_set_task,
                                                                  y=y_target_set_task, weights=names_weights_copy,
                                                                  backup_running_statistics=False, training=True,
                                                                  num_step=num_step)
                     task_losses.append(target_loss)
+                ## Inner-loop END
 
             per_task_target_preds[task_id] = target_preds.detach().cpu().numpy()
             _, predicted = torch.max(target_preds.data, 1)
@@ -343,13 +357,13 @@ class MAMLFewShotClassifier(nn.Module):
         :param num_step: An integer indicating the number of the step in the inner loop.
         :return: the crossentropy losses with respect to the given y, the predictions of the base model.
         """
-        preds = self.classifier.forward(x=x, params=weights,
+        preds, out_feature_dict = self.classifier.forward(x=x, params=weights,
                                         training=training,
                                         backup_running_statistics=backup_running_statistics, num_step=num_step)
 
         loss = F.cross_entropy(input=preds, target=y)
 
-        return loss, preds
+        return loss, preds, out_feature_dict
 
     def trainable_parameters(self):
         """
@@ -359,7 +373,7 @@ class MAMLFewShotClassifier(nn.Module):
             if param.requires_grad:
                 yield param
 
-    def train_forward_prop(self, data_batch, epoch):
+    def train_forward_prop(self, data_batch, epoch, current_iter):
         """
         Runs an outer loop forward prop using the meta-model and base-model.
         :param data_batch: A data batch containing the support set and the target set input, output pairs.
@@ -371,10 +385,11 @@ class MAMLFewShotClassifier(nn.Module):
                                                                       epoch > self.args.first_order_to_second_order_epoch,
                                                      use_multi_step_loss_optimization=self.args.use_multi_step_loss_optimization,
                                                      num_steps=self.args.number_of_training_steps_per_iter,
-                                                     training_phase=True)
+                                                     training_phase=True,
+                                                     current_iter=current_iter)
         return losses, per_task_target_preds
 
-    def evaluation_forward_prop(self, data_batch, epoch):
+    def evaluation_forward_prop(self, data_batch, epoch, current_iter):
         """
         Runs an outer loop evaluation forward prop using the meta-model and base-model.
         :param data_batch: A data batch containing the support set and the target set input, output pairs.
@@ -384,11 +399,12 @@ class MAMLFewShotClassifier(nn.Module):
         losses, per_task_target_preds = self.forward(data_batch=data_batch, epoch=epoch, use_second_order=False,
                                                      use_multi_step_loss_optimization=True,
                                                      num_steps=self.args.number_of_evaluation_steps_per_iter,
-                                                     training_phase=False)
+                                                     training_phase=False,
+                                                     current_iter=current_iter)
 
         return losses, per_task_target_preds
 
-    def meta_update(self, loss):
+    def meta_update(self, loss, current_iter):
         """
         Applies an outer loop update on the meta-parameters of the model.
         :param loss: The current crossentropy loss.
@@ -405,6 +421,7 @@ class MAMLFewShotClassifier(nn.Module):
         #     for name, param in self.classifier.named_parameters():
         #         if param.requires_grad:
         #             param.grad.data.clamp_(-10, 10)  # not sure if this is necessary, more experiments are needed
+
         self.optimizer.step()
 
         # 가중치 업데이트 확인
@@ -413,7 +430,7 @@ class MAMLFewShotClassifier(nn.Module):
         #         print(f"{name} 가중치가 업데이트되었습니다.")
         #         prev_weights[name] = param.data.clone()
 
-    def run_train_iter(self, data_batch, epoch):
+    def run_train_iter(self, data_batch, epoch, current_iter):
         """
         Runs an outer loop update step on the meta-model's parameters.
         :param data_batch: input data batch containing the support set and target set input, output pairs
@@ -437,16 +454,16 @@ class MAMLFewShotClassifier(nn.Module):
 
         data_batch = (x_support_set, x_target_set, y_support_set, y_target_set)
 
-        losses, per_task_target_preds = self.train_forward_prop(data_batch=data_batch, epoch=epoch)
+        losses, per_task_target_preds = self.train_forward_prop(data_batch=data_batch, epoch=epoch, current_iter=current_iter)
 
-        self.meta_update(loss=losses['loss'])
+        self.meta_update(loss=losses['loss'], current_iter=current_iter)
         losses['learning_rate'] = self.scheduler.get_lr()[0]
         self.optimizer.zero_grad()
         self.zero_grad()
 
         return losses, per_task_target_preds
 
-    def run_validation_iter(self, data_batch):
+    def run_validation_iter(self, data_batch, current_iter):
         """
         Runs an outer loop evaluation step on the meta-model's parameters.
         :param data_batch: input data batch containing the support set and target set input, output pairs
@@ -466,7 +483,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         data_batch = (x_support_set, x_target_set, y_support_set, y_target_set)
 
-        losses, per_task_target_preds = self.evaluation_forward_prop(data_batch=data_batch, epoch=self.current_epoch)
+        losses, per_task_target_preds = self.evaluation_forward_prop(data_batch=data_batch, epoch=self.current_epoch, current_iter=current_iter)
 
         losses['loss'].backward() # uncomment if you get the weird memory error
         self.zero_grad()
