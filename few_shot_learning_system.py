@@ -293,11 +293,6 @@ class MAMLFewShotClassifier(nn.Module):
                     for key in names_weights_copy.keys():
                         generated_alpha_params[key] = generated_gradient_rate[g]
                         g += 1
-                        # if "bias" not in key:
-                        #     generated_alpha_params[key] = generated_gradient_rate[g]
-                        #     g += 1
-                        # else:
-                        #     generated_alpha_params[key] = torch.tensor(1)
 
                 names_weights_copy = self.apply_inner_loop_update(loss=support_loss,
                                                                   names_weights_copy=names_weights_copy,
