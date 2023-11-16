@@ -62,9 +62,6 @@ class ExperimentBuilder(object):
                                       model_idx=self.args.continue_from_epoch)
             self.start_epoch = int(self.state['current_iter'] / self.args.total_iter_per_epoch)
 
-        ## Data 구성
-        ## current_iter에 주목해야할것 같다.
-        ## data.py를 분석할 때 심도있게 진행해보자
         self.data = data(args=args, current_iter=self.state['current_iter'])
 
         print("train_seed {}, val_seed: {}, at start time".format(self.data.dataset.seed["train"],
@@ -78,8 +75,6 @@ class ExperimentBuilder(object):
         self.start_time = time.time()
         self.epochs_done_in_this_run = 0
 
-        # TODO: 여기서 iteration과 epoch이 설정되는구나
-        ## 1 epoch 당 500 iteration이고 total epoch이 500이니, 50000번의 가중치 update가 일어난다
         print(self.state['current_iter'], int(self.args.total_iter_per_epoch * self.args.total_epochs))
 
     def build_summary_dict(self, total_losses, phase, summary_losses=None):
@@ -304,10 +299,20 @@ class ExperimentBuilder(object):
         #     assert np.equal(np.array(per_model_per_batch_targets[0]), np.array(per_model_per_batch_targets[i]))
 
         per_batch_preds = np.mean(per_model_per_batch_preds, axis=0)
-        # print(per_batch_preds.shape)
+
+        print("per_batch_preds == ", per_batch_preds)
+        print("per_batch_preds shape== ", per_batch_preds.shape)
+
         per_batch_max = np.argmax(per_batch_preds, axis=2)
+
+        print("per_batch_max == ", per_batch_max)
+        print("per_batch_max shape== ", per_batch_max.shape)
+
         per_batch_targets = np.array(per_model_per_batch_targets[0]).reshape(per_batch_max.shape)
-        # print(per_batch_max)
+
+        print("per_batch_targets == ", per_batch_targets)
+        print("per_batch_targets shape== ", per_batch_targets.shape)
+
         accuracy = np.mean(np.equal(per_batch_targets, per_batch_max))
         accuracy_std = np.std(np.equal(per_batch_targets, per_batch_max))
 
