@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import copy
 from mypyhessian import my_hessian
+import torch.nn.functional as F
 
 
 class landscape(nn.Module):
@@ -14,10 +15,12 @@ class landscape(nn.Module):
         self.criterion = criterion
 
     def get_params(self, model_orig, model_perb, direction, alpha):
-        for m_orig, m_perb, d in zip(model_orig.parameters(), model_perb.parameters(), direction):
-            print("m_orig shape == ", m_orig.shape)
-            print("m_perb shape == ", m_perb.shape)
-            m_perb.data = m_orig.data + alpha * d
+        i=0
+        for m_orig, m_perb in zip(model_orig.parameters(), model_perb.parameters()):
+            if m_orig.requires_grad:
+                m_perb.data = m_orig.data + alpha * direction[i]
+                i = i+1
+
         return model_perb
 
     def save__landscape_image(self, loss_list):
@@ -37,17 +40,16 @@ class landscape(nn.Module):
         landscape.view_init(elev=15, azim=75)
         landscape.dist = 6
 
-        #plt.savefig('savefig_default.png')
+        plt.savefig('savefig_default.png')
 
     def show(self, inputs, targets):
-
-        print("==loss_landscape==")
 
         model = self.model.cuda()
         inputs, targets = inputs.cuda(), targets.cuda()
 
         for name, param in model.named_parameters():
-            print(name)
+            if not param.requires_grad:
+                print(name)
 
         hessian_comp = my_hessian.my_hessian(model, self.criterion, data=(inputs, targets), cuda=True)
 
@@ -56,6 +58,7 @@ class landscape(nn.Module):
 
         print("top_eigenvector")
         print(len(top_eigenvector[0]))
+        print(len(top_eigenvector[1]))
 
         # lambda is a small scalar that we use to perturb the model parameters along the eigenvectors
         lams1 = np.linspace(-0.5, 0.5, 21).astype(np.float32)
@@ -75,7 +78,11 @@ class landscape(nn.Module):
             for lam2 in lams2:
                 model_perb1 = self.get_params(model, model_perb1, top_eigenvector[0], lam1)
                 model_perb2 = self.get_params(model_perb1, model_perb2, top_eigenvector[1], lam2)
-                loss_list.append((lam1, lam2, self.criterion(model_perb2(inputs), targets).item()))
+                # loss_list.append((lam1, lam2, self.criterion(model_perb2(inputs), targets).item()))
+                preds, out_feature_dict = model_perb2.forward(x=inputs, num_step=5)
+                loss = F.cross_entropy(input=preds, target=targets)
+
+                loss_list.append((lam1, lam2, loss.item()))
 
         self.save__landscape_image(loss_list)
 

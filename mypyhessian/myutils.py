@@ -64,7 +64,7 @@ def get_params_grad(model):
     """
     params = []
     grads = []
-    for param in model.parameters():
+    for name, param in model.named_parameters():
         if not param.requires_grad:
             continue
         params.append(param)

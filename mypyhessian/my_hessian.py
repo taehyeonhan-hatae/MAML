@@ -130,9 +130,6 @@ class my_hessian():
 
         computed_dim = 0
 
-        for p in self.params:
-            print("p == ", p)
-
         while computed_dim < top_n:
             eigenvalue = None
 
