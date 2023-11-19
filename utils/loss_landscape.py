@@ -1,12 +1,10 @@
-
-import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
-from pyhessian import hessian
 import matplotlib.pyplot as plt
 import numpy as np
 import copy
+from mypyhessian import my_hessian
+
 
 class landscape(nn.Module):
     def __init__(self, model, criterion):
@@ -17,6 +15,8 @@ class landscape(nn.Module):
 
     def get_params(self, model_orig, model_perb, direction, alpha):
         for m_orig, m_perb, d in zip(model_orig.parameters(), model_perb.parameters(), direction):
+            print("m_orig shape == ", m_orig.shape)
+            print("m_perb shape == ", m_perb.shape)
             m_perb.data = m_orig.data + alpha * d
         return model_perb
 
@@ -37,17 +37,25 @@ class landscape(nn.Module):
         landscape.view_init(elev=15, azim=75)
         landscape.dist = 6
 
-        # plt.savefig('savefig_default.png')
+        #plt.savefig('savefig_default.png')
 
     def show(self, inputs, targets):
+
+        print("==loss_landscape==")
 
         model = self.model.cuda()
         inputs, targets = inputs.cuda(), targets.cuda()
 
-        hessian_comp = hessian(model, self.criterion, data=(inputs, targets), cuda=True)
+        for name, param in model.named_parameters():
+            print(name)
+
+        hessian_comp = my_hessian.my_hessian(model, self.criterion, data=(inputs, targets), cuda=True)
 
         # get the top eigenvector
         top_eigenvalues, top_eigenvector = hessian_comp.eigenvalues(top_n=2)
+
+        print("top_eigenvector")
+        print(len(top_eigenvector[0]))
 
         # lambda is a small scalar that we use to perturb the model parameters along the eigenvectors
         lams1 = np.linspace(-0.5, 0.5, 21).astype(np.float32)
