@@ -10,10 +10,11 @@ import os
 
 
 class landscape(nn.Module):
-    def __init__(self, model):
+    def __init__(self, model, args):
         super(landscape, self).__init__()
 
         self.model = model
+        self.args = args
 
     def get_params(self, model_orig, model_perb, direction, alpha):
         i=0
@@ -21,16 +22,16 @@ class landscape(nn.Module):
             if m_orig.requires_grad:
                 m_perb.data = m_orig.data + alpha * direction[i]
                 i = i+1
-
         return model_perb
 
-    def save__landscape_image(self, loss_list, title):
+    def save_landscape_3dimage(self, loss_list, title):
 
         loss_list = np.array(loss_list)
 
         fig = plt.figure()
         landscape = fig.gca(projection='3d')
-        landscape.plot_trisurf(loss_list[:, 0], loss_list[:, 1], loss_list[:, 2], alpha=0.8, cmap='viridis')
+        #landscape.plot_trisurf(loss_list[:, 0], loss_list[:, 1], loss_list[:, 2], alpha=0.8, cmap='viridis')
+        landscape.plot_trisurf(loss_list[:, 0], loss_list[:, 1], loss_list[:, 2], alpha=0.8, cmap='hot')
         # cmap=cm.autumn, #cmamp = 'hot')
 
         landscape.set_title('Loss Landscape')
@@ -39,10 +40,13 @@ class landscape(nn.Module):
         landscape.set_zlabel('Loss')
 
         landscape.view_init(elev=15, azim=75)
+        #landscape.view_init(elev=30, azim=45)
         landscape.dist = 6
 
 
-        directory = 'landscape_image/'
+        directory = self.args.experiment_name.replace('../', '')
+        directory = 'landscape_image/' + directory + "/3d/"
+
         try:
             if not os.path.exists(directory):
                 os.makedirs(directory)
@@ -56,18 +60,10 @@ class landscape(nn.Module):
         model = self.model.cuda()
         inputs, targets = inputs.cuda(), targets.cuda()
 
-        for name, param in model.named_parameters():
-            if not param.requires_grad:
-                print(name)
-
         hessian_comp = my_hessian.my_hessian(model, data=(inputs, targets), cuda=True)
 
         # get the top eigenvector
         top_eigenvalues, top_eigenvector = hessian_comp.eigenvalues(top_n=2)
-
-        print("top_eigenvector")
-        print(len(top_eigenvector[0]))
-        print(len(top_eigenvector[1]))
 
         # lambda is a small scalar that we use to perturb the model parameters along the eigenvectors
         lams1 = np.linspace(-0.5, 0.5, 21).astype(np.float32)
@@ -92,7 +88,56 @@ class landscape(nn.Module):
 
                 loss_list.append((lam1, lam2, loss.item()))
 
-        self.save__landscape_image(loss_list, title)
+        self.save_landscape_3dimage(loss_list, title)
+
+
+    def save_landscape_2dimage(self, lams, loss_list, title):
+
+        fig, ax = plt.subplots()
+        plt.plot(lams, loss_list)
+        plt.ylabel('Loss')
+        plt.xlabel('Perturbation')
+
+        # 축 범위 지정
+        plt.ylim([0, 15])
+
+        plt.title('Loss landscape perturbed based on top Hessian eigenvector')
+
+        directory = self.args.experiment_name.replace('../', '')
+        directory = 'landscape_image/' + directory + "/2d/"
+
+        try:
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+        except OSError:
+            print('Error: Creating directory. ' + directory)
+
+        plt.savefig(directory + title + '.png')
+
+
+    def show_2d(self, inputs, targets, title):
+        model = self.model.cuda()
+        inputs, targets = inputs.cuda(), targets.cuda()
+
+        hessian_comp = my_hessian.my_hessian(model, data=(inputs, targets), cuda=True)
+        top_eigenvalues, top_eigenvector = hessian_comp.eigenvalues()
+
+        lams = np.linspace(-0.5, 0.5, 21).astype(np.float32)
+
+        model_perb = copy.deepcopy(model)
+        model_perb.eval()
+        model_perb.cuda()
+
+        loss_list = []
+
+        for lam in lams:
+            model_perb = self.get_params(model, model_perb, top_eigenvector[0], lam)
+            preds, out_feature_dict = model_perb.forward(x=inputs, num_step=5)
+            loss = F.cross_entropy(input=preds, target=targets)
+            loss_list.append(loss.item())
+
+        self.save_landscape_2dimage(lams, loss_list, title)
+
 
 
 
