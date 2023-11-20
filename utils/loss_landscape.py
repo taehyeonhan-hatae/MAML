@@ -6,13 +6,14 @@ import copy
 from mypyhessian import my_hessian
 import torch.nn.functional as F
 
+import os
+
 
 class landscape(nn.Module):
-    def __init__(self, model, criterion):
+    def __init__(self, model):
         super(landscape, self).__init__()
 
         self.model = model
-        self.criterion = criterion
 
     def get_params(self, model_orig, model_perb, direction, alpha):
         i=0
@@ -23,7 +24,7 @@ class landscape(nn.Module):
 
         return model_perb
 
-    def save__landscape_image(self, loss_list):
+    def save__landscape_image(self, loss_list, title):
 
         loss_list = np.array(loss_list)
 
@@ -40,9 +41,17 @@ class landscape(nn.Module):
         landscape.view_init(elev=15, azim=75)
         landscape.dist = 6
 
-        plt.savefig('savefig_default.png')
 
-    def show(self, inputs, targets):
+        directory = 'landscape_image/'
+        try:
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+        except OSError:
+            print('Error: Creating directory. ' + directory)
+
+        plt.savefig(directory + title + '.png')
+
+    def show(self, inputs, targets, title):
 
         model = self.model.cuda()
         inputs, targets = inputs.cuda(), targets.cuda()
@@ -51,7 +60,7 @@ class landscape(nn.Module):
             if not param.requires_grad:
                 print(name)
 
-        hessian_comp = my_hessian.my_hessian(model, self.criterion, data=(inputs, targets), cuda=True)
+        hessian_comp = my_hessian.my_hessian(model, data=(inputs, targets), cuda=True)
 
         # get the top eigenvector
         top_eigenvalues, top_eigenvector = hessian_comp.eigenvalues(top_n=2)
@@ -78,13 +87,12 @@ class landscape(nn.Module):
             for lam2 in lams2:
                 model_perb1 = self.get_params(model, model_perb1, top_eigenvector[0], lam1)
                 model_perb2 = self.get_params(model_perb1, model_perb2, top_eigenvector[1], lam2)
-                # loss_list.append((lam1, lam2, self.criterion(model_perb2(inputs), targets).item()))
                 preds, out_feature_dict = model_perb2.forward(x=inputs, num_step=5)
                 loss = F.cross_entropy(input=preds, target=targets)
 
                 loss_list.append((lam1, lam2, loss.item()))
 
-        self.save__landscape_image(loss_list)
+        self.save__landscape_image(loss_list, title)
 
 
 

@@ -36,7 +36,7 @@ class my_hessian():
         iii) the estimated eigenvalue density
     """
 
-    def __init__(self, model, criterion, data=None, dataloader=None, cuda=True):
+    def __init__(self, model, data=None, dataloader=None, cuda=True):
         """
         model: the model that needs Hessain information
         criterion: the loss function
@@ -49,7 +49,6 @@ class my_hessian():
                                                          dataloader != None)
 
         self.model = model.eval()  # make model is in evaluation model
-        self.criterion = criterion
 
         if data != None:
             self.data = data
