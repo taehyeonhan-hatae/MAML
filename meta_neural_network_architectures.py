@@ -923,8 +923,6 @@ class VGGReLUNormNetwork(nn.Module):
             if self.args.max_pooling:
                 out = F.max_pool2d(input=out, kernel_size=(2, 2), stride=2, padding=0)
 
-        # Task-specific knowledge absorption을 위한 layer
-        # self.layer_dict['conv_absorption'] =
 
         if not self.args.max_pooling:
             out = F.avg_pool2d(out, out.shape[2])
@@ -979,6 +977,9 @@ class VGGReLUNormNetwork(nn.Module):
             out = F.avg_pool2d(out, out.shape[2])
 
         out = out.view(out.size(0), -1)
+
+        # feature normalization
+        # out = out / torch.norm(out, p=2)
 
         out = self.layer_dict['linear'](out, param_dict['linear'])
 
