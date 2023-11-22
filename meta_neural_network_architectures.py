@@ -874,6 +874,7 @@ class VGGReLUNormNetwork(nn.Module):
         self.device = device
         self.total_layers = 0
         self.args = args
+        self.use_bias = args.use_bias
         self.upscale_shapes = []
         self.cnn_filters = args.cnn_num_filters
         self.input_shape = list(im_shape)
@@ -911,7 +912,7 @@ class VGGReLUNormNetwork(nn.Module):
                                                                         num_filters=self.cnn_filters,
                                                                         kernel_size=3, stride=self.conv_stride,
                                                                         padding=self.args.conv_padding,
-                                                                        use_bias=True, args=self.args,
+                                                                        use_bias=self.use_bias, args=self.args,
                                                                         normalization=True,
                                                                         meta_layer=self.meta_classifier,
                                                                         no_bn_learnable_params=False,
