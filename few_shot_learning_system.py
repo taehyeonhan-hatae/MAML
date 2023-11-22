@@ -411,11 +411,17 @@ class MAMLFewShotClassifier(nn.Module):
         #     prev_weights[name] = param.data.clone()
 
         self.optimizer.zero_grad()
+
         loss.backward()
         # if 'imagenet' in self.args.dataset_name:
         #     for name, param in self.classifier.named_parameters():
         #         if param.requires_grad:
         #             param.grad.data.clamp_(-10, 10)  # not sure if this is necessary, more experiments are needed
+
+        # for name, param in self.named_parameters(): 이걸로 Test를 해보자
+        for name, param in self.classifier.named_parameters():
+            if param.requires_grad:
+                param.grad = param.grad / torch.norm(param.grad, p=2)
 
         self.optimizer.step()
 
