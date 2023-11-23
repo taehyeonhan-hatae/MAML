@@ -418,6 +418,12 @@ class MAMLFewShotClassifier(nn.Module):
         #         if param.requires_grad:
         #             param.grad.data.clamp_(-10, 10)  # not sure if this is necessary, more experiments are needed
 
+        # if self.args.arbiter:
+        #     # Outer-loop에서도 Gradient norm
+        #     for name, param in self.classifier.named_parameters():
+        #         if param.requires_grad:
+        #             param.grad = param.grad / torch.norm(param.grad, p=2)
+
         self.optimizer.step()
 
         # 가중치 업데이트 확인

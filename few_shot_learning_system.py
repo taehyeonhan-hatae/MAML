@@ -273,11 +273,6 @@ class MAMLFewShotClassifier(nn.Module):
                         per_step_task_embedding.append(weight_norm)
 
                     for key, grad in names_grads_copy.items():
-                        # if "bias" not in key:
-                        #gradient_mean = torch.mean(grad)
-                        #gradient_l1norm = torch.norm(grad, p=1)
-                        #per_step_task_embedding.append(gradient_mean)
-                        #per_step_task_embedding.append(gradient_l1norm)
                         gradient_l2norm = torch.norm(grad, p=2)
                         per_step_task_embedding.append(gradient_l2norm)
 
@@ -317,6 +312,7 @@ class MAMLFewShotClassifier(nn.Module):
                                                                  num_step=num_step)
                     task_losses.append(target_loss)
                 ## Inner-loop END
+
 
             per_task_target_preds[task_id] = target_preds.detach().cpu().numpy()
             _, predicted = torch.max(target_preds.data, 1)
@@ -418,11 +414,11 @@ class MAMLFewShotClassifier(nn.Module):
         #         if param.requires_grad:
         #             param.grad.data.clamp_(-10, 10)  # not sure if this is necessary, more experiments are needed
 
-        if self.args.arbiter:
-            # Outer-loop에서도 Gradient norm
-            for name, param in self.classifier.named_parameters():
-                if param.requires_grad:
-                    param.grad = param.grad / torch.norm(param.grad, p=2)
+        # if self.args.arbiter:
+        #     # Outer-loop에서도 Gradient norm
+        #     for name, param in self.classifier.named_parameters():
+        #         if param.requires_grad:
+        #             param.grad = param.grad / torch.norm(param.grad, p=2)
 
         self.optimizer.step()
 
