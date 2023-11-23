@@ -9,7 +9,7 @@ import torch.optim as optim
 from meta_neural_network_architectures import VGGReLUNormNetwork,ResNet12
 from inner_loop_optimizers_GR import LSLRGradientDescentLearningRule
 
-from utils.storage import save_statistics
+from SAM import SAM
 
 
 def set_torch_seed(seed):
@@ -93,8 +93,13 @@ class MAMLFewShotClassifier(nn.Module):
             if param.requires_grad:
                 print(name, param.shape, param.device, param.requires_grad)
 
+        base_optimizer = optim.Adam
 
-        self.optimizer = optim.Adam(self.trainable_parameters(), lr=args.meta_learning_rate, amsgrad=False)
+        adap = False
+        alpha = 0.0005
+        self.optimizer = SAM(self.trainable_parameters(), base_optimizer, rho=alpha,
+                             adaptive=adap, lr=args.meta_learning_rate)
+
         self.scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer, T_max=self.args.total_epochs,
                                                               eta_min=self.args.min_learning_rate)
 
@@ -395,7 +400,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         return losses, per_task_target_preds
 
-    def meta_update(self, loss, current_iter):
+    def meta_update(self, loss, current_iter, first_step):
         """
         Applies an outer loop update on the meta-parameters of the model.
         :param loss: The current crossentropy loss.
@@ -406,9 +411,13 @@ class MAMLFewShotClassifier(nn.Module):
         # for name, param in self.arbiter.named_parameters():
         #     prev_weights[name] = param.data.clone()
 
-        self.optimizer.zero_grad()
-
         loss.backward()
+
+        if first_step:
+            self.optimizer.first_step(zero_grad=True)
+        else:
+            self.optimizer.second_step(zero_grad=True)
+
         # if 'imagenet' in self.args.dataset_name:
         #     for name, param in self.classifier.named_parameters():
         #         if param.requires_grad:
@@ -420,7 +429,7 @@ class MAMLFewShotClassifier(nn.Module):
         #         if param.requires_grad:
         #             param.grad = param.grad / torch.norm(param.grad, p=2)
 
-        self.optimizer.step()
+        #self.optimizer.step()
 
         # 가중치 업데이트 확인
         # for name, param in self.arbiter.named_parameters():
@@ -452,10 +461,19 @@ class MAMLFewShotClassifier(nn.Module):
 
         data_batch = (x_support_set, x_target_set, y_support_set, y_target_set)
 
+        losses_1, per_task_target_preds_1 = self.train_forward_prop(data_batch=data_batch, epoch=epoch, current_iter=current_iter)
+
+        self.optimizer.zero_grad()
+
+        self.meta_update(loss=losses_1['loss'], current_iter=current_iter, first_step=True)
+
         losses, per_task_target_preds = self.train_forward_prop(data_batch=data_batch, epoch=epoch, current_iter=current_iter)
 
-        self.meta_update(loss=losses['loss'], current_iter=current_iter)
+        self.meta_update(loss=losses['loss'], current_iter=current_iter, first_step=False)
+
+
         losses['learning_rate'] = self.scheduler.get_lr()[0]
+
         self.optimizer.zero_grad()
         self.zero_grad()
 
