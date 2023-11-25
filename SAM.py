@@ -23,7 +23,6 @@ class SAM(torch.optim.Optimizer):
             for p in group["params"]:
                 if p.grad is None: continue
 
-
                 self.state[p]["old_p"] = p.data.clone()
                 # 여기서 w에 대한 gradient를 저장해두어야한다
                 self.state[p]["old_p_grad"] = p.grad.clone()
