@@ -30,8 +30,6 @@ class SAM(torch.optim.Optimizer):
                 # 여기서 w에 대한 gradient를 저장해두어야한다
                 self.state[p]["old_p_grad"] = p.grad.clone()
 
-                print(self.state[p]["old_p_grad"])
-
                 e_w = (torch.pow(p, 2) if group["adaptive"] else 1.0) * p.grad * scale.to(p)
                 p.add_(e_w)  # climb to the local maximum "w + e(w)"
 
