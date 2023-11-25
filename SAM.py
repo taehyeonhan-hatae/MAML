@@ -15,8 +15,6 @@ class SAM(torch.optim.Optimizer):
     @torch.no_grad()
     def first_step(self, zero_grad=False):
 
-        print("first_step===")
-
         grad_norm = self._grad_norm()
         for group in self.param_groups:
 
