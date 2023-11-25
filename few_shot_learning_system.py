@@ -94,6 +94,8 @@ class MAMLFewShotClassifier(nn.Module):
                 print(name, param.shape, param.device, param.requires_grad)
 
         base_optimizer = optim.Adam
+        # base_optimizer = torch.optim.SGD
+        # optim.Adam(self.trainable_parameters(), lr=args.meta_learning_rate, amsgrad=False)
 
         self.optimizer = SAM(self.trainable_parameters(), base_optimizer,
                              adaptive=False, lr=args.meta_learning_rate)
