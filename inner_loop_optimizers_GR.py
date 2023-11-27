@@ -136,7 +136,19 @@ class LSLRGradientDescentLearningRule(nn.Module):
                 self.norm_information[key + "_alpha"] = generated_alpha_params[key].item()
 
                 updated_names_weights_dict[key] = names_weights_dict[key] - \
-                                                  self.names_learning_rates_dict[key.replace(".", "-")][num_step] * generated_alpha_params[key] * (names_grads_wrt_params_dict[key] / torch.norm(names_grads_wrt_params_dict[key]))
+                                                  self.names_learning_rates_dict[key.replace(".", "-")][num_step] * \
+                                                  generated_alpha_params[key] * (
+                                                              names_grads_wrt_params_dict[key] / torch.norm(
+                                                          names_grads_wrt_params_dict[key]))
+
+                # #코드짜는중
+                # if 'linear' in key:
+                #     updated_names_weights_dict[key] = names_weights_dict[key] - \
+                #                                       self.names_learning_rates_dict[key.replace(".", "-")][num_step] * \
+                #                                       names_grads_wrt_params_dict[key]
+                # else:
+                #     updated_names_weights_dict[key] = names_weights_dict[key] - \
+                #                                       self.names_learning_rates_dict[key.replace(".", "-")][num_step] * generated_alpha_params[key] * (names_grads_wrt_params_dict[key] / torch.norm(names_grads_wrt_params_dict[key]))
 
             else:
                 updated_names_weights_dict[key] = names_weights_dict[key] - \
