@@ -118,14 +118,14 @@ def get_transforms_for_dataset(dataset_name, args, k):
             transforms.Normalize((104 / 255.0, 117 / 255.0, 128 / 255.0),
                                  (1 / 255.0, 1 / 255.0, 1 / 255.0))
         ])]
-        '''
+
         transform_evaluate = [transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((104 / 255.0, 117 / 255.0, 128 / 255.0),
                                  (1 / 255.0, 1 / 255.0, 1 / 255.0))
         ])]
-        '''
-        transform_evaluate = [transforms.ToTensor()]
+
+        # transform_evaluate = [transforms.ToTensor()]
     elif 'Cars' in dataset_name:
         transform_train = [transforms.Compose([
             transforms.ToTensor(),

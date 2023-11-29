@@ -67,7 +67,7 @@ class MAMLFewShotClassifier(nn.Module):
         # Gradient Arbiter
         if self.args.arbiter:
             num_layers = len(names_weights_copy)
-            input_dim = num_layers * 2
+            input_dim = num_layers # * 2
             output_dim = num_layers
             self.arbiter = nn.Sequential(
                 nn.Linear(input_dim, input_dim),
@@ -273,9 +273,9 @@ class MAMLFewShotClassifier(nn.Module):
 
                     per_step_task_embedding = []
 
-                    for key, weight in names_weights_copy.items():
-                        weight_norm = torch.norm(weight, p=2)
-                        per_step_task_embedding.append(weight_norm)
+                    # for key, weight in names_weights_copy.items():
+                    #     weight_norm = torch.norm(weight, p=2)
+                    #     per_step_task_embedding.append(weight_norm)
 
                     for key, grad in names_grads_copy.items():
                         gradient_l2norm = torch.norm(grad, p=2)
@@ -283,7 +283,7 @@ class MAMLFewShotClassifier(nn.Module):
 
                     per_step_task_embedding = torch.stack(per_step_task_embedding)
 
-                    ## Standardization/ torch norm으로 계산할까..?
+                    ## Standardization
                     per_step_task_embedding = (per_step_task_embedding - per_step_task_embedding.mean()) / (
                                 per_step_task_embedding.std() + 1e-12)
 
