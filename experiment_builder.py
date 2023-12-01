@@ -277,6 +277,10 @@ class ExperimentBuilder(object):
         per_model_per_batch_preds = [[] for i in range(top_n_models)]
         per_model_per_batch_targets = [[] for i in range(top_n_models)]
         test_losses = [dict() for i in range(top_n_models)]
+
+        # top_n_idx = [30, 32, 22, 34, 21]
+        # #top_n_idx = [33, 33, 33, 33, 33]
+
         for idx, model_idx in enumerate(top_n_idx):
             self.state = \
                 self.model.load_model(model_save_dir=self.saved_models_filepath, model_name="train_model",
