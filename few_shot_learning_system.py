@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 from meta_neural_network_architectures import VGGReLUNormNetwork,ResNet12
-from inner_loop_optimizers_GR import LSLRGradientDescentLearningRule
+from inner_loop_optimizers_GR import GradientDescentLearningRule, LSLRGradientDescentLearningRule
 
 from SAM import SAM
 
@@ -56,13 +56,19 @@ class MAMLFewShotClassifier(nn.Module):
 
         self.task_learning_rate = args.init_inner_loop_learning_rate
 
-        self.inner_loop_optimizer = LSLRGradientDescentLearningRule(device=device,
-                                                                    args=self.args,
-                                                                    init_learning_rate=self.task_learning_rate,
-                                                                    total_num_inner_loop_steps=self.args.number_of_training_steps_per_iter,
-                                                                    use_learnable_learning_rates=self.args.learnable_per_layer_per_step_inner_loop_learning_rate)
-
         names_weights_copy = self.get_inner_loop_parameter_dict(self.classifier.named_parameters())
+
+        if self.args.learnable_per_layer_per_step_inner_loop_learning_rate:
+            self.inner_loop_optimizer = LSLRGradientDescentLearningRule(device=device,
+                                                                        args=self.args,
+                                                                        init_learning_rate=self.task_learning_rate,
+                                                                        total_num_inner_loop_steps=self.args.number_of_training_steps_per_iter,
+                                                                        use_learnable_learning_rates=True)
+            self.inner_loop_optimizer.initialise(names_weights_dict=names_weights_copy)
+        else:
+            self.inner_loop_optimizer = GradientDescentLearningRule(device=device,
+                                                                    args=self.args,
+                                                                    learning_rate=self.task_learning_rate)
 
         # Gradient Arbiter
         if self.args.arbiter:
@@ -76,9 +82,6 @@ class MAMLFewShotClassifier(nn.Module):
                 ## nn.Softplus(beta=2) # GAP
                 nn.Softplus() # CxGrad
             ).to(device=self.device)
-
-        self.inner_loop_optimizer.initialise(
-            names_weights_dict=names_weights_copy)
 
         print("Inner Loop parameters")
         for key, value in self.inner_loop_optimizer.named_parameters():
@@ -94,7 +97,7 @@ class MAMLFewShotClassifier(nn.Module):
                 print(name, param.shape, param.device, param.requires_grad)
 
         base_optimizer = optim.Adam
-        # base_optimizer = torch.optim.SGD
+        # base_optimizer = optim.SGD
         # optim.Adam(self.trainable_parameters(), lr=args.meta_learning_rate, amsgrad=False)
 
         self.optimizer = SAM(self.trainable_parameters(), base_optimizer,

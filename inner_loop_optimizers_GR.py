@@ -26,7 +26,7 @@ class GradientDescentLearningRule(nn.Module):
     will correspond to a stochastic gradient descent learning rule.
     """
 
-    def __init__(self, device, learning_rate=1e-3):
+    def __init__(self, device, args, learning_rate=1e-3):
         """Creates a new learning rule object.
         Args:
             learning_rate: A postive scalar to scale gradient updates to the
@@ -36,10 +36,16 @@ class GradientDescentLearningRule(nn.Module):
         """
         super(GradientDescentLearningRule, self).__init__()
         assert learning_rate > 0., 'learning_rate should be positive.'
-        self.learning_rate = torch.ones(1) * learning_rate
-        self.learning_rate.to(device)
+        self.device = device
 
-    def update_params(self, names_weights_dict, names_grads_wrt_params_dict, num_step, tau=0.9):
+
+        self.learning_rate = learning_rate
+
+        self.args = args
+        self.norm_information = {}
+        self.innerloop_excel = True
+
+    def update_params(self, names_weights_dict, names_grads_wrt_params_dict, out_feature_dict, generated_alpha_params, num_step, current_iter, training_phase):
         """Applies a single gradient descent update to all parameters.
         All parameter updates are performed using in-place operations and so
         nothing is returned.
@@ -48,11 +54,59 @@ class GradientDescentLearningRule(nn.Module):
                 with respect to each of the parameters passed to `initialise`
                 previously, with this list expected to be in the same order.
         """
-        return {
-            key: names_weights_dict[key]
-            - self.learning_rate * names_grads_wrt_params_dict[key]
-            for key in names_weights_dict.keys()
-        }
+
+        updated_names_weights_dict = dict()
+
+        self.norm_information['current_iter'] = current_iter
+
+        if training_phase:
+            self.norm_information["phase"] = "train"
+        else:
+            self.norm_information["phase"] = "val"
+
+        self.norm_information['num_step'] = num_step
+
+        for key, value in out_feature_dict.items():
+            self.norm_information[key + "_feature_L2norm"] = torch.norm(out_feature_dict[key], p=2).item()
+
+        for key in names_grads_wrt_params_dict.keys():
+
+            self.norm_information[key + "_grad_mean"] = torch.mean(names_grads_wrt_params_dict[key]).item()
+            self.norm_information[key + "_grad_L1norm"] = torch.norm(names_grads_wrt_params_dict[key], p=1).item()
+            self.norm_information[key + "_grad_L2norm"] = torch.norm(names_grads_wrt_params_dict[key], p=2).item()
+            self.norm_information[key + "_weight_mean"] = torch.mean(names_weights_dict[key]).item()
+            self.norm_information[key + "_weight_L1norm"] = torch.norm(names_weights_dict[key], p=1).item()
+            self.norm_information[key + "_weight_L2norm"] = torch.norm(names_weights_dict[key], p=2).item()
+
+            if self.args.arbiter:
+
+                self.norm_information[key + "_alpha"] = generated_alpha_params[key].item()
+
+                updated_names_weights_dict[key] = names_weights_dict[key] - self.learning_rate * \
+                                                  generated_alpha_params[key] * \
+                                                  (names_grads_wrt_params_dict[key] / torch.norm(
+                                                      names_grads_wrt_params_dict[key]))
+            else:
+                updated_names_weights_dict[key] = names_weights_dict[key] - self.learning_rate * \
+                                                  names_grads_wrt_params_dict[key]
+
+        if os.path.exists(self.args.experiment_name + '/' + self.args.experiment_name + "_inner_loop.csv"):
+            self.innerloop_excel = False
+
+        if self.innerloop_excel:
+            save_statistics(experiment_name=self.args.experiment_name,
+                            line_to_add=list(self.norm_information.keys()),
+                            filename=self.args.experiment_name + "_inner_loop.csv", create=True)
+            self.innerloop_excel = False
+            save_statistics(experiment_name=self.args.experiment_name,
+                            line_to_add=list(self.norm_information.values()),
+                            filename=self.args.experiment_name + "_inner_loop.csv", create=False)
+        else:
+            save_statistics(experiment_name=self.args.experiment_name,
+                            line_to_add=list(self.norm_information.values()),
+                            filename=self.args.experiment_name + "_inner_loop.csv", create=False)
+
+        return updated_names_weights_dict
 
 
 class LSLRGradientDescentLearningRule(nn.Module):
