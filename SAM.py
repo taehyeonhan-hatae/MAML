@@ -2,7 +2,7 @@ import torch
 
 
 class SAM(torch.optim.Optimizer):
-    def __init__(self, params, base_optimizer, rho=0.0005, adaptive=True, **kwargs):
+    def __init__(self, params, base_optimizer, rho=0.05, adaptive=True, **kwargs):
         assert rho >= 0.0, f"Invalid rho, should be non-negative: {rho}"
         # rho=0.05
         defaults = dict(rho=rho, adaptive=adaptive, **kwargs)
