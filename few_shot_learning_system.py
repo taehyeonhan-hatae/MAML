@@ -365,7 +365,7 @@ class MAMLFewShotClassifier(nn.Module):
                                         backup_running_statistics=backup_running_statistics, num_step=num_step)
 
         if self.args.smoothing:
-            criterion = LabelSmoothingCrossEntropy(smoothing=0.3)
+            criterion = LabelSmoothingCrossEntropy(smoothing=0.1)
             loss = criterion(preds, y)
         else:
             loss = F.cross_entropy(input=preds, target=y)
