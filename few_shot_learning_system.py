@@ -11,6 +11,8 @@ from inner_loop_optimizers_GR import GradientDescentLearningRule, LSLRGradientDe
 
 from SAM import SAM
 
+from timm.loss import LabelSmoothingCrossEntropy
+
 
 def set_torch_seed(seed):
     """
@@ -360,7 +362,11 @@ class MAMLFewShotClassifier(nn.Module):
                                         training=training,
                                         backup_running_statistics=backup_running_statistics, num_step=num_step)
 
-        loss = F.cross_entropy(input=preds, target=y)
+        if self.args.smoothing:
+            criterion = LabelSmoothingCrossEntropy(smoothing=0.1)
+            loss = criterion(preds, y)
+        else:
+            loss = F.cross_entropy(input=preds, target=y)
 
         return loss, preds, out_feature_dict
 
