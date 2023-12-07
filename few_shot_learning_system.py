@@ -320,6 +320,11 @@ class MAMLFewShotClassifier(nn.Module):
                                                                  y=y_target_set_task, weights=names_weights_copy,
                                                                  backup_running_statistics=False, training=True,
                                                                  num_step=num_step)
+
+                    # (작업 중) Gradient를 저장해놔야한다
+                    target_loss_grad = torch.autograd.grad(target_loss, names_weights_copy.values(),
+                                                            retain_graph=True)
+
                     task_losses.append(target_loss)
                 ## Inner-loop END
 
