@@ -321,26 +321,36 @@ class MAMLFewShotClassifier(nn.Module):
                                                                  backup_running_statistics=False, training=True,
                                                                  num_step=num_step)
 
-                    # (작업 중) Gradient를 저장해놔야한다
-                    target_loss_grad = torch.autograd.grad(target_loss, names_weights_copy.values(),
-                                                            retain_graph=True)
-
                     task_losses.append(target_loss)
-                ## Inner-loop END
-
+            ## Inner-loop END
 
             per_task_target_preds[task_id] = target_preds.detach().cpu().numpy()
             _, predicted = torch.max(target_preds.data, 1)
 
             accuracy = predicted.float().eq(y_target_set_task.data.float()).cpu().float()
+
+
+            # print("task_losses == ", len(task_losses))
+            # # 여기서 gradient 사이의 cos 값을 구해보자
+            # target_loss_grad0 = torch.autograd.grad(task_losses[0], names_weights_copy.values(),
+            #                                        retain_graph=True)
+            #
+            # target_loss_grad1 = torch.autograd.grad(task_losses[1], names_weights_copy.values(),
+            #                                         retain_graph=True)
+            #
+            # cos_sim = torch.dot(target_loss_grad0, target_loss_grad1) / (torch.norm(target_loss_grad0) * torch.norm(target_loss_grad1))
+            #
+            # print(f"Cosine Similarity: {cos_sim.item()}")
+
+
             task_losses = torch.sum(torch.stack(task_losses))
             total_losses.append(task_losses)
             total_accuracies.extend(accuracy)
 
+        ## Outer-loop End
+
             if not training_phase:
                 self.classifier.restore_backup_stats()
-
-        ## Outer-loop End
 
         losses = self.get_across_task_loss_metrics(total_losses=total_losses,
                                                    total_accuracies=total_accuracies)
