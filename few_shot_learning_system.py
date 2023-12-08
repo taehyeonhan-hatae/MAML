@@ -216,7 +216,7 @@ class MAMLFewShotClassifier(nn.Module):
         task1_gradient = task1_gradient.view(task1_gradient.size(0), -1)
         task2_gradient = task2_gradient.view(task2_gradient.size(0), -1)
 
-        cosine_similarity = F.cosine_similarity(task1_gradient, task2_gradient)
+        cosine_similarity = torch.abs(F.cosine_similarity(task1_gradient, task2_gradient))
 
         # losses['loss'] = torch.mean(torch.stack(total_losses))
         losses['loss'] = torch.mean(torch.stack(total_losses)) + cosine_similarity
