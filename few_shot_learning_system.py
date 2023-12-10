@@ -225,7 +225,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         return losses
 
-    def get_soft_label(self, x_support_set_task, y_support_set_task, x_target_set_task, y_target_set_task, names_weights_copy):
+    def get_soft_label(self, x_support_set_task, y_support_set_task, x_target_set_task, y_target_set_task, names_weights_copy, epoch):
 
         support_loss, support_preds, out_feature_dict = self.net_forward(
             x=x_support_set_task,
@@ -234,6 +234,7 @@ class MAMLFewShotClassifier(nn.Module):
             backup_running_statistics=True,
             training=True,
             num_step=0,
+            epoch=epoch
         )
 
         taget_loss, target_preds, out_feature_dict = self.net_forward(
@@ -243,6 +244,7 @@ class MAMLFewShotClassifier(nn.Module):
             backup_running_statistics=True,
             training=True,
             num_step=0,
+            epoch=epoch
         )
 
         return support_preds.detach(), target_preds.detach() # detach하여 역전파 방지
@@ -296,7 +298,7 @@ class MAMLFewShotClassifier(nn.Module):
             x_target_set_task = x_target_set_task.view(-1, c, h, w)
             y_target_set_task = y_target_set_task.view(-1)
 
-            support_soft_preds, targetsoft__preds = self.get_soft_label(x_support_set_task, y_support_set_task, x_target_set_task, y_target_set_task, names_weights_copy)
+            support_soft_preds, targetsoft__preds = self.get_soft_label(x_support_set_task, y_support_set_task, x_target_set_task, y_target_set_task, names_weights_copy, epoch)
 
             for num_step in range(num_steps):
 
@@ -307,7 +309,8 @@ class MAMLFewShotClassifier(nn.Module):
                     backup_running_statistics=num_step == 0,
                     training=True,
                     num_step=num_step,
-                    soft_target=support_soft_preds
+                    soft_target=support_soft_preds,
+                    epoch=epoch
                 )
 
                 generated_alpha_params = {}
@@ -361,7 +364,7 @@ class MAMLFewShotClassifier(nn.Module):
                     target_loss, target_preds, _ = self.net_forward(x=x_target_set_task,
                                                                  y=y_target_set_task, weights=names_weights_copy,
                                                                  backup_running_statistics=False, training=True,
-                                                                 num_step=num_step,soft_target=targetsoft__preds)
+                                                                 num_step=num_step,soft_target=targetsoft__preds, epoch=epoch)
 
 
                     # names_weights_copy 때문에 무조건 여기서 계산을 해야한다
@@ -400,7 +403,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         return losses, per_task_target_preds
 
-    def net_forward(self, x, y, weights, backup_running_statistics, training, num_step, soft_target=None):
+    def net_forward(self, x, y, weights, backup_running_statistics, training, num_step, epoch, soft_target=None):
         """
         A base model forward pass on some data points x. Using the parameters in the weights dictionary. Also requires
         boolean flags indicating whether to reset the running statistics at the end of the run (if at evaluation phase).
@@ -425,7 +428,8 @@ class MAMLFewShotClassifier(nn.Module):
                 criterion = LabelSmoothingCrossEntropy(smoothing=0.1)
                 loss = criterion(preds, y)
             else:
-                loss = knowledge_distillation_loss(outputs_student=preds, outputs_teacher=soft_target, labels=y)
+                alpha = epoch / self.args.total_epochs
+                loss = knowledge_distillation_loss(outputs_student=preds, outputs_teacher=soft_target, labels=y, alpha=alpha)
 
         else:
             loss = F.cross_entropy(input=preds, target=y)
