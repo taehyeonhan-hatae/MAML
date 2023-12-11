@@ -428,7 +428,8 @@ class MAMLFewShotClassifier(nn.Module):
                 criterion = LabelSmoothingCrossEntropy(smoothing=0.1)
                 loss = criterion(preds, y)
             else:
-                alpha = epoch / self.args.total_epochs
+                # alpha = epoch / self.args.total_epochs
+                alpha = 0.1
                 loss = knowledge_distillation_loss(outputs_student=preds, outputs_teacher=soft_target, labels=y, alpha=alpha)
 
         else:
