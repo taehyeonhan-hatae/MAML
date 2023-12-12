@@ -12,7 +12,6 @@ from inner_loop_optimizers_GR import GradientDescentLearningRule, LSLRGradientDe
 from SAM import SAM
 
 from timm.loss import LabelSmoothingCrossEntropy
-from loss import knowledge_distillation_loss
 
 
 def set_torch_seed(seed):
@@ -224,32 +223,6 @@ class MAMLFewShotClassifier(nn.Module):
 
         return losses
 
-    def get_soft_label(self, x_support_set_task, y_support_set_task, x_target_set_task, y_target_set_task, names_weights_copy, epoch):
-
-        support_loss, support_preds, out_feature_dict = self.net_forward(
-            x=x_support_set_task,
-            y=y_support_set_task,
-            weights=names_weights_copy,
-            backup_running_statistics=True,
-            training=True,
-            num_step=0,
-            epoch=epoch
-        )
-
-        taget_loss, target_preds, out_feature_dict = self.net_forward(
-            x=x_target_set_task,
-            y=y_target_set_task,
-            weights=names_weights_copy,
-            backup_running_statistics=True,
-            training=True,
-            num_step=0,
-            epoch=epoch
-        )
-
-        return support_preds.detach(), target_preds.detach() # detach하여 역전파 방지
-
-
-
     def forward(self, data_batch, epoch, use_second_order, use_multi_step_loss_optimization, num_steps, training_phase, current_iter):
         """
         Runs a forward outer loop pass on the batch of tasks using the MAML/++ framework.
@@ -297,8 +270,6 @@ class MAMLFewShotClassifier(nn.Module):
             x_target_set_task = x_target_set_task.view(-1, c, h, w)
             y_target_set_task = y_target_set_task.view(-1)
 
-            support_soft_preds, targetsoft__preds = self.get_soft_label(x_support_set_task, y_support_set_task, x_target_set_task, y_target_set_task, names_weights_copy, epoch)
-
             for num_step in range(num_steps):
 
                 support_loss, support_preds, out_feature_dict  = self.net_forward(
@@ -308,8 +279,6 @@ class MAMLFewShotClassifier(nn.Module):
                     backup_running_statistics=num_step == 0,
                     training=True,
                     num_step=num_step,
-                    soft_target=support_soft_preds,
-                    epoch=epoch
                 )
 
                 generated_alpha_params = {}
@@ -363,10 +332,8 @@ class MAMLFewShotClassifier(nn.Module):
                     target_loss, target_preds, _ = self.net_forward(x=x_target_set_task,
                                                                  y=y_target_set_task, weights=names_weights_copy,
                                                                  backup_running_statistics=False, training=True,
-                                                                 num_step=num_step,soft_target=targetsoft__preds, epoch=epoch)
+                                                                 num_step=num_step)
 
-
-                    # names_weights_copy 때문에 무조건 여기서 계산을 해야한다
                     target_loss_grad = torch.autograd.grad(target_loss, names_weights_copy.values(), retain_graph=True)
                     target_grads_copy = dict(zip(names_weights_copy.keys(), target_loss_grad))
 
@@ -380,6 +347,7 @@ class MAMLFewShotClassifier(nn.Module):
 
             accuracy = predicted.float().eq(y_target_set_task.data.float()).cpu().float()
 
+            #print("len task_losses ==  ", len(task_losses)) # 1
             task_losses = torch.sum(torch.stack(task_losses))
 
             total_losses.append(task_losses)
@@ -399,7 +367,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         return losses, per_task_target_preds
 
-    def net_forward(self, x, y, weights, backup_running_statistics, training, num_step, epoch, soft_target=None):
+    def net_forward(self, x, y, weights, backup_running_statistics, training, num_step):
         """
         A base model forward pass on some data points x. Using the parameters in the weights dictionary. Also requires
         boolean flags indicating whether to reset the running statistics at the end of the run (if at evaluation phase).
@@ -419,15 +387,8 @@ class MAMLFewShotClassifier(nn.Module):
                                         backup_running_statistics=backup_running_statistics, num_step=num_step)
 
         if self.args.smoothing:
-
-            if soft_target == None:
-                criterion = LabelSmoothingCrossEntropy(smoothing=0.1)
-                loss = criterion(preds, y)
-            else:
-                # alpha = epoch / self.args.total_epochs
-                alpha = 0.1
-                loss = knowledge_distillation_loss(outputs_student=preds, outputs_teacher=soft_target, labels=y, alpha=alpha)
-
+            criterion = LabelSmoothingCrossEntropy(smoothing=0.1)
+            loss = criterion(preds, y)
         else:
             loss = F.cross_entropy(input=preds, target=y)
 
