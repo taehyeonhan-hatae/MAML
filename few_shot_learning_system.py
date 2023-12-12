@@ -279,6 +279,7 @@ class MAMLFewShotClassifier(nn.Module):
                     backup_running_statistics=num_step == 0,
                     training=True,
                     num_step=num_step,
+                    training_phase=training_phase
                 )
 
                 generated_alpha_params = {}
@@ -325,14 +326,14 @@ class MAMLFewShotClassifier(nn.Module):
                     target_loss, target_preds, _ = self.net_forward(x=x_target_set_task,
                                                                  y=y_target_set_task, weights=names_weights_copy,
                                                                  backup_running_statistics=False, training=True,
-                                                                 num_step=num_step)
+                                                                 num_step=num_step,training_phase=training_phase)
 
                     task_losses.append(per_step_loss_importance_vectors[num_step] * target_loss)
                 elif num_step == (self.args.number_of_training_steps_per_iter - 1):
                     target_loss, target_preds, _ = self.net_forward(x=x_target_set_task,
                                                                  y=y_target_set_task, weights=names_weights_copy,
                                                                  backup_running_statistics=False, training=True,
-                                                                 num_step=num_step)
+                                                                 num_step=num_step, training_phase=training_phase)
 
                     target_loss_grad = torch.autograd.grad(target_loss, names_weights_copy.values(), retain_graph=True)
                     target_grads_copy = dict(zip(names_weights_copy.keys(), target_loss_grad))
@@ -367,7 +368,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         return losses, per_task_target_preds
 
-    def net_forward(self, x, y, weights, backup_running_statistics, training, num_step):
+    def net_forward(self, x, y, weights, backup_running_statistics, training, num_step, training_phase):
         """
         A base model forward pass on some data points x. Using the parameters in the weights dictionary. Also requires
         boolean flags indicating whether to reset the running statistics at the end of the run (if at evaluation phase).
@@ -386,7 +387,7 @@ class MAMLFewShotClassifier(nn.Module):
                                         training=training,
                                         backup_running_statistics=backup_running_statistics, num_step=num_step)
 
-        if self.args.smoothing:
+        if self.args.smoothing and training_phase:
             criterion = LabelSmoothingCrossEntropy(smoothing=0.1)
             loss = criterion(preds, y)
         else:
