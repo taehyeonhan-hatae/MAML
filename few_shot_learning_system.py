@@ -213,13 +213,12 @@ class MAMLFewShotClassifier(nn.Module):
 
         task2_gradient = task_gradients[1]['layer_dict.conv3.conv.weight']
 
-        # 각 텐서를 벡터로 평탄화(flatten)합니다
+        # 각 텐서를 벡터로 평탄화(flatten)
         task1_gradient = task1_gradient.view(task1_gradient.size(0), -1)
         task2_gradient = task2_gradient.view(task2_gradient.size(0), -1)
 
         cosine_similarity = torch.abs(F.cosine_similarity(task1_gradient, task2_gradient))
 
-        # losses['loss'] = torch.mean(torch.stack(total_losses))
         losses['loss'] = torch.mean(torch.stack(total_losses)) + cosine_similarity
         losses['accuracy'] = np.mean(total_accuracies)
 
@@ -381,7 +380,6 @@ class MAMLFewShotClassifier(nn.Module):
 
             accuracy = predicted.float().eq(y_target_set_task.data.float()).cpu().float()
 
-            #print("len task_losses ==  ", len(task_losses)) # 1
             task_losses = torch.sum(torch.stack(task_losses))
 
             total_losses.append(task_losses)
@@ -391,8 +389,6 @@ class MAMLFewShotClassifier(nn.Module):
 
             if not training_phase:
                 self.classifier.restore_backup_stats()
-
-        # total_losses의 개수는 2이다
 
         losses = self.get_across_task_loss_metrics(total_losses=total_losses,
                                                    total_accuracies=total_accuracies,
