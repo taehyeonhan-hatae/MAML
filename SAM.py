@@ -42,7 +42,7 @@ class SAM(torch.optim.Optimizer):
 
                 # p.grad = torch.tensor(1 - balance) * self.state[p]["old_p_grad"] + torch.tensor(balance) * p.grad
                 sam_grad = self.state[p]['old_p_grad'] * 0.5 - p.grad * 0.5
-                sam_grad = balance * sam_grad
+                # sam_grad = balance * sam_grad
 
                 p.grad.data.add_(sam_grad)
 
