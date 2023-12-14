@@ -46,7 +46,6 @@ class SAM(torch.optim.Optimizer):
 
                 p.grad.data.add_(sam_grad)
 
-
         self.base_optimizer.step()  # do the actual "sharpness-aware" update
 
         if zero_grad: self.zero_grad()
