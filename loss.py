@@ -17,7 +17,7 @@ import scipy.linalg as linalg
 from meta_neural_network_architectures import extract_top_level_dict
 
 
-def knowledge_distillation_loss(student_logit, teacher_logit, labels, label_loss_weight=1, soft_label_loss_weight=1, temperature=1.0, alpha=0.7):
+def knowledge_distillation_loss(student_logit, teacher_logit, labels, label_loss_weight=1, soft_label_loss_weight=1, Temperature=1.0):
     """
     Knowledge Distillation Loss를 계산하는 함수
     outputs_student: 작은 모델의 출력
@@ -31,9 +31,9 @@ def knowledge_distillation_loss(student_logit, teacher_logit, labels, label_loss
     criterion = nn.CrossEntropyLoss()
 
     # Knowledge Distillation 손실 계산
-    soft_teacher_outputs = nn.functional.softmax(teacher_logit / temperature, dim=1)
-    soft_student_outputs = nn.functional.log_softmax(student_logit / temperature, dim=1)
-    distillation_loss = nn.KLDivLoss()(soft_student_outputs, soft_teacher_outputs) * temperature ** 2
+    soft_teacher_outputs = nn.functional.softmax(teacher_logit / Temperature, dim=1)
+    soft_student_outputs = nn.functional.log_softmax(student_logit / Temperature, dim=1)
+    distillation_loss = nn.KLDivLoss()(soft_student_outputs, soft_teacher_outputs) * (Temperature * Temperature)
 
     classification_loss = criterion(student_logit, labels)
 
