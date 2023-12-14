@@ -41,7 +41,6 @@ class SAM(torch.optim.Optimizer):
                 p.data = self.state[p]["old_p"]  # get back to "w" from "w + e(w)"
                 p.grad = torch.tensor(1 - balance) * self.state[p]["old_p_grad"] + torch.tensor(balance) * p.grad
 
-
         self.base_optimizer.step()  # do the actual "sharpness-aware" update
 
         if zero_grad: self.zero_grad()

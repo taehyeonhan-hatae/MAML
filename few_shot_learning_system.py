@@ -236,7 +236,7 @@ class MAMLFewShotClassifier(nn.Module):
             epoch=epoch
         )
 
-        return support_preds.clone(), target_preds.clone() # clone하여 역전파 방지
+        return support_preds.detach(), target_preds.detach() # detach하여 역전파 방지
 
 
 
@@ -398,10 +398,9 @@ class MAMLFewShotClassifier(nn.Module):
         if self.args.smoothing:
 
             if not soft_target==None:
-                # alpha = epoch / self.args.total_epochs
                 alpha = epoch / self.args.total_epochs
                 loss = knowledge_distillation_loss(student_logit=preds, teacher_logit=soft_target, labels=y,
-                                                   label_loss_weight=1.0, soft_label_loss_weight=alpha)
+                                                   label_loss_weight=(1.0 - alpha), soft_label_loss_weight=alpha)
             else:
                 criterion = LabelSmoothingCrossEntropy(smoothing=0.1)
                 loss = criterion(preds, y)
@@ -449,7 +448,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         return losses, per_task_target_preds
 
-    def meta_update(self, loss, current_iter, first_step):
+    def meta_update(self, loss, current_iter, first_step, epoch):
         """
         Applies an outer loop update on the meta-parameters of the model.
         :param loss: The current crossentropy loss.
@@ -465,7 +464,8 @@ class MAMLFewShotClassifier(nn.Module):
         if first_step:
             self.optimizer.first_step(zero_grad=True)
         else:
-            self.optimizer.second_step(zero_grad=True)
+            balance = epoch / self.args.total_epochs
+            self.optimizer.second_step(zero_grad=True, balance=balance)
 
         # if 'imagenet' in self.args.dataset_name:
         #     for name, param in self.classifier.named_parameters():
@@ -514,11 +514,11 @@ class MAMLFewShotClassifier(nn.Module):
 
         self.optimizer.zero_grad()
 
-        self.meta_update(loss=losses_1['loss'], current_iter=current_iter, first_step=True)
+        self.meta_update(loss=losses_1['loss'], current_iter=current_iter, first_step=True, epoch=epoch)
 
         losses, per_task_target_preds = self.train_forward_prop(data_batch=data_batch, epoch=epoch, current_iter=current_iter)
 
-        self.meta_update(loss=losses['loss'], current_iter=current_iter, first_step=False)
+        self.meta_update(loss=losses['loss'], current_iter=current_iter, first_step=False, epoch=epoch)
 
 
         losses['learning_rate'] = self.scheduler.get_lr()[0]
