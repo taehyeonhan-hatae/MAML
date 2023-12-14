@@ -2,7 +2,7 @@ import torch
 
 
 class SAM(torch.optim.Optimizer):
-    def __init__(self, params, base_optimizer, rho=0.0005, adaptive=True, **kwargs):
+    def __init__(self, params, base_optimizer, rho=0.0005, adaptive=False, **kwargs):
         assert rho >= 0.0, f"Invalid rho, should be non-negative: {rho}"
         # rho=0.05
         defaults = dict(rho=rho, adaptive=adaptive, **kwargs)
@@ -39,7 +39,13 @@ class SAM(torch.optim.Optimizer):
             for p in group["params"]:
                 if p.grad is None: continue
                 p.data = self.state[p]["old_p"]  # get back to "w" from "w + e(w)"
-                p.grad = torch.tensor(1 - balance) * self.state[p]["old_p_grad"] + torch.tensor(balance) * p.grad
+
+                # p.grad = torch.tensor(1 - balance) * self.state[p]["old_p_grad"] + torch.tensor(balance) * p.grad
+                sam_grad = self.state[p]['old_p_grad'] * 0.5 - p.grad * 0.5
+                sam_grad = balance * sam_grad
+
+                p.grad.data.add_(sam_grad)
+
 
         self.base_optimizer.step()  # do the actual "sharpness-aware" update
 
