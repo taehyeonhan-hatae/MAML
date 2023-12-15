@@ -494,12 +494,12 @@ class MAMLFewShotClassifier(nn.Module):
         self.meta_update(loss=losses['loss'], current_iter=current_iter, first_step=False, epoch=epoch)
 
 
-        losses['learning_rate'] = self.scheduler.get_lr()[0]
+        losses_1['learning_rate'] = self.scheduler.get_lr()[0]
 
         self.optimizer.zero_grad()
         self.zero_grad()
 
-        return losses, per_task_target_preds
+        return losses_1, per_task_target_preds
 
     def run_validation_iter(self, data_batch, current_iter):
         """
