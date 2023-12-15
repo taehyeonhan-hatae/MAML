@@ -36,7 +36,7 @@ class SAM(torch.optim.Optimizer):
         if zero_grad: self.zero_grad()
 
     @torch.no_grad()
-    def second_step(self, zero_grad=False, balance=0.7):
+    def second_step(self, balance, zero_grad=False):
 
         for group in self.param_groups:
             for p in group["params"]:
