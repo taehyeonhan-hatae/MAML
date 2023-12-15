@@ -321,14 +321,6 @@ class MAMLFewShotClassifier(nn.Module):
                                                                  y=y_target_set_task, weights=names_weights_copy,
                                                                  backup_running_statistics=False, training=True,
                                                                  num_step=num_step)
-
-                    metalearner_classifer = self.classifier.layer_dict.linear.weights.clone()
-                    tasklearner_classifer = names_weights_copy['layer_dict.linear.weights'].clone()
-
-                    weight_difference = torch.norm(metalearner_classifer - tasklearner_classifer)
-
-                    target_loss = target_loss + weight_difference
-
                     task_losses.append(target_loss)
             ## Inner-loop END
 
@@ -370,6 +362,11 @@ class MAMLFewShotClassifier(nn.Module):
         :param num_step: An integer indicating the number of the step in the inner loop.
         :return: the crossentropy losses with respect to the given y, the predictions of the base model.
         """
+
+        metalearner_classifer = self.classifier.layer_dict.linear.weights.clone()
+        tasklearner_classifer = weights['layer_dict.linear.weights'].clone()
+        weight_difference = torch.norm(metalearner_classifer - tasklearner_classifer)
+
         preds, out_feature_dict = self.classifier.forward(x=x, params=weights,
                                         training=training,
                                         backup_running_statistics=backup_running_statistics, num_step=num_step)
@@ -379,6 +376,8 @@ class MAMLFewShotClassifier(nn.Module):
             loss = criterion(preds, y)
         else:
             loss = F.cross_entropy(input=preds, target=y)
+
+        loss = loss + weight_difference
 
         return loss, preds, out_feature_dict
 
