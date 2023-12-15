@@ -27,7 +27,10 @@ class SAM(torch.optim.Optimizer):
                 # 여기서 w에 대한 gradient를 저장해두어야한다
                 self.state[p]["old_p_grad"] = p.grad.clone()
 
-                e_w = (torch.pow(p, 2) if group["adaptive"] else 1.0) * p.grad * scale.to(p)
+                e_w = p.grad * scale.to(p)
+                if group["adaptive"]:
+                    e_w *= torch.pow(p, 2)
+
                 p.add_(e_w)  # climb to the local maximum "w + e(w)"
 
         if zero_grad: self.zero_grad()
@@ -38,13 +41,15 @@ class SAM(torch.optim.Optimizer):
         for group in self.param_groups:
             for p in group["params"]:
                 if p.grad is None: continue
+
+                ## self.state[p]['old_p_grad']가 w에 대한 gradient이고
+                ## p.grad는 w + e(w)이다
+
                 p.data = self.state[p]["old_p"]  # get back to "w" from "w + e(w)"
 
-                # p.grad = torch.tensor(1 - balance) * self.state[p]["old_p_grad"] + torch.tensor(balance) * p.grad
-                sam_grad = self.state[p]['old_p_grad'] * 0.5 - p.grad * 0.5
-                # sam_grad = balance * sam_grad
-
-                p.grad.data.add_(sam_grad)
+                # 어느게 맞을까?
+                # p.grad = (1 - balance) * self.state[p]["old_p_grad"] + balance * p.grad
+                p.grad = balance * self.state[p]["old_p_grad"] + (1 - balance) * p.grad
 
         self.base_optimizer.step()  # do the actual "sharpness-aware" update
 
