@@ -43,7 +43,7 @@ class SAM(torch.optim.Optimizer):
                 if p.grad is None: continue
 
                 ## self.state[p]['old_p_grad']가 w에 대한 gradient이고
-                ## p.grad는 w + e(w)이다
+                ## p.grad는 w + e(w)에서의 gradient이다 이다
 
                 p.data = self.state[p]["old_p"]  # get back to "w" from "w + e(w)"
 

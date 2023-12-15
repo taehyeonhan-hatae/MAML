@@ -322,6 +322,13 @@ class MAMLFewShotClassifier(nn.Module):
                                                                  backup_running_statistics=False, training=True,
                                                                  num_step=num_step)
 
+                    metalearner_classifer = self.classifier.layer_dict.linear.weights.clone()
+                    tasklearner_classifer = names_weights_copy['layer_dict.linear.weights'].clone()
+
+                    weight_difference = torch.norm(metalearner_classifer - tasklearner_classifer)
+
+                    target_loss = target_loss + weight_difference
+
                     task_losses.append(target_loss)
             ## Inner-loop END
 
