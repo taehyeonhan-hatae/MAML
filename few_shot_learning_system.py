@@ -363,7 +363,7 @@ class MAMLFewShotClassifier(nn.Module):
         :return: the crossentropy losses with respect to the given y, the predictions of the base model.
         """
 
-        lambda_dif = 10
+        lambda_dif = 1.0
         metalearner_classifer = self.classifier.layer_dict.linear.weights.detach()
         tasklearner_classifer = weights['layer_dict.linear.weights'].detach()
         weight_difference = torch.norm(metalearner_classifer - tasklearner_classifer)
