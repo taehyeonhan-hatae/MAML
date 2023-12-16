@@ -48,8 +48,8 @@ class SAM(torch.optim.Optimizer):
                 p.data = self.state[p]["old_p"]  # get back to "w" from "w + e(w)"
 
                 # 어느게 맞을까?
-                # p.grad = (1 - balance) * self.state[p]["old_p_grad"] + balance * p.grad
-                p.grad = balance * self.state[p]["old_p_grad"] + (1 - balance) * p.grad
+                p.grad = (1 - balance) * self.state[p]["old_p_grad"] + balance * p.grad
+                # p.grad = balance * self.state[p]["old_p_grad"] + (1 - balance) * p.grad
 
         self.base_optimizer.step()  # do the actual "sharpness-aware" update
 
