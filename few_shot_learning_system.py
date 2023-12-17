@@ -204,11 +204,21 @@ class MAMLFewShotClassifier(nn.Module):
 
         return names_weights_copy
 
-    def get_across_task_loss_metrics(self, total_losses, total_accuracies):
+    def get_across_task_loss_metrics(self, total_losses, total_accuracies, task_gradients):
 
         losses = dict()
 
-        losses['loss'] = torch.mean(torch.stack(total_losses))
+        task1_gradient = task_gradients[0]['layer_dict.conv3.conv.weight']
+
+        task2_gradient = task_gradients[1]['layer_dict.conv3.conv.weight']
+
+        # 각 텐서를 벡터로 평탄화(flatten)
+        task1_gradient = task1_gradient.view(task1_gradient.size(0), -1)
+        task2_gradient = task2_gradient.view(task2_gradient.size(0), -1)
+
+        cosine_similarity = torch.abs(F.cosine_similarity(task1_gradient, task2_gradient))
+
+        losses['loss'] = torch.mean(torch.stack(total_losses)) + cosine_similarity
         losses['accuracy'] = np.mean(total_accuracies)
 
         return losses
@@ -230,6 +240,8 @@ class MAMLFewShotClassifier(nn.Module):
         [b, ncs, spc] = y_support_set.shape
 
         self.num_classes_per_set = ncs
+
+        task_gradient = []
 
         total_losses = []
         total_accuracies = []
@@ -321,6 +333,12 @@ class MAMLFewShotClassifier(nn.Module):
                                                                  y=y_target_set_task, weights=names_weights_copy,
                                                                  backup_running_statistics=False, training=True,
                                                                  num_step=num_step)
+
+                    target_loss_grad = torch.autograd.grad(target_loss, names_weights_copy.values(), retain_graph=True)
+                    target_grads_copy = dict(zip(names_weights_copy.keys(), target_loss_grad))
+
+                    task_gradient.append(target_grads_copy)
+
                     task_losses.append(target_loss)
             ## Inner-loop END
 
@@ -340,7 +358,8 @@ class MAMLFewShotClassifier(nn.Module):
                 self.classifier.restore_backup_stats()
 
         losses = self.get_across_task_loss_metrics(total_losses=total_losses,
-                                                   total_accuracies=total_accuracies)
+                                                   total_accuracies=total_accuracies,
+                                                   task_gradients=task_gradient)
 
         for idx, item in enumerate(per_step_loss_importance_vectors):
             losses['loss_importance_vector_{}'.format(idx)] = item.detach().cpu().numpy()
@@ -363,10 +382,10 @@ class MAMLFewShotClassifier(nn.Module):
         :return: the crossentropy losses with respect to the given y, the predictions of the base model.
         """
 
-        lambda_dif = 1.0
-        metalearner_classifer = self.classifier.layer_dict.linear.weights.detach()
-        tasklearner_classifer = weights['layer_dict.linear.weights'].detach()
-        weight_difference = torch.norm(metalearner_classifer - tasklearner_classifer)
+        # lambda_dif = 1.0
+        # metalearner_classifer = self.classifier.layer_dict.linear.weights.detach()
+        # tasklearner_classifer = weights['layer_dict.linear.weights'].detach()
+        # weight_difference = torch.norm(metalearner_classifer - tasklearner_classifer)
 
         preds, out_feature_dict = self.classifier.forward(x=x, params=weights,
                                         training=training,
@@ -378,7 +397,7 @@ class MAMLFewShotClassifier(nn.Module):
         else:
             loss = F.cross_entropy(input=preds, target=y)
 
-        loss = loss + lambda_dif * weight_difference
+        #loss = loss + lambda_dif * weight_difference
 
         return loss, preds, out_feature_dict
 
