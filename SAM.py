@@ -57,7 +57,7 @@ class SAM(torch.optim.Optimizer):
     @torch.no_grad()
     def gradient_decompose(self, balance, zero_grad=False):
 
-        self.unperturb()
+        self.unperturb() # get back to "w" from "w + e(w)"
 
         # # calculate inner product
         # inner_prod = 0.0
