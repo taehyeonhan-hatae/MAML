@@ -2,15 +2,25 @@ import torch
 
 
 class SAM(torch.optim.Optimizer):
-    def __init__(self, params, base_optimizer, rho=0.0005, adaptive=False, **kwargs):
-        assert rho >= 0.0, f"Invalid rho, should be non-negative: {rho}"
-        # rho=0.05
-        defaults = dict(rho=rho, adaptive=adaptive, **kwargs)
+    def __init__(self, params, base_optimizer, rho_scheduler, rho=0.0005, adaptive=False, perturb_eps=1e-12, **kwargs):
+
+        defaults = dict(adaptive=adaptive, **kwargs)
         super(SAM, self).__init__(params, defaults)
 
-        self.base_optimizer = base_optimizer(self.param_groups, **kwargs)
+        self.base_optimizer = base_optimizer#(self.param_groups, **kwargs)
         self.param_groups = self.base_optimizer.param_groups
-        self.defaults.update(self.base_optimizer.defaults)
+        self.rho_scheduler = rho_scheduler
+        self.rho_t = rho
+        self.adaptive = adaptive
+        self.perturb_eps = perturb_eps
+
+        # initialize self.rho_t
+        self.update_rho_t()
+
+    @torch.no_grad()
+    def update_rho_t(self):
+        self.rho_t = self.rho_scheduler.step()
+        return self.rho_t
 
     @torch.no_grad()
     def first_step(self, zero_grad=False):
@@ -18,7 +28,7 @@ class SAM(torch.optim.Optimizer):
         grad_norm = self._grad_norm()
         for group in self.param_groups:
 
-            scale = group["rho"] / (grad_norm + 1e-12)
+            scale = self.rho_t / (grad_norm + self.perturb_eps)
 
             for p in group["params"]:
                 if p.grad is None: continue
@@ -28,7 +38,7 @@ class SAM(torch.optim.Optimizer):
                 self.state[p]["old_p_grad"] = p.grad.clone()
 
                 e_w = p.grad * scale.to(p)
-                if group["adaptive"]:
+                if self.adaptive:
                     e_w *= torch.pow(p, 2)
 
                 p.add_(e_w)  # climb to the local maximum "w + e(w)"
@@ -68,7 +78,7 @@ class SAM(torch.optim.Optimizer):
         shared_device = self.param_groups[0]["params"][0].device  # put everything on the same device, in case of model parallelism
         norm = torch.norm(
                     torch.stack([
-                        ((torch.abs(p) if group["adaptive"] else 1.0) * p.grad).norm(p=2).to(shared_device)
+                        ((torch.abs(p) if self.adaptive else 1.0) * p.grad).norm(p=2).to(shared_device)
                         for group in self.param_groups for p in group["params"]
                         if p.grad is not None
                     ]),

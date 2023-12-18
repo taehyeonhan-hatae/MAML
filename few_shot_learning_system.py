@@ -10,6 +10,7 @@ from meta_neural_network_architectures import VGGReLUNormNetwork,ResNet12
 from inner_loop_optimizers_GR import GradientDescentLearningRule, LSLRGradientDescentLearningRule
 
 from SAM import SAM
+from GSAM_Scheduler import LinearScheduler, CosineScheduler, ProportionScheduler
 
 from timm.loss import LabelSmoothingCrossEntropy
 
@@ -98,15 +99,19 @@ class MAMLFewShotClassifier(nn.Module):
             if param.requires_grad:
                 print(name, param.shape, param.device, param.requires_grad)
 
-        base_optimizer = optim.Adam
-        # base_optimizer = optim.SGD
+        base_optimizer = optim.Adam(self.trainable_parameters(), lr=args.meta_learning_rate)
+        #  base_optimizer = optim.Adam
         # optim.Adam(self.trainable_parameters(), lr=args.meta_learning_rate, amsgrad=False)
 
-        self.optimizer = SAM(self.trainable_parameters(), base_optimizer,
-                             adaptive=True, lr=args.meta_learning_rate)
-
-        self.scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer, T_max=self.args.total_epochs,
+        self.scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer=base_optimizer, T_max=self.args.total_epochs,
                                                               eta_min=self.args.min_learning_rate)
+
+        rho_scheduler = ProportionScheduler(pytorch_lr_scheduler=self.scheduler, max_lr=args.meta_learning_rate, min_lr=0.0,
+                                            max_value=0.0005, min_value=0.0005)
+
+        self.optimizer = SAM(self.trainable_parameters(), base_optimizer,
+                             rho_scheduler=rho_scheduler,
+                             adaptive=True, lr=args.meta_learning_rate)
 
         self.device = torch.device('cpu')
         if torch.cuda.is_available():
@@ -514,6 +519,8 @@ class MAMLFewShotClassifier(nn.Module):
 
 
         losses_1['learning_rate'] = self.scheduler.get_lr()[0]
+
+        self.optimizer.update_rho_t()
 
         self.optimizer.zero_grad()
         self.zero_grad()
