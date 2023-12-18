@@ -459,10 +459,9 @@ class MAMLFewShotClassifier(nn.Module):
         loss.backward()
 
         if first_step:
-            self.optimizer.first_step(zero_grad=True)
+            self.optimizer.perturb_weights(zero_grad=True)
         else:
-            # balance = epoch / self.args.total_epochs
-            self.optimizer.second_step(zero_grad=True, balance=0.7)
+            self.optimizer.gradient_decompose(zero_grad=True, balance=0.7)
 
         # if 'imagenet' in self.args.dataset_name:
         #     for name, param in self.classifier.named_parameters():
