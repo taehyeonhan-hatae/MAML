@@ -39,7 +39,7 @@ class SAM(torch.optim.Optimizer):
         return self.rho_t
 
     @torch.no_grad()
-    def perturb_weights(self, zero_grad=False):
+    def first_step(self, zero_grad=False):
 
         grad_norm = self._grad_norm( weight_adaptive = self.adaptive )
         for group in self.param_groups:
@@ -49,66 +49,30 @@ class SAM(torch.optim.Optimizer):
             for p in group["params"]:
                 if p.grad is None: continue
 
+                self.state[p]["old_p"] = p.data.clone()
                 # w에 대한 gradient를 저장
-                self.state[p]["old_g"] = p.grad.data.clone()
+                self.state[p]["old_p_grad"] = p.grad.clone()
 
                 e_w = p.grad * scale.to(p)
                 if self.adaptive:
                     e_w *= torch.pow(p, 2)
 
-                # perturb_weights
                 p.add_(e_w)  # climb to the local maximum "w + e(w)"
-                self.state[p]['e_w'] = e_w
 
         if zero_grad: self.zero_grad()
 
     @torch.no_grad()
-    def unperturb(self):
-        # get back to "w" from "w + e(w)"
-        for group in self.param_groups:
-            for p in group['params']:
-                if 'e_w' in self.state[p].keys():
-                    p.data.sub_(self.state[p]['e_w'])
-
-    @torch.no_grad()
-    def gradient_decompose(self, balance, zero_grad=False):
-
-        self.unperturb() # get back to "w" from "w + e(w)"
-
-        # # calculate inner product
-        # inner_prod = 0.0
-        # for group in self.param_groups:
-        #     for p in group['params']:
-        #         if p.grad is None: continue
-        #         inner_prod += torch.sum(
-        #             self.state[p]['old_g'] * p.grad.data
-        #         )
-        #
-        # # get norm
-        # new_grad_norm = self._grad_norm()
-        # old_grad_norm = self._grad_norm(by='old_g')
-        #
-        # # get cosine
-        # cosine = inner_prod / (new_grad_norm * old_grad_norm + self.perturb_eps)
-        #
-        # # gradient decomposition
-        # for group in self.param_groups:
-        #     for p in group['params']:
-        #         if p.grad is None: continue
-        #         vertical = self.state[p]['old_g'] - cosine * old_grad_norm * p.grad.data / (
-        #                     new_grad_norm + self.perturb_eps)
-        #         p.grad.data.add_(vertical, alpha=-alpha)
+    def second_step(self, balance, zero_grad=False):
 
         for group in self.param_groups:
             for p in group["params"]:
                 if p.grad is None: continue
 
-                ## self.state[p]['old_g']가 w에 대한 gradient이고
-                ## p.grad는 w + e(w)에서의 gradient이다 이다
+                p.data = self.state[p]["old_p"]  # get back to "w" from "w + e(w)"
 
-                # 어느게 맞을까?
-                p.grad = (1 - balance) * self.state[p]["old_g"] + balance * p.grad
-                # p.grad = balance * self.state[p]["old_p_grad"] + (1 - balance) * p.grad
+                ## self.state[p]['old_p_grad']가 w에 대한 gradient이고
+                ## p.grad는 w + e(w)에서의 gradient이다 이다
+                p.grad = (1 - balance) * self.state[p]["old_p_grad"] + balance * p.grad
 
         self.base_optimizer.step()  # do the actual "sharpness-aware" update
 

@@ -10,6 +10,7 @@ from meta_neural_network_architectures import VGGReLUNormNetwork,ResNet12
 from inner_loop_optimizers_GR import GradientDescentLearningRule, LSLRGradientDescentLearningRule
 
 from SAM import SAM
+from utils import sam_util
 from GSAM_Scheduler import LinearScheduler, CosineScheduler, ProportionScheduler
 
 from timm.loss import LabelSmoothingCrossEntropy
@@ -99,19 +100,19 @@ class MAMLFewShotClassifier(nn.Module):
             if param.requires_grad:
                 print(name, param.shape, param.device, param.requires_grad)
 
-        base_optimizer = optim.Adam(self.trainable_parameters(), lr=args.meta_learning_rate)
-        #  base_optimizer = optim.Adam
-        # optim.Adam(self.trainable_parameters(), lr=args.meta_learning_rate, amsgrad=False)
+        base_optimizer = optim.Adam(self.trainable_parameters(), lr=args.meta_learning_rate, amsgrad=False)
 
         self.scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer=base_optimizer, T_max=self.args.total_epochs,
                                                               eta_min=self.args.min_learning_rate)
 
-        rho_scheduler = ProportionScheduler(pytorch_lr_scheduler=self.scheduler, max_lr=args.meta_learning_rate, min_lr=0.0,
+        rho_scheduler = ProportionScheduler(pytorch_lr_scheduler=self.scheduler,
+                                            max_lr=args.meta_learning_rate, min_lr=0.0,
                                             max_value=0.0005, min_value=0.0005)
 
-        self.optimizer = SAM(self.trainable_parameters(), base_optimizer,
+        self.optimizer = SAM(params=self.trainable_parameters(),
+                             base_optimizer=base_optimizer,
                              rho_scheduler=rho_scheduler,
-                             adaptive=True, lr=args.meta_learning_rate)
+                             adaptive=False)
 
         self.device = torch.device('cpu')
         if torch.cuda.is_available():
@@ -213,17 +214,17 @@ class MAMLFewShotClassifier(nn.Module):
 
         losses = dict()
 
-        task1_gradient = task_gradients[0]['layer_dict.conv3.conv.weight']
+        # task1_gradient = task_gradients[0]['layer_dict.conv3.conv.weight']
+        #
+        # task2_gradient = task_gradients[1]['layer_dict.conv3.conv.weight']
+        #
+        # # 각 텐서를 벡터로 평탄화(flatten)
+        # task1_gradient = task1_gradient.view(task1_gradient.size(0), -1)
+        # task2_gradient = task2_gradient.view(task2_gradient.size(0), -1)
+        #
+        # cosine_similarity = torch.abs(F.cosine_similarity(task1_gradient, task2_gradient))
 
-        task2_gradient = task_gradients[1]['layer_dict.conv3.conv.weight']
-
-        # 각 텐서를 벡터로 평탄화(flatten)
-        task1_gradient = task1_gradient.view(task1_gradient.size(0), -1)
-        task2_gradient = task2_gradient.view(task2_gradient.size(0), -1)
-
-        cosine_similarity = torch.abs(F.cosine_similarity(task1_gradient, task2_gradient))
-
-        losses['loss'] = torch.mean(torch.stack(total_losses)) + cosine_similarity
+        losses['loss'] = torch.mean(torch.stack(total_losses)) #+ cosine_similarity
         losses['accuracy'] = np.mean(total_accuracies)
 
         return losses
@@ -339,10 +340,10 @@ class MAMLFewShotClassifier(nn.Module):
                                                                  backup_running_statistics=False, training=True,
                                                                  num_step=num_step)
 
-                    target_loss_grad = torch.autograd.grad(target_loss, names_weights_copy.values(), retain_graph=True)
-                    target_grads_copy = dict(zip(names_weights_copy.keys(), target_loss_grad))
-
-                    task_gradient.append(target_grads_copy)
+                    # target_loss_grad = torch.autograd.grad(target_loss, names_weights_copy.values(), retain_graph=True)
+                    # target_grads_copy = dict(zip(names_weights_copy.keys(), target_loss_grad))
+                    #
+                    # task_gradient.append(target_grads_copy)
 
                     task_losses.append(target_loss)
             ## Inner-loop END
@@ -459,9 +460,9 @@ class MAMLFewShotClassifier(nn.Module):
         loss.backward()
 
         if first_step:
-            self.optimizer.perturb_weights(zero_grad=True)
+            self.optimizer.first_step(zero_grad=True)
         else:
-            self.optimizer.gradient_decompose(zero_grad=True, balance=0.7)
+            self.optimizer.second_step(zero_grad=True, balance=0.7)
 
         # if 'imagenet' in self.args.dataset_name:
         #     for name, param in self.classifier.named_parameters():
@@ -506,25 +507,23 @@ class MAMLFewShotClassifier(nn.Module):
 
         data_batch = (x_support_set, x_target_set, y_support_set, y_target_set)
 
-        losses_1, per_task_target_preds_1 = self.train_forward_prop(data_batch=data_batch, epoch=epoch, current_iter=current_iter)
 
+        # first forward-backward step
         self.optimizer.zero_grad()
-
+        losses_1, per_task_target_preds_1 = self.train_forward_prop(data_batch=data_batch, epoch=epoch, current_iter=current_iter)
         self.meta_update(loss=losses_1['loss'], current_iter=current_iter, first_step=True, epoch=epoch)
 
+        # second forward-backward step
         losses, per_task_target_preds = self.train_forward_prop(data_batch=data_batch, epoch=epoch, current_iter=current_iter)
-
         self.meta_update(loss=losses['loss'], current_iter=current_iter, first_step=False, epoch=epoch)
 
-
-        losses_1['learning_rate'] = self.scheduler.get_lr()[0]
-
+        losses['learning_rate'] = self.scheduler.get_lr()[0]
         self.optimizer.update_rho_t()
 
         self.optimizer.zero_grad()
         self.zero_grad()
 
-        return losses_1, per_task_target_preds
+        return losses, per_task_target_preds
 
     def run_validation_iter(self, data_batch, current_iter):
         """
