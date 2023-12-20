@@ -37,7 +37,7 @@ class SAM(torch.optim.Optimizer):
 
                 self.state[p]["old_p"] = p.data.clone()
                 # w에 대한 gradient를 저장
-                self.state[p]["old_p_grad"] = p.grad.clone()
+                ## self.state[p]["old_g"] = p.grad.clone()
 
                 e_w = p.grad * scale.to(p)
                 if self.adaptive:
@@ -56,9 +56,9 @@ class SAM(torch.optim.Optimizer):
 
                 p.data = self.state[p]["old_p"]  # get back to "w" from "w + e(w)"
 
-                ## self.state[p]['old_p_grad']가 w에 대한 gradient이고
+                ## self.state[p]['old_g']가 w에 대한 gradient이고
                 ## p.grad는 w + e(w)에서의 gradient이다 이다
-                p.grad = (1 - balance) * self.state[p]["old_p_grad"] + balance * p.grad
+                ## p.grad = (1 - balance) * self.state[p]["old_g"] + balance * p.grad
 
         self.base_optimizer.step()  # do the actual "sharpness-aware" update
 
@@ -78,7 +78,7 @@ class SAM(torch.optim.Optimizer):
         shared_device = self.param_groups[0]["params"][0].device  # put everything on the same device, in case of model parallelism
         norm = torch.norm(
                     torch.stack([
-                        ((torch.abs(p) if group["adaptive"] else 1.0) * p.grad).norm(p=2).to(shared_device)
+                        ((torch.abs(p) if self.adaptive else 1.0) * p.grad).norm(p=2).to(shared_device)
                         for group in self.param_groups for p in group["params"]
                         if p.grad is not None
                     ]),
