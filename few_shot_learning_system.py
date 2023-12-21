@@ -405,7 +405,8 @@ class MAMLFewShotClassifier(nn.Module):
                 self.classifier.restore_backup_stats()
 
         losses = self.get_across_task_loss_metrics(total_losses=total_losses,
-                                                   total_accuracies=total_accuracies)
+                                                   total_accuracies=total_accuracies,
+                                                   task_gradients=task_gradient)
 
         for idx, item in enumerate(per_step_loss_importance_vectors):
             losses['loss_importance_vector_{}'.format(idx)] = item.detach().cpu().numpy()
