@@ -12,6 +12,7 @@ from inner_loop_optimizers_GR import GradientDescentLearningRule, LSLRGradientDe
 from SAM import SAM
 
 from timm.loss import LabelSmoothingCrossEntropy
+from loss import knowledge_distillation_loss
 
 
 def set_torch_seed(seed):
@@ -206,12 +207,55 @@ class MAMLFewShotClassifier(nn.Module):
 
     def get_across_task_loss_metrics(self, total_losses, total_accuracies):
 
+        # task1_gradient = task_gradients[0]['layer_dict.conv3.conv.weight']
+        #
+        # task2_gradient = task_gradients[1]['layer_dict.conv3.conv.weight']
+        #
+        # # 각 텐서를 벡터로 평탄화(flatten)
+        # task1_gradient = task1_gradient.view(task1_gradient.size(0), -1)
+        # task2_gradient = task2_gradient.view(task2_gradient.size(0), -1)
+        #
+        # cosine_similarity = torch.abs(F.cosine_similarity(task1_gradient, task2_gradient))
+        # cosine_similarity = 1 - cosine_similarity ?
+
         losses = dict()
 
         losses['loss'] = torch.mean(torch.stack(total_losses))
         losses['accuracy'] = np.mean(total_accuracies)
 
         return losses
+
+
+    def get_soft_label(self, x_support_set_task, y_support_set_task, x_target_set_task, y_target_set_task, names_weights_copy, epoch):
+        """
+        Knowledge Distillation을 위한 soft target 생성
+        """
+
+        ## Support Set에 대한 Soft target 생성
+        support_loss, support_preds, out_feature_dict = self.net_forward(
+            x=x_support_set_task,
+            y=y_support_set_task,
+            weights=names_weights_copy,
+            backup_running_statistics=True,
+            training=True,
+            num_step=0,
+            training_phase=False, # Cross Entropy Loss를 구하기 위해서 False로 설정한다
+            epoch=epoch
+        )
+
+        ## Query Set에 대한 Soft target 생성
+        taget_loss, target_preds, out_feature_dict = self.net_forward(
+            x=x_target_set_task,
+            y=y_target_set_task,
+            weights=names_weights_copy,
+            backup_running_statistics=True,
+            training=True,
+            num_step=0,
+            training_phase=False, # Cross Entropy Loss를 구하기 위해서 False로 설정한다
+            epoch=epoch
+        )
+
+        return support_preds.detach(), target_preds.detach() # detach하여 역전파 방지
 
     def forward(self, data_batch, epoch, use_second_order, use_multi_step_loss_optimization, num_steps, training_phase, current_iter):
         """
@@ -258,6 +302,14 @@ class MAMLFewShotClassifier(nn.Module):
             x_target_set_task = x_target_set_task.view(-1, c, h, w)
             y_target_set_task = y_target_set_task.view(-1)
 
+            support_soft_preds=None
+            target_soft_preds=None
+
+            if self.args.knowledge_distillation:
+                support_soft_preds, target_soft_preds = self.get_soft_label(x_support_set_task, y_support_set_task,
+                                                                           x_target_set_task, y_target_set_task,
+                                                                           names_weights_copy, epoch)
+
             for num_step in range(num_steps):
 
                 support_loss, support_preds, out_feature_dict  = self.net_forward(
@@ -266,7 +318,10 @@ class MAMLFewShotClassifier(nn.Module):
                     weights=names_weights_copy,
                     backup_running_statistics=num_step == 0,
                     training=True,
-                    num_step=num_step
+                    num_step=num_step,
+                    training_phase=training_phase,
+                    epoch=epoch,
+                    soft_target=support_soft_preds
                 )
 
                 generated_alpha_params = {}
@@ -320,7 +375,9 @@ class MAMLFewShotClassifier(nn.Module):
                     target_loss, target_preds, _ = self.net_forward(x=x_target_set_task,
                                                                  y=y_target_set_task, weights=names_weights_copy,
                                                                  backup_running_statistics=False, training=True,
-                                                                 num_step=num_step)
+                                                                 num_step=num_step, training_phase=training_phase,
+                                                                 epoch=epoch,
+                                                                 soft_target=target_soft_preds)
 
                     task_losses.append(target_loss)
             ## Inner-loop END
@@ -348,7 +405,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         return losses, per_task_target_preds
 
-    def net_forward(self, x, y, weights, backup_running_statistics, training, num_step, training_phase):
+    def net_forward(self, x, y, weights, backup_running_statistics, training, num_step, training_phase, epoch, soft_target=None):
         """
         A base model forward pass on some data points x. Using the parameters in the weights dictionary. Also requires
         boolean flags indicating whether to reset the running statistics at the end of the run (if at evaluation phase).
@@ -367,7 +424,8 @@ class MAMLFewShotClassifier(nn.Module):
         # lambda_dif = 1.0
         # metalearner_classifer = self.classifier.layer_dict.linear.weights.detach()
         # tasklearner_classifer = weights['layer_dict.linear.weights'].detach()
-        # weight_difference = torch.norm(metalearner_classifer - tasklearner_classifer)
+        # mse_loss = nn.MSELoss()
+        # weight_difference = mse_loss(metalearner_classifer, tasklearner_classifer)
 
         preds, out_feature_dict = self.classifier.forward(x=x, params=weights,
                                         training=training,
@@ -377,6 +435,13 @@ class MAMLFewShotClassifier(nn.Module):
             if self.args.smoothing:
                 criterion = LabelSmoothingCrossEntropy(smoothing=0.1)
                 loss = criterion(preds, y)
+            elif self.args.knowledge_distillation:
+                if soft_target:
+                    print("knowledge_distillation")
+                    alpha = epoch / self.args.total_epochs
+                    loss = knowledge_distillation_loss(student_logit=preds, teacher_logit=soft_target, labels=y,
+                                                       label_loss_weight=(1.0 - alpha), soft_label_loss_weight=alpha,
+                                                       Temperature=1.0)
             else:
                 loss = F.cross_entropy(input=preds, target=y)
         else:

@@ -57,5 +57,6 @@
   "arbiter": true,
   "SWA": false,
   "use_bias": true,
-  "smoothing": true
+  "smoothing": true,
+  "knowledge_distillation": false
 }

@@ -40,7 +40,12 @@ class SAM(torch.optim.Optimizer):
                 if p.grad is None: continue
                 p.data = self.state[p]["old_p"]  # get back to "w" from "w + e(w)"
 
+                ## Penalizing Gradient Norm for Efficiently Improving Generalization in Deep Learning
                 p.grad = torch.tensor(1 - balance) * self.state[p]["old_p_grad"] + torch.tensor(balance) * p.grad
+
+                ## Sharpness-Aware Gradient Matching for Domain Generalization
+                # sam_grad = self.state[p]['old_p_grad'] * 0.5 - p.grad * 0.5
+                # p.grad.data.add_(sam_grad)
 
         self.base_optimizer.step()  # do the actual "sharpness-aware" update
 
