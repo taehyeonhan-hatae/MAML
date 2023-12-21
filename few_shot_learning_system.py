@@ -422,7 +422,7 @@ class MAMLFewShotClassifier(nn.Module):
         """
 
         lambda_diff = torch.tensor(1.0)
-        metalearner_classifier = self.classifier.layer_dict.linear.weights.detach()
+        metalearner_classifier = self.classifier.layer_dict.linear.weights.detach() # Detach를 하는게 맞을까?
         tasklearner_classifier = weights['layer_dict.linear.weights'].detach()
         mse_loss = nn.MSELoss()
         classifier_diff = mse_loss(metalearner_classifier, tasklearner_classifier)
@@ -435,6 +435,7 @@ class MAMLFewShotClassifier(nn.Module):
             if self.args.smoothing:
                 criterion = LabelSmoothingCrossEntropy(smoothing=0.1)
                 loss = criterion(preds, y)
+                #loss = loss + lambda_diff * classifier_diff
             elif self.args.knowledge_distillation:
                 if soft_target:
                     print("knowledge_distillation")
@@ -442,6 +443,7 @@ class MAMLFewShotClassifier(nn.Module):
                     loss = knowledge_distillation_loss(student_logit=preds, teacher_logit=soft_target, labels=y,
                                                        label_loss_weight=(1.0 - alpha), soft_label_loss_weight=alpha,
                                                        Temperature=1.0)
+                    #loss = loss + lambda_diff * classifier_diff
             else:
                 loss = F.cross_entropy(input=preds, target=y)
         else:
