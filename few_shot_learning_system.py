@@ -205,22 +205,11 @@ class MAMLFewShotClassifier(nn.Module):
 
         return names_weights_copy
 
-    def get_across_task_loss_metrics(self, total_losses, total_accuracies, task_gradients):
-
-        task1_gradient = task_gradients[0]['layer_dict.conv3.conv.weight']
-
-        task2_gradient = task_gradients[1]['layer_dict.conv3.conv.weight']
-
-        # 각 텐서를 벡터로 평탄화(flatten)
-        task1_gradient = task1_gradient.view(task1_gradient.size(0), -1)
-        task2_gradient = task2_gradient.view(task2_gradient.size(0), -1)
-
-        cosine_similarity = torch.abs(F.cosine_similarity(task1_gradient, task2_gradient))
-        # cosine_similarity = 1 - cosine_similarity
+    def get_across_task_loss_metrics(self, total_losses, total_accuracies):
 
         losses = dict()
 
-        losses['loss'] = torch.mean(torch.stack(total_losses)) + cosine_similarity
+        losses['loss'] = torch.mean(torch.stack(total_losses))
         losses['accuracy'] = np.mean(total_accuracies)
 
         return losses
@@ -274,8 +263,6 @@ class MAMLFewShotClassifier(nn.Module):
         [b, ncs, spc] = y_support_set.shape
 
         self.num_classes_per_set = ncs
-
-        task_gradient = []
 
         total_losses = []
         total_accuracies = []
@@ -380,12 +367,6 @@ class MAMLFewShotClassifier(nn.Module):
                                                                  num_step=num_step, training_phase=training_phase,
                                                                  epoch=epoch,
                                                                  soft_target=target_soft_preds)
-
-                    target_loss_grad = torch.autograd.grad(target_loss, names_weights_copy.values(), retain_graph=True)
-                    target_grads_copy = dict(zip(names_weights_copy.keys(), target_loss_grad))
-
-                    task_gradient.append(target_grads_copy)
-
                     task_losses.append(target_loss)
             ## Inner-loop END
 
@@ -405,8 +386,7 @@ class MAMLFewShotClassifier(nn.Module):
                 self.classifier.restore_backup_stats()
 
         losses = self.get_across_task_loss_metrics(total_losses=total_losses,
-                                                   total_accuracies=total_accuracies,
-                                                   task_gradients=task_gradient)
+                                                   total_accuracies=total_accuracies)
 
         for idx, item in enumerate(per_step_loss_importance_vectors):
             losses['loss_importance_vector_{}'.format(idx)] = item.detach().cpu().numpy()
@@ -444,7 +424,7 @@ class MAMLFewShotClassifier(nn.Module):
                 criterion = LabelSmoothingCrossEntropy(smoothing=0.1)
                 loss = criterion(preds, y)
             elif self.args.knowledge_distillation:
-                if soft_target:
+                if not soft_target == None:
                     alpha = epoch / self.args.total_epochs
                     loss = knowledge_distillation_loss(student_logit=preds, teacher_logit=soft_target, labels=y,
                                                        label_loss_weight=(1.0 - alpha), soft_label_loss_weight=alpha,
@@ -573,7 +553,7 @@ class MAMLFewShotClassifier(nn.Module):
         self.optimizer.zero_grad()
         self.zero_grad()
 
-        return losses_1, per_task_target_preds
+        return losses, per_task_target_preds
 
     def run_validation_iter(self, data_batch, current_iter):
         """
