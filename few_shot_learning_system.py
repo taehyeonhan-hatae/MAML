@@ -104,7 +104,7 @@ class MAMLFewShotClassifier(nn.Module):
         # optim.Adam(self.trainable_parameters(), lr=args.meta_learning_rate, amsgrad=False)
 
         self.optimizer = SAM(self.trainable_parameters(), base_optimizer,
-                             adaptive=True, lr=args.meta_learning_rate)
+                             adaptive=False, lr=args.meta_learning_rate)
 
         self.scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer, T_max=self.args.total_epochs,
                                                               eta_min=self.args.min_learning_rate)
@@ -419,20 +419,21 @@ class MAMLFewShotClassifier(nn.Module):
                                         training=training,
                                         backup_running_statistics=backup_running_statistics, num_step=num_step)
 
-        if training_phase:
-            if self.args.smoothing:
-                criterion = LabelSmoothingCrossEntropy(smoothing=0.1)
-                loss = criterion(preds, y)
-            elif self.args.knowledge_distillation:
-                if not soft_target == None:
-                    alpha = epoch / self.args.total_epochs
-                    loss = knowledge_distillation_loss(student_logit=preds, teacher_logit=soft_target, labels=y,
-                                                       label_loss_weight=(1.0 - alpha), soft_label_loss_weight=alpha,
-                                                       Temperature=1.0)
+
+        if self.args.smoothing:
+            criterion = LabelSmoothingCrossEntropy(smoothing=0.1)
+            loss = criterion(preds, y)
+        elif self.args.knowledge_distillation:
+            if not soft_target == None:
+                alpha = 0.1
+                loss = knowledge_distillation_loss(student_logit=preds, teacher_logit=soft_target, labels=y,
+                                                   label_loss_weight=(1.0 - alpha), soft_label_loss_weight=alpha,
+                                                   Temperature=1.0)
             else:
                 loss = F.cross_entropy(input=preds, target=y)
         else:
             loss = F.cross_entropy(input=preds, target=y)
+
 
         return loss, preds, out_feature_dict
 
