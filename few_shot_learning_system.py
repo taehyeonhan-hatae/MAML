@@ -554,7 +554,7 @@ class MAMLFewShotClassifier(nn.Module):
         self.optimizer.zero_grad()
         self.zero_grad()
 
-        return losses, per_task_target_preds
+        return losses, per_task_target_preds_1
 
     def run_validation_iter(self, data_batch, current_iter):
         """
