@@ -426,6 +426,7 @@ class MAMLFewShotClassifier(nn.Module):
         elif self.args.knowledge_distillation:
             if not soft_target == None:
                 alpha = 0.1
+                # alpha = epoch / self.args.total_epochs
                 loss = knowledge_distillation_loss(student_logit=preds, teacher_logit=soft_target, labels=y,
                                                    label_loss_weight=(1.0 - alpha), soft_label_loss_weight=alpha,
                                                    Temperature=1.0)
