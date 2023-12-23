@@ -4,7 +4,7 @@ from torch.distributed import ReduceOp
 
 
 class SAM(torch.optim.Optimizer):
-    def __init__(self, params, base_optimizer, rho_scheduler, alpha, rho=0.0005, adaptive=False, perturb_eps=1e-12, **kwargs):
+    def __init__(self, params, base_optimizer, rho_scheduler, alpha, adaptive, rho=0.0005, perturb_eps=1e-12, **kwargs):
 
         defaults = dict(adaptive=adaptive, **kwargs)
         super(SAM, self).__init__(params, defaults)
@@ -22,6 +22,7 @@ class SAM(torch.optim.Optimizer):
 
     @torch.no_grad()
     def update_rho_t(self):
+
         self.rho_t = self.rho_scheduler.step()
         return self.rho_t
 
@@ -38,7 +39,7 @@ class SAM(torch.optim.Optimizer):
 
                 self.state[p]["old_p"] = p.data.clone()
                 # w에 대한 gradient를 저장
-                ## self.state[p]["old_g"] = p.grad.data.clone()
+                self.state[p]["old_g"] = p.grad.data.clone()
 
                 e_w = p.grad * scale.to(p)
                 if self.adaptive:
@@ -61,7 +62,7 @@ class SAM(torch.optim.Optimizer):
                 p.data = self.state[p]["old_p"]  # get back to "w" from "w + e(w)"
 
                 ## Penalizing Gradient Norm for Efficiently Improving Generalization in Deep Learning
-                ## p.grad = (1 - balance) * self.state[p]["old_g"] + balance * p.grad
+                p.grad = (1 - balance) * self.state[p]["old_g"] + balance * p.grad
 
                 ## Sharpness-Aware Gradient Matching for Domain Generalization (SAGM)
                 # sam_grad = self.state[p]['old_g'] * 0.5 - p.grad * 0.5
