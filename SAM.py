@@ -29,7 +29,7 @@ class SAM(torch.optim.Optimizer):
     @torch.no_grad()
     def first_step(self, zero_grad=False):
 
-        grad_norm = self._grad_norm()
+        grad_norm = self._grad_norm(weight_adaptive=self.adaptive)
         for group in self.param_groups:
 
             scale = (self.rho_t / (grad_norm + self.perturb_eps) - self.alpha)
