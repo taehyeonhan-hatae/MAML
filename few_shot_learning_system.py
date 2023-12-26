@@ -418,10 +418,14 @@ class MAMLFewShotClassifier(nn.Module):
         """
 
         # lambda_diff = torch.tensor(1.0)
-        # metalearner_classifier = self.classifier.layer_dict.linear.weights.detach() # Detach를 하는게 맞을까?
-        # tasklearner_classifier = weights['layer_dict.linear.weights'].detach()
+        # metalearner_classifier = self.classifier.layer_dict.linear.weights.detach()
+        # tasklearner_classifier = weights['layer_dict.linear.weights'] # Detach를 하는게 맞을까?
         # mse_loss = nn.MSELoss()
         # classifier_diff = mse_loss(metalearner_classifier, tasklearner_classifier)
+        #
+        # print("metalearner_classifier == ", metalearner_classifier)
+        # print("tasklearner_classifier == ", tasklearner_classifier)
+        # print("classifier_diff == ", classifier_diff)
 
         preds, out_feature_dict = self.classifier.forward(x=x, params=weights,
                                         training=training,
