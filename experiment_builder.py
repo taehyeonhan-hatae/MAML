@@ -278,7 +278,7 @@ class ExperimentBuilder(object):
         per_model_per_batch_targets = [[] for i in range(top_n_models)]
         test_losses = [dict() for i in range(top_n_models)]
 
-        # top_n_idx = [45,47,43,49,51]
+        # top_n_idx = [57,48,45,52,50]
 
         for idx, model_idx in enumerate(top_n_idx):
             self.state = \
