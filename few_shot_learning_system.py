@@ -381,7 +381,7 @@ class MAMLFewShotClassifier(nn.Module):
                     tasklearner_classifier = names_weights_copy['layer_dict.linear.weights'].squeeze() # Detach를 하는게 맞을까?
 
                     #classifier_diff = F.mse_loss(tasklearner_classifier,metalearner_classifier, reduction='sum')
-                    classifier_diff= F.l1_loss(tasklearner_classifier,metalearner_classifier, reduction='sum')
+                    classifier_diff= F.l1_loss(tasklearner_classifier,metalearner_classifier, reduction='mean')
 
                     target_loss = target_loss + lambda_diff * classifier_diff
 
@@ -433,7 +433,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         if training_phase:
             if self.args.smoothing:
-                criterion = LabelSmoothingCrossEntropy(smoothing=0.1)
+                criterion = LabelSmoothingCrossEntropy(smoothing=0.3)
                 loss = criterion(preds, y)
             elif self.args.knowledge_distillation:
                 if not soft_target == None:
