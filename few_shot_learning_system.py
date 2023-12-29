@@ -456,7 +456,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         if training_phase:
             if self.args.smoothing:
-                criterion = LabelSmoothingCrossEntropy(smoothing=0.3)
+                criterion = LabelSmoothingCrossEntropy(smoothing=0.1)
                 loss = criterion(preds, y)
             elif self.args.knowledge_distillation:
                 if not soft_target == None:
