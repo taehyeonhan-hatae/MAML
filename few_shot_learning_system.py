@@ -213,47 +213,47 @@ class MAMLFewShotClassifier(nn.Module):
 
         return names_weights_copy
 
-    def get_across_task_loss_metrics(self, total_losses, total_accuracies, task_gradients=None):
+    def get_across_task_loss_metrics(self, total_losses, total_accuracies):
 
         losses = dict()
 
-        ## cos 값이 0~1일때만 penalty를 줄까?
-        task1_gradient = task_gradients[0]['layer_dict.conv3.conv.weight']
-        task2_gradient = task_gradients[1]['layer_dict.conv3.conv.weight']
+        # ## cos 값이 0~1일때만 penalty를 줄까?
+        # task1_gradient = task_gradients[0]['layer_dict.conv3.conv.weight']
+        # task2_gradient = task_gradients[1]['layer_dict.conv3.conv.weight']
+        #
+        # # 각 텐서를 벡터로 평탄화(flatten)
+        # task1_gradient = task1_gradient.view(task1_gradient.size(0), -1)
+        # task2_gradient = task2_gradient.view(task2_gradient.size(0), -1)
+        #
+        # cosine_similarity = torch.abs(F.cosine_similarity(task1_gradient, task2_gradient))
+        #
+        # if cosine_similarity >= 0:
+        #     losses['loss'] = torch.mean(torch.stack(total_losses)) + cosine_similarity
+        # else:
+        #     losses['loss'] = torch.mean(torch.stack(total_losses))
 
-        # 각 텐서를 벡터로 평탄화(flatten)
-        task1_gradient = task1_gradient.view(task1_gradient.size(0), -1)
-        task2_gradient = task2_gradient.view(task2_gradient.size(0), -1)
-
-        cosine_similarity = torch.abs(F.cosine_similarity(task1_gradient, task2_gradient))
-
-        if cosine_similarity >= 0:
-            losses['loss'] = torch.mean(torch.stack(total_losses)) + cosine_similarity
-        else:
-            losses['loss'] = torch.mean(torch.stack(total_losses))
-
-        # losses['loss'] = torch.mean(torch.stack(total_losses))
+        losses['loss'] = torch.mean(torch.stack(total_losses))
         losses['accuracy'] = np.mean(total_accuracies)
 
         return losses
 
-
-    def get_soft_label(self, x_support_set_task, y_support_set_task, x_target_set_task, y_target_set_task, names_weights_copy, epoch):
+    # def get_soft_label(self, x_support_set_task, y_support_set_task, x_target_set_task, y_target_set_task, names_weights_copy, epoch):
+    def get_soft_label(self, x_target_set_task, y_target_set_task, names_weights_copy, epoch):
         """
         Knowledge Distillation을 위한 soft target 생성
         """
 
         ## Support Set에 대한 Soft target 생성
-        support_loss, support_preds, out_feature_dict = self.net_forward(
-            x=x_support_set_task,
-            y=y_support_set_task,
-            weights=names_weights_copy,
-            backup_running_statistics=True,
-            training=True,
-            num_step=0,
-            training_phase=False, # Cross Entropy Loss를 구하기 위해서 False로 설정한다
-            epoch=epoch
-        )
+        # support_loss, support_preds, out_feature_dict = self.net_forward(
+        #     x=x_support_set_task,
+        #     y=y_support_set_task,
+        #     weights=names_weights_copy,
+        #     backup_running_statistics=True,
+        #     training=True,
+        #     num_step=0,
+        #     training_phase=False, # Cross Entropy Loss를 구하기 위해서 False로 설정한다
+        #     epoch=epoch
+        # )
 
         ## Query Set에 대한 Soft target 생성
         taget_loss, target_preds, out_feature_dict = self.net_forward(
@@ -267,7 +267,8 @@ class MAMLFewShotClassifier(nn.Module):
             epoch=epoch
         )
 
-        return support_preds.detach(), target_preds.detach() # detach하여 역전파 방지
+        return target_preds.detach() # detach하여 역전파 방지
+        # return support_preds.detach(), target_preds.detach() # detach하여 역전파 방지
 
     def forward(self, data_batch, epoch, use_second_order, use_multi_step_loss_optimization, num_steps, training_phase, current_iter):
         """
@@ -287,7 +288,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         self.num_classes_per_set = ncs
 
-        task_gradient = []
+        # task_gradient = []
 
         total_losses = []
         total_accuracies = []
@@ -320,9 +321,11 @@ class MAMLFewShotClassifier(nn.Module):
             target_soft_preds=None
 
             if self.args.knowledge_distillation:
-                support_soft_preds, target_soft_preds = self.get_soft_label(x_support_set_task, y_support_set_task,
-                                                                           x_target_set_task, y_target_set_task,
-                                                                           names_weights_copy, epoch)
+                # support_soft_preds, target_soft_preds = self.get_soft_label(x_support_set_task, y_support_set_task,
+                #                                                            x_target_set_task, y_target_set_task,
+                #                                                            names_weights_copy, epoch)
+                target_soft_preds = self.get_soft_label(x_target_set_task, y_target_set_task,
+                                                                            names_weights_copy, epoch)
 
             for num_step in range(num_steps):
 
@@ -402,10 +405,10 @@ class MAMLFewShotClassifier(nn.Module):
                     #
                     # target_loss = target_loss + lambda_diff * classifier_diff
 
-                    target_loss_grad = torch.autograd.grad(target_loss, names_weights_copy.values(), retain_graph=True)
-                    target_grads_copy = dict(zip(names_weights_copy.keys(), target_loss_grad))
-
-                    task_gradient.append(target_grads_copy)
+                    # target_loss_grad = torch.autograd.grad(target_loss, names_weights_copy.values(), retain_graph=True)
+                    # target_grads_copy = dict(zip(names_weights_copy.keys(), target_loss_grad))
+                    #
+                    # task_gradient.append(target_grads_copy)
 
                     task_losses.append(target_loss)
             ## Inner-loop END
@@ -426,8 +429,7 @@ class MAMLFewShotClassifier(nn.Module):
                 self.classifier.restore_backup_stats()
 
         losses = self.get_across_task_loss_metrics(total_losses=total_losses,
-                                                   total_accuracies=total_accuracies,
-                                                   task_gradients=task_gradient)
+                                                   total_accuracies=total_accuracies)
 
         for idx, item in enumerate(per_step_loss_importance_vectors):
             losses['loss_importance_vector_{}'.format(idx)] = item.detach().cpu().numpy()
