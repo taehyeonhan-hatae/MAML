@@ -380,8 +380,8 @@ class MAMLFewShotClassifier(nn.Module):
                     metalearner_classifier = self.classifier.layer_dict.linear.weights.detach()
                     tasklearner_classifier = names_weights_copy['layer_dict.linear.weights'].squeeze() # Detach를 하는게 맞을까?
 
-                    mse_loss = nn.MSELoss()
-                    classifier_diff = mse_loss(tasklearner_classifier,metalearner_classifier)
+                    #classifier_diff = F.mse_loss(tasklearner_classifier,metalearner_classifier, reduction='sum')
+                    classifier_diff= F.l1_loss(tasklearner_classifier,metalearner_classifier, reduction='sum')
 
                     target_loss = target_loss + lambda_diff * classifier_diff
 
