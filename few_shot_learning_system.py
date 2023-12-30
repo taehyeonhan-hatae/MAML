@@ -100,12 +100,29 @@ class MAMLFewShotClassifier(nn.Module):
             if param.requires_grad:
                 print(name, param.shape, param.device, param.requires_grad)
 
-        base_optimizer = optim.Adam(self.trainable_parameters(), lr=args.meta_learning_rate, amsgrad=False)
+        #base_optimizer = optim.Adam(self.trainable_parameters(), lr=args.meta_learning_rate, amsgrad=False)
+
+        freeze_params = [p for name, p in self.classifier.named_parameters() if 'linear' in name]
+        learnable_params  = [p for name, p in self.classifier.named_parameters() if not 'linear' in name]
+
+        base_optimizer = optim.Adam([
+            {'params': freeze_params, 'lr': 0},
+            {'params': learnable_params, 'lr': args.meta_learning_rate},
+            {'params': self.arbiter.parameters(), 'lr':args.meta_learning_rate}
+        ], amsgrad=False)
 
         self.scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer=base_optimizer, T_max=self.args.total_epochs,
                                                               eta_min=self.args.min_learning_rate)
         # 1) eta_min=self.args.min_learning_rate)
         # 2) eta_min=0.0)
+
+        # optimizer의 파라미터 정보 확인
+        for idx, param_group in enumerate(base_optimizer.param_groups):
+            print(f"Parameter Group {idx}:")
+            print("Parameters:")
+            for param in param_group['params']:
+                print(param)
+            print("Learning rate:", param_group['lr'])
 
         rho_scheduler = ProportionScheduler(pytorch_lr_scheduler=self.scheduler,
                                             max_lr=args.meta_learning_rate, min_lr=0.0,
