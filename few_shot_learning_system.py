@@ -117,12 +117,12 @@ class MAMLFewShotClassifier(nn.Module):
         # 2) eta_min=0.0)
 
         # optimizer의 파라미터 정보 확인
-        for idx, param_group in enumerate(base_optimizer.param_groups):
-            print(f"Parameter Group {idx}:")
-            print("Parameters:")
-            for param in param_group['params']:
-                print(param)
-            print("Learning rate:", param_group['lr'])
+        # for idx, param_group in enumerate(base_optimizer.param_groups):
+        #     print(f"Parameter Group {idx}:")
+        #     print("Parameters:")
+        #     for param in param_group['params']:
+        #         print(param)
+        #     print("Learning rate:", param_group['lr'])
 
         rho_scheduler = ProportionScheduler(pytorch_lr_scheduler=self.scheduler,
                                             max_lr=args.meta_learning_rate, min_lr=0.0,
