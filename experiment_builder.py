@@ -310,6 +310,13 @@ class ExperimentBuilder(object):
         accuracy = np.mean(np.equal(per_batch_targets, per_batch_max))
         accuracy_std = np.std(np.equal(per_batch_targets, per_batch_max))
 
+        ##cxgrad
+        # # test_losses = {"test_accuracy_mean": accuracy, "test_accuracy_std": accuracy_std}
+        # error_rate = 1 - accuracy
+        # conf = 1.96 * np.sqrt((error_rate * (1 - error_rate)) / per_batch_targets.size)
+        # #print('conf by std: {}'.format(1.96 * accuracy_std / np.sqrt(per_batch_targets.size)))
+        # test_losses = {"test_accuracy_mean": accuracy, "test_accuracy_conf": conf}
+
         test_losses = {"test_accuracy_mean": accuracy, "test_accuracy_std": accuracy_std}
 
         _ = save_statistics(self.logs_filepath,
