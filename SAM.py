@@ -68,20 +68,20 @@ class SAM(torch.optim.Optimizer):
 
         ## 3. SURROGATE GAP MINIMIZATION IMPROVES SHARPNESS-AWARE TRAINING (GSAM)
         # calculate inner product
-        inner_prod = 0.0
-        for group in self.param_groups:
-            for p in group['params']:
-                if p.grad is None: continue
-                inner_prod += torch.sum(
-                    self.state[p]['old_g'] * p.grad.data
-                )
-
-        # get norm
-        new_grad_norm = self._grad_norm()
-        old_grad_norm = self._grad_norm(by='old_g')
-
-        # get cosine
-        cosine = inner_prod / (new_grad_norm * old_grad_norm + self.perturb_eps)
+        # inner_prod = 0.0
+        # for group in self.param_groups:
+        #     for p in group['params']:
+        #         if p.grad is None: continue
+        #         inner_prod += torch.sum(
+        #             self.state[p]['old_g'] * p.grad.data
+        #         )
+        #
+        # # get norm
+        # new_grad_norm = self._grad_norm()
+        # old_grad_norm = self._grad_norm(by='old_g')
+        #
+        # # get cosine
+        # cosine = inner_prod / (new_grad_norm * old_grad_norm + self.perturb_eps)
 
 
         for group in self.param_groups:
@@ -94,17 +94,17 @@ class SAM(torch.optim.Optimizer):
                 p.data = self.state[p]["old_p"]  # get back to "w" from "w + e(w)"
 
                 ## 1. Penalizing Gradient Norm for Efficiently Improving Generalization in Deep Learning
-                # p.grad = (1 - balance) * self.state[p]["old_g"] + balance * p.grad.data
+                p.grad = (1 - balance) * self.state[p]["old_g"] + balance * p.grad.data
 
                 ## 2. Sharpness-Aware Gradient Matching for Domain Generalization (SAGM)
                 # sam_grad = self.state[p]['old_g'] * 0.5 - p.grad * 0.5
                 # p.grad.data.add_(sam_grad)
 
                 ## 3. SURROGATE GAP MINIMIZATION IMPROVES SHARPNESS-AWARE TRAINING (GSAM)
-                alpha=0.0
-                vertical = self.state[p]['old_g'] - cosine * old_grad_norm * p.grad.data / (
-                        new_grad_norm + self.perturb_eps)
-                p.grad.data.add_(vertical, alpha=-alpha)
+                # alpha=0.0
+                # vertical = self.state[p]['old_g'] - cosine * old_grad_norm * p.grad.data / (
+                #         new_grad_norm + self.perturb_eps)
+                # p.grad.data.add_(vertical, alpha=-alpha)
 
         # synchronize gradients across workers
         self._sync_grad()
