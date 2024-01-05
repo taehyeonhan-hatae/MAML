@@ -103,19 +103,19 @@ class MAMLFewShotClassifier(nn.Module):
         base_optimizer = optim.Adam(self.trainable_parameters(), lr=args.meta_learning_rate, amsgrad=False)
 
         self.scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer=base_optimizer, T_max=self.args.total_epochs,
-                                                              eta_min=0.0)
+                                                              eta_min=self.args.min_learning_rate)
         # 1) eta_min=self.args.min_learning_rate)
         # 2) eta_min=0.0)
 
         rho_scheduler = ProportionScheduler(pytorch_lr_scheduler=self.scheduler,
                                             max_lr=args.meta_learning_rate, min_lr=0.0,
-                                            max_value=0.0005, min_value=0.0002)
+                                            max_value=0.0005, min_value=0.0005)
 
         self.optimizer = SAM(params=self.trainable_parameters(),
                              base_optimizer=base_optimizer,
                              rho_scheduler=rho_scheduler,
                              alpha=0.0,
-                             adaptive=False)
+                             adaptive=True)
 
         self.device = torch.device('cpu')
         if torch.cuda.is_available():
