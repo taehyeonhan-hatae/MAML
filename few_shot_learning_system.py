@@ -109,7 +109,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         rho_scheduler = ProportionScheduler(pytorch_lr_scheduler=self.scheduler,
                                             max_lr=args.meta_learning_rate, min_lr=0.0,
-                                            max_value=0.0005, min_value=0.0005)
+                                            max_value=0.0005, min_value=0.0002)
 
         self.optimizer = SAM(params=self.trainable_parameters(),
                              base_optimizer=base_optimizer,
