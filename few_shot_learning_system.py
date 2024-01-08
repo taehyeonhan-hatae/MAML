@@ -115,7 +115,7 @@ class MAMLFewShotClassifier(nn.Module):
                              base_optimizer=base_optimizer,
                              rho_scheduler=rho_scheduler,
                              alpha=0.0,
-                             adaptive=False)
+                             adaptive=True)
 
         self.device = torch.device('cpu')
         if torch.cuda.is_available():
