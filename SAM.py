@@ -83,9 +83,9 @@ class SAM(torch.optim.Optimizer):
         # # get cosine
         # cosine = inner_prod / (new_grad_norm * old_grad_norm + self.perturb_eps)
 
-
         for group in self.param_groups:
             for p in group["params"]:
+
                 if p.grad is None: continue
 
                 ## self.state[p]['old_g']가 w에 대한 gradient이고

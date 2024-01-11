@@ -87,9 +87,9 @@ class GradientDescentLearningRule(nn.Module):
                                                   (names_grads_wrt_params_dict[key] / torch.norm(
                                                       names_grads_wrt_params_dict[key]))
 
-                # updated_names_weights_dict[key] = names_weights_dict[key] - self.learning_rate * \
-                #                                   generated_alpha_params[key] * names_grads_wrt_params_dict[key]
-
+                # Constrained Weight Optimization for Learning without Activation Normalization
+                # updated_names_weights_dict[key] =  torch.norm(names_weights_dict[key]) \
+                #                                    * (updated_names_weights_dict[key] / (torch.norm(updated_names_weights_dict[key]) + 1e-12))
 
             else:
                 updated_names_weights_dict[key] = names_weights_dict[key] - self.learning_rate * \

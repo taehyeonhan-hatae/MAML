@@ -217,33 +217,33 @@ class MAMLFewShotClassifier(nn.Module):
 
         return names_weights_copy
 
-    def get_across_task_loss_metrics(self, total_losses, total_accuracies, task_gradients):
+    def get_across_task_loss_metrics(self, total_losses, total_accuracies):
 
         losses = dict()
-
-        ## cos 값이 0~1일때만 penalty를 줄까?
-        task1_gradient = task_gradients[0]['layer_dict.conv3.conv.weight']
-        task2_gradient = task_gradients[1]['layer_dict.conv3.conv.weight']
-
-        # # 각 텐서를 벡터로 평탄화(flatten)
-        task1_gradient = task1_gradient.view(task1_gradient.size(0), -1)
-        task2_gradient = task2_gradient.view(task2_gradient.size(0), -1)
-
-        cosine_similarity = F.cosine_similarity(task1_gradient, task2_gradient)
-
-        ## 두 벡터의 내적
-        # gradient_dot_product = torch.matmul(task1_gradient, task2_gradient)
-        # print("두 그래디언트 텐서의 내적:", gradient_dot_product)
-
-        if cosine_similarity > 0:
-            losses['loss'] = torch.mean(torch.stack(total_losses)) + cosine_similarity
-        else:
-            losses['loss'] = torch.mean(torch.stack(total_losses))
-
+        losses['loss'] = torch.mean(torch.stack(total_losses))
         losses['accuracy'] = np.mean(total_accuracies)
 
-        # losses['loss'] = torch.mean(torch.stack(total_losses))
+        # ## cos 값이 0~1일때만 penalty를 줄까?
+        # task1_gradient = task_gradients[0]['layer_dict.conv3.conv.weight']
+        # task2_gradient = task_gradients[1]['layer_dict.conv3.conv.weight']
+        #
+        # # # 각 텐서를 벡터로 평탄화(flatten)
+        # task1_gradient = task1_gradient.view(task1_gradient.size(0), -1)
+        # task2_gradient = task2_gradient.view(task2_gradient.size(0), -1)
+        #
+        # cosine_similarity = F.cosine_similarity(task1_gradient, task2_gradient)
+        #
+        # # ## 두 벡터의 내적
+        # # # gradient_dot_product = torch.matmul(task1_gradient, task2_gradient)
+        # # # print("두 그래디언트 텐서의 내적:", gradient_dot_product)
+        #
+        # if cosine_similarity > 0:
+        #     losses['loss'] = torch.mean(torch.stack(total_losses)) + cosine_similarity
+        # else:
+        #     losses['loss'] = torch.mean(torch.stack(total_losses))
+        #
         # losses['accuracy'] = np.mean(total_accuracies)
+
 
         return losses
 
@@ -415,10 +415,10 @@ class MAMLFewShotClassifier(nn.Module):
                     #
                     # target_loss = target_loss + lambda_diff * classifier_diff
 
-                    target_loss_grad = torch.autograd.grad(target_loss, names_weights_copy.values(), retain_graph=True)
-                    target_grads_copy = dict(zip(names_weights_copy.keys(), target_loss_grad))
-
-                    task_gradient.append(target_grads_copy)
+                    # target_loss_grad = torch.autograd.grad(target_loss, names_weights_copy.values(), retain_graph=True)
+                    # target_grads_copy = dict(zip(names_weights_copy.keys(), target_loss_grad))
+                    #
+                    # task_gradient.append(target_grads_copy)
 
                     task_losses.append(target_loss)
             ## Inner-loop END
@@ -439,8 +439,7 @@ class MAMLFewShotClassifier(nn.Module):
                 self.classifier.restore_backup_stats()
 
         losses = self.get_across_task_loss_metrics(total_losses=total_losses,
-                                                   total_accuracies=total_accuracies,
-                                                   task_gradients=task_gradient)
+                                                   total_accuracies=total_accuracies)
 
         for idx, item in enumerate(per_step_loss_importance_vectors):
             losses['loss_importance_vector_{}'.format(idx)] = item.detach().cpu().numpy()
@@ -543,7 +542,19 @@ class MAMLFewShotClassifier(nn.Module):
             self.optimizer.first_step(zero_grad=True)
         else:
             # balance = epoch / self.args.total_epochs
+
+            # prev_weight_norm = {}
+            # for name, param in self.classifier.named_parameters():
+            #     if param.requires_grad:
+            #         prev_weight_norm[name] = torch.norm(param.data)
+
             self.optimizer.second_step(zero_grad=True, balance=0.7)
+
+            # Constrained Weight Optimization for Learning without Activation Normalization
+            # for name, param in self.classifier.named_parameters():
+            #     if param.requires_grad:
+            #         param.data = prev_weight_norm[name] * param.data * torch.norm(param.data)
+
 
         # if 'imagenet' in self.args.dataset_name:
         #     for name, param in self.classifier.named_parameters():
