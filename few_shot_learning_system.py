@@ -400,6 +400,7 @@ class MAMLFewShotClassifier(nn.Module):
                     g = 0
                     for key in names_weights_copy.keys():
                         generated_alpha_params[key] = generated_gradient_rate[g]
+                        # generated_beta_params[key] = generated_gradient_rate[g+1]
                         g += 1
 
                 names_weights_copy = self.apply_inner_loop_update(loss=support_loss,
