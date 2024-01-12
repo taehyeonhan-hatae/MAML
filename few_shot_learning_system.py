@@ -105,26 +105,15 @@ class MAMLFewShotClassifier(nn.Module):
             if param.requires_grad:
                 print(name, param.shape, param.device, param.requires_grad)
 
-        base_optimizer = optim.Adam(self.trainable_parameters(), lr=args.meta_learning_rate, amsgrad=False)
+        base_optimizer = optim.Adam
+        # base_optimizer = optim.SGD
+        # optim.Adam(self.trainable_parameters(), lr=args.meta_learning_rate, amsgrad=False)
 
-        self.scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer=base_optimizer, T_max=self.args.total_epochs,
+        self.optimizer = SAM(self.trainable_parameters(), base_optimizer,
+                             adaptive=True, lr=args.meta_learning_rate)
+
+        self.scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer, T_max=self.args.total_epochs,
                                                               eta_min=self.args.min_learning_rate)
-        # 1) eta_min=self.args.min_learning_rate)
-        # 2) eta_min=0.0)
-
-        rho_scheduler = ProportionScheduler(pytorch_lr_scheduler=self.scheduler,
-                                            max_lr=args.meta_learning_rate, min_lr=args.meta_learning_rate,
-                                            max_value=0.0005, min_value=0.0005)
-
-        # rho_scheduler = ProportionScheduler(pytorch_lr_scheduler=self.scheduler,
-        #                                     max_lr=args.meta_learning_rate, min_lr=0.0,
-        #                                     max_value=0.05, min_value=0.0005)
-
-        self.optimizer = SAM(params=self.trainable_parameters(),
-                             base_optimizer=base_optimizer,
-                             rho_scheduler=rho_scheduler,
-                             alpha=0.0,
-                             adaptive=True)
 
         self.device = torch.device('cpu')
         if torch.cuda.is_available():
@@ -601,9 +590,6 @@ class MAMLFewShotClassifier(nn.Module):
 
         self.scheduler.step(epoch=epoch)
 
-        ## SAM을 위한 추가
-        self.optimizer.update_rho_t()
-
         if self.current_epoch != epoch:
             self.current_epoch = epoch
 
@@ -619,17 +605,15 @@ class MAMLFewShotClassifier(nn.Module):
 
         data_batch = (x_support_set, x_target_set, y_support_set, y_target_set)
 
+        self.optimizer.zero_grad() # 수정
+
         losses_1, per_task_target_preds_1 = self.train_forward_prop(data_batch=data_batch, epoch=epoch, current_iter=current_iter)
 
-        self.optimizer.zero_grad()
+        self.meta_update(loss=losses_1['loss'], current_iter=current_iter, first_step=True, epoch=epoch)
 
-        with self.optimizer.maybe_no_sync():
+        losses, per_task_target_preds = self.train_forward_prop(data_batch=data_batch, epoch=epoch, current_iter=current_iter)
 
-            self.meta_update(loss=losses_1['loss'], current_iter=current_iter, first_step=True, epoch=epoch)
-
-            losses, per_task_target_preds = self.train_forward_prop(data_batch=data_batch, epoch=epoch, current_iter=current_iter)
-
-            self.meta_update(loss=losses['loss'], current_iter=current_iter, first_step=False, epoch=epoch)
+        self.meta_update(loss=losses['loss'], current_iter=current_iter, first_step=False, epoch=epoch)
 
         losses['learning_rate'] = self.scheduler.get_lr()[0]
 
