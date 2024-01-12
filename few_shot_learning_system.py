@@ -553,7 +553,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         # 가중치 업데이트 확인용 변수
         # prev_weights = {}
-        # for name, param in self.arbiter.named_parameters():
+        # for name, param in self.step_arbiter.named_parameters():
         #     prev_weights[name] = param.data.clone()
 
         loss.backward()
@@ -570,12 +570,6 @@ class MAMLFewShotClassifier(nn.Module):
 
             self.optimizer.second_step(zero_grad=True, balance=0.7)
 
-            # Constrained Weight Optimization for Learning without Activation Normalization
-            # for name, param in self.classifier.named_parameters():
-            #     if param.requires_grad:
-            #         param.data = prev_weight_norm[name] * param.data * torch.norm(param.data)
-
-
         # if 'imagenet' in self.args.dataset_name:
         #     for name, param in self.classifier.named_parameters():
         #         if param.requires_grad:
@@ -590,7 +584,7 @@ class MAMLFewShotClassifier(nn.Module):
         #self.optimizer.step()
 
         # 가중치 업데이트 확인
-        # for name, param in self.arbiter.named_parameters():
+        # for name, param in self.step_arbiter.named_parameters():
         #     if not torch.equal(prev_weights[name], param.data):
         #         print(f"{name} 가중치가 업데이트되었습니다.")
         #         prev_weights[name] = param.data.clone()
