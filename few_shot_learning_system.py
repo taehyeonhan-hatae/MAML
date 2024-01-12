@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-from meta_neural_network_architectures import VGGReLUNormNetwork,ResNet12, StepArbiter
+from meta_neural_network_architectures import VGGReLUNormNetwork,ResNet12, StepArbiter, Arbiter
 from inner_loop_optimizers_GR import GradientDescentLearningRule, LSLRGradientDescentLearningRule
 
 from SAM import SAM
@@ -87,10 +87,10 @@ class MAMLFewShotClassifier(nn.Module):
             #     nn.Softplus() # CxGrad
             # ).to(device=self.device)
 
+            # self.arbiter = Arbiter(input_dim=input_dim, output_dim=output_dim, args=self.args,
+            #                                 device=self.device)
 
             self.step_arbiter = StepArbiter(input_dim=input_dim, output_dim=output_dim, args=self.args, device=self.device)
-
-
 
         print("Inner Loop parameters")
         for key, value in self.inner_loop_optimizer.named_parameters():
