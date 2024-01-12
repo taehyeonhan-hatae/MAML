@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-from meta_neural_network_architectures import VGGReLUNormNetwork,ResNet12
+from meta_neural_network_architectures import VGGReLUNormNetwork,ResNet12, StepArbiter
 from inner_loop_optimizers_GR import GradientDescentLearningRule, LSLRGradientDescentLearningRule
 
 from SAM import SAM
@@ -79,13 +79,18 @@ class MAMLFewShotClassifier(nn.Module):
             num_layers = len(names_weights_copy)
             input_dim = num_layers * 2
             output_dim = num_layers
-            self.arbiter = nn.Sequential(
-                nn.Linear(input_dim, input_dim),
-                nn.ReLU(inplace=True),
-                nn.Linear(input_dim, output_dim),
-                ## nn.Softplus(beta=2) # GAP
-                nn.Softplus() # CxGrad
-            ).to(device=self.device)
+            # self.arbiter = nn.Sequential(
+            #     nn.Linear(input_dim, input_dim),
+            #     nn.ReLU(inplace=True),
+            #     nn.Linear(input_dim, output_dim),
+            #     ## nn.Softplus(beta=2) # GAP
+            #     nn.Softplus() # CxGrad
+            # ).to(device=self.device)
+
+
+            self.step_arbiter = StepArbiter(input_dim=input_dim, output_dim=output_dim, args=self.args, device=self.device)
+
+
 
         print("Inner Loop parameters")
         for key, value in self.inner_loop_optimizer.named_parameters():
@@ -280,6 +285,18 @@ class MAMLFewShotClassifier(nn.Module):
         return target_preds.detach() # detach하여 역전파 방지
         # return support_preds.detach(), target_preds.detach() # detach하여 역전파 방지
 
+    def contextual_grad_scaling(self, names_weights_copy ):
+
+        updated_names_weights_copy = dict()
+
+        for key in names_weights_copy.keys():
+            if 'linear' in key:
+                updated_names_weights_copy[key] = names_weights_copy[key]
+            else:
+                updated_names_weights_copy[key] = names_weights_copy[key] / (torch.norm(names_weights_copy[key], p=2) + 1e-12)
+
+        return updated_names_weights_copy
+
     def forward(self, data_batch, epoch, use_second_order, use_multi_step_loss_optimization, num_steps, training_phase, current_iter):
         """
         Runs a forward outer loop pass on the batch of tasks using the MAML/++ framework.
@@ -298,7 +315,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         self.num_classes_per_set = ncs
 
-        task_gradient = []
+        # task_gradient = []
 
         total_losses = []
         total_accuracies = []
@@ -339,6 +356,8 @@ class MAMLFewShotClassifier(nn.Module):
 
             for num_step in range(num_steps):
 
+                # names_weights_copy = self.contextual_grad_scaling(names_weights_copy=names_weights_copy)
+
                 support_loss, support_preds, out_feature_dict  = self.net_forward(
                     x=x_support_set_task,
                     y=y_support_set_task,
@@ -375,7 +394,8 @@ class MAMLFewShotClassifier(nn.Module):
                     per_step_task_embedding = (per_step_task_embedding - per_step_task_embedding.mean()) / (
                                 per_step_task_embedding.std() + 1e-12)
 
-                    generated_gradient_rate = self.arbiter(per_step_task_embedding)
+                    # generated_gradient_rate = self.arbiter(per_step_task_embedding)
+                    generated_gradient_rate = self.step_arbiter(task_state=per_step_task_embedding, num_step=num_step)
 
                     g = 0
                     for key in names_weights_copy.keys():

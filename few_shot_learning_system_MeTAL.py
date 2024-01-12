@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-from meta_neural_network_architectures import VGGReLUNormNetwork, ResNet12, MetaLossNetwork, LossAdapter
+from meta_neural_network_architectures_bak import VGGReLUNormNetwork, ResNet12, MetaLossNetwork, LossAdapter
 from inner_loop_optimizers_MeTAL import LSLRGradientDescentLearningRule
 
 

@@ -1161,290 +1161,50 @@ class ResNet12(nn.Module):
             self.layer_dict['layer{}'.format(i)].restore_backup_stats()
 
 
-
-class MetaCurriculumNetwork(nn.Module):
-    def __init__(self, input_dim, args, device):
-        super(MetaCurriculumNetwork, self).__init__()
-
-        self.device = device
-        self.args = args
-        self.input_dim = input_dim
-        self.input_shape = (1, input_dim)
-
-        self.build_network()
-
-        print("MetaCurriculumNetwork params")
-        for name, param in self.named_parameters():
-            print(name, param.shape)
-
-    def build_network(self):
-
-        x = torch.zeros(self.input_shape)
-        out = x
-
-        self.linear1 = MetaLinearLayer(input_shape=self.input_shape,
-                                       num_filters=self.input_dim, use_bias=True)
-
-        self.linear2 = MetaLinearLayer(input_shape=self.input_shape,
-                                       num_filters=self.input_dim, use_bias=True)
-
-        # self.linear2 = MetaLinearLayer(input_shape=(1, self.input_dim),
-        #                                num_filters=1, use_bias=True)
-
-        out = self.linear1(out)
-        out = F.relu_(out)
-        out = self.linear2(out)
-
-    def forward(self, x, params=None):
-        linear1_params = None
-        linear2_params = None
-
-        if params is not None:
-            params = extract_top_level_dict(current_dict=params)
-
-            linear1_params = params['linear1']
-            linear2_params = params['linear2']
-
-        out = x
-
-        out = self.linear1(out, linear1_params)
-        out = F.relu_(out)
-        out = self.linear2(out, linear2_params)
-
-        return out
-
-
-class MetaStepLossNetwork(nn.Module):
-    def __init__(self, input_dim, args, device):
-        super(MetaStepLossNetwork, self).__init__()
+class Arbiter(nn.Module):
+    def __init__(self, input_dim, output_dim, args, device):
+        super(Arbiter, self).__init__()
 
         self.device = device
         self.args = args
-        self.input_dim = input_dim
-        self.input_shape = (1, input_dim)
-
-        self.build_network()
-        print("(MetaStepLossNetwork) meta network params")
-        for name, param in self.named_parameters():
-            print(name, param.shape)
-
-    def build_network(self):
-        """
-        Builds the network before inference is required by creating some dummy inputs with the same input as the
-        self.im_shape tuple. Then passes that through the network and dynamically computes input shapes and
-        sets output shapes for each layer.
-        """
-        x = torch.zeros(self.input_shape)
-        out = x
-
-        self.linear1 = MetaLinearLayer(input_shape=self.input_shape,
-                                       num_filters=self.input_dim, use_bias=True)
-
-        self.linear2 = MetaLinearLayer(input_shape=(1, self.input_dim),
-                                       num_filters=1, use_bias=True)
-
-        out = self.linear1(out)
-        out = F.relu_(out)
-        out = self.linear2(out)
-
-    def forward(self, x, params=None):
-        """
-        Forward propages through the network. If any params are passed then they are used instead of stored params.
-        :param x: Input image batch.
-        :param num_step: The current inner loop step number
-        :param params: If params are None then internal parameters are used. If params are a dictionary with keys the
-         same as the layer names then they will be used instead.
-        :param training: Whether this is training (True) or eval time.
-        :param backup_running_statistics: Whether to backup the running statistics in their backup store. Which is
-        then used to reset the stats back to a previous state (usually after an eval loop, when we want to throw away stored statistics)
-        :return: Logits of shape b, num_output_classes.
-        """
-
-        linear1_params = None
-        linear2_params = None
-
-        if params is not None:
-            params = extract_top_level_dict(current_dict=params)
-
-            linear1_params = params['linear1']
-            linear2_params = params['linear2']
-
-        out = x
-
-        out = self.linear1(out, linear1_params)
-        out = F.relu_(out)
-        out = self.linear2(out, linear2_params)
-
-        return out
-
-    def zero_grad(self, params=None):
-        if params is None:
-            for param in self.parameters():
-                if param.requires_grad == True:
-                    if param.grad is not None:
-                        if torch.sum(param.grad) > 0:
-                            print(param.grad)
-                            param.grad.zero_()
-        else:
-            for name, param in params.items():
-                if param.requires_grad == True:
-                    if param.grad is not None:
-                        if torch.sum(param.grad) > 0:
-                            print(param.grad)
-                            param.grad.zero_()
-                            params[name].grad = None
-
-    def restore_backup_stats(self):
-        """
-        Reset stored batch statistics from the stored backup.
-        """
-        for i in range(self.num_stages):
-            self.layer_dict['conv{}'.format(i)].restore_backup_stats()
-
-
-class MetaLossNetwork(nn.Module):
-    def __init__(self, input_dim, args, device):
-        """
-        Builds a multilayer convolutional network. It also provides functionality for passing external parameters to be
-        used at inference time. Enables inner loop optimization readily.
-        :param im_shape: The input image batch shape.
-        :param num_output_classes: The number of output classes of the network.
-        :param args: A named tuple containing the system's hyperparameters.
-        :param device: The device to run this on.
-        :param meta_classifier: A flag indicating whether the system's meta-learning (inner-loop) functionalities should
-        be enabled.
-        """
-        super(MetaLossNetwork, self).__init__()
-
-        self.device = device
-        self.args = args
-        self.input_dim = input_dim
-        self.input_shape = (1, input_dim)
-
-        self.num_steps = args.number_of_training_steps_per_iter  # number of inner-loop steps
-
-        self.build_network()
-        print("(MetaLossNetwork) meta network params")
-        for name, param in self.named_parameters():
-            print(name, param.shape)
-
-    def build_network(self):
-        """
-        Builds the network before inference is required by creating some dummy inputs with the same input as the
-        self.im_shape tuple. Then passes that through the network and dynamically computes input shapes and
-        sets output shapes for each layer.
-        """
-        x = torch.zeros(self.input_shape)
-        self.layer_dict = nn.ModuleDict()
-
-        for i in range(self.num_steps):
-            self.layer_dict['step{}'.format(i)] = MetaStepLossNetwork(self.input_dim, args=self.args,
-                                                                      device=self.device)
-
-            out = self.layer_dict['step{}'.format(i)](x)
-
-    def forward(self, x, num_step, params=None):
-        """
-        Forward propages through the network. If any params are passed then they are used instead of stored params.
-        :param x: Input image batch.
-        :param num_step: The current inner loop step number
-        :param params: If params are None then internal parameters are used. If params are a dictionary with keys the
-         same as the layer names then they will be used instead.
-        :param training: Whether this is training (True) or eval time.
-        :param backup_running_statistics: Whether to backup the running statistics in their backup store. Which is
-        then used to reset the stats back to a previous state (usually after an eval loop, when we want to throw away stored statistics)
-        :return: Logits of shape b, num_output_classes.
-        """
-        param_dict = dict()
-
-        if params is not None:
-            params = {key: value[0] for key, value in params.items()}
-            param_dict = extract_top_level_dict(current_dict=params)
-
-        for name, param in self.layer_dict.named_parameters():
-            path_bits = name.split(".")
-            layer_name = path_bits[0]
-            if layer_name not in param_dict:
-                param_dict[layer_name] = None
-
-        out = x
-
-        out = self.layer_dict['step{}'.format(num_step)](out, param_dict['step{}'.format(num_step)])
-
-        return out
-
-    def zero_grad(self, params=None):
-        if params is None:
-            for param in self.parameters():
-                if param.requires_grad == True:
-                    if param.grad is not None:
-                        if torch.sum(param.grad) > 0:
-                            print(param.grad)
-                            param.grad.zero_()
-        else:
-            for name, param in params.items():
-                if param.requires_grad == True:
-                    if param.grad is not None:
-                        if torch.sum(param.grad) > 0:
-                            print(param.grad)
-                            param.grad.zero_()
-                            params[name].grad = None
-
-    def restore_backup_stats(self):
-        """
-        Reset stored batch statistics from the stored backup.
-        """
-        for i in range(self.num_stages):
-            self.layer_dict['conv{}'.format(i)].restore_backup_stats()
-
-
-class StepLossAdapter(nn.Module):
-    def __init__(self, input_dim, num_loss_net_layers, args, device):
-        super(StepLossAdapter, self).__init__()
-
-        self.device = device
-        self.args = args
-        output_dim = num_loss_net_layers * 2 * 2  # 2 for weight and bias, another 2 for multiplier and offset
 
         self.linear1 = nn.Linear(input_dim, input_dim)
-        self.activation = nn.ReLU(inplace=True)
+        self.activation1 = nn.ReLU(inplace=True)
         self.linear2 = nn.Linear(input_dim, output_dim)
+        self.activation2 = nn.Softplus()
 
-        self.multiplier_bias = nn.Parameter(torch.zeros(output_dim // 2))
-        self.offset_bias = nn.Parameter(torch.zeros(output_dim // 2))
-
-    def forward(self, task_state, num_step, loss_params):
+    def forward(self, task_state):
 
         out = self.linear1(task_state)
-        out = F.relu_(out)
+        out = self.activation1(out)
         out = self.linear2(out)
+        out = self.activation2(out)
 
-        generated_multiplier, generated_offset = torch.chunk(out, chunks=2, dim=-1)
-
-        i = 0
-        updated_loss_weights = dict()
-        for key, val in loss_params.items():
-            if 'step{}'.format(num_step) in key:
-                updated_loss_weights[key] = (1 + self.multiplier_bias[i] * generated_multiplier[i]) * val + \
-                                            self.offset_bias[i] * generated_offset[i]
-                i += 1
-
-        return updated_loss_weights
+        return out
 
 
-class LossAdapter(nn.Module):
-    def __init__(self, input_dim, num_loss_net_layers, args, device):
-        super(LossAdapter, self).__init__()
+class StepArbiter(nn.Module):
+    def __init__(self, input_dim, output_dim, args, device):
+        super(StepArbiter, self).__init__()
 
-        self.device = device
+        self.input_dim = input_dim
+        self.output_dim = output_dim
         self.args = args
-
+        self.device = device
         self.num_steps = args.number_of_training_steps_per_iter  # number of inner-loop steps
 
-        self.loss_adapter = nn.ModuleList()
-        for i in range(self.num_steps):
-            self.loss_adapter.append(StepLossAdapter(input_dim, num_loss_net_layers, args=args, device=device))
+        self.step_arbiter = nn.ModuleList()
+        self.build_network()
 
-    def forward(self, task_state, num_step, loss_params):
-        return self.loss_adapter[num_step](task_state, num_step, loss_params)
+        print("Arbiter per step parameter")
+        for name, param in self.named_parameters():
+            print(name, param.shape)
+
+    def build_network(self):
+
+        for i in range(self.num_steps):
+            self.step_arbiter.append(Arbiter(self.input_dim, self.output_dim, args=self.args, device=self.device))
+
+    def forward(self, task_state, num_step):
+        return self.step_arbiter[num_step](task_state)
 
