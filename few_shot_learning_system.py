@@ -164,7 +164,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         return param_dict
 
-    def apply_inner_loop_update(self, loss, names_weights_copy, out_feature_dict, alpha, use_second_order, current_step_idx, current_iter, training_phase):
+    def apply_inner_loop_update(self, loss, names_weights_copy, alpha, use_second_order, current_step_idx, current_iter, training_phase):
         """
         Applies an inner loop update given current step's loss, the weights to update, a flag indicating whether to use
         second order derivatives and the current step's index.
@@ -196,7 +196,6 @@ class MAMLFewShotClassifier(nn.Module):
 
         names_weights_copy = self.inner_loop_optimizer.update_params(names_weights_dict=names_weights_copy,
                                                                      names_grads_wrt_params_dict=names_grads_copy,
-                                                                     out_feature_dict=out_feature_dict,
                                                                      generated_alpha_params=alpha,
                                                                      num_step=current_step_idx,
                                                                      current_iter=current_iter,
@@ -260,7 +259,7 @@ class MAMLFewShotClassifier(nn.Module):
         # )
 
         ## Query Set에 대한 Soft target 생성
-        taget_loss, target_preds, out_feature_dict = self.net_forward(
+        taget_loss, target_preds = self.net_forward(
             x=x_target_set_task,
             y=y_target_set_task,
             weights=names_weights_copy,
@@ -347,7 +346,7 @@ class MAMLFewShotClassifier(nn.Module):
 
                 # names_weights_copy = self.contextual_grad_scaling(names_weights_copy=names_weights_copy)
 
-                support_loss, support_preds, out_feature_dict  = self.net_forward(
+                support_loss, support_preds  = self.net_forward(
                     x=x_support_set_task,
                     y=y_support_set_task,
                     weights=names_weights_copy,
@@ -394,7 +393,6 @@ class MAMLFewShotClassifier(nn.Module):
 
                 names_weights_copy = self.apply_inner_loop_update(loss=support_loss,
                                                                   names_weights_copy=names_weights_copy,
-                                                                  out_feature_dict=out_feature_dict,
                                                                   alpha=generated_alpha_params,
                                                                   use_second_order=use_second_order,
                                                                   current_step_idx=num_step,
@@ -402,14 +400,14 @@ class MAMLFewShotClassifier(nn.Module):
                                                                   training_phase=training_phase)
 
                 if use_multi_step_loss_optimization and training_phase and epoch < self.args.multi_step_loss_num_epochs:
-                    target_loss, target_preds, _ = self.net_forward(x=x_target_set_task,
+                    target_loss, target_preds = self.net_forward(x=x_target_set_task,
                                                                  y=y_target_set_task, weights=names_weights_copy,
                                                                  backup_running_statistics=False, training=True,
                                                                  num_step=num_step)
 
                     task_losses.append(per_step_loss_importance_vectors[num_step] * target_loss)
                 elif num_step == (self.args.number_of_training_steps_per_iter - 1):
-                    target_loss, target_preds, _ = self.net_forward(x=x_target_set_task,
+                    target_loss, target_preds = self.net_forward(x=x_target_set_task,
                                                                  y=y_target_set_task, weights=names_weights_copy,
                                                                  backup_running_statistics=False, training=True,
                                                                  num_step=num_step, training_phase=training_phase,
@@ -472,7 +470,7 @@ class MAMLFewShotClassifier(nn.Module):
         :return: the crossentropy losses with respect to the given y, the predictions of the base model.
         """
 
-        preds, out_feature_dict = self.classifier.forward(x=x, params=weights,
+        preds = self.classifier.forward(x=x, params=weights,
                                         training=training,
                                         backup_running_statistics=backup_running_statistics, num_step=num_step)
 
@@ -494,7 +492,7 @@ class MAMLFewShotClassifier(nn.Module):
         else:
             loss = F.cross_entropy(input=preds, target=y)
 
-        return loss, preds, out_feature_dict
+        return loss, preds
 
     def trainable_parameters(self):
         """

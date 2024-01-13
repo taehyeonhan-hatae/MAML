@@ -45,7 +45,7 @@ class GradientDescentLearningRule(nn.Module):
         self.norm_information = {}
         self.innerloop_excel = True
 
-    def update_params(self, names_weights_dict, names_grads_wrt_params_dict, out_feature_dict, generated_alpha_params, num_step, current_iter, training_phase):
+    def update_params(self, names_weights_dict, names_grads_wrt_params_dict, generated_alpha_params, num_step, current_iter, training_phase):
         """Applies a single gradient descent update to all parameters.
         All parameter updates are performed using in-place operations and so
         nothing is returned.
@@ -65,9 +65,6 @@ class GradientDescentLearningRule(nn.Module):
             self.norm_information["phase"] = "val"
 
         self.norm_information['num_step'] = num_step
-
-        for key, value in out_feature_dict.items():
-            self.norm_information[key + "_feature_L2norm"] = torch.norm(out_feature_dict[key], p=2).item()
 
         for key in names_grads_wrt_params_dict.keys():
 

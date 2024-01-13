@@ -962,8 +962,6 @@ class VGGReLUNormNetwork(nn.Module):
 
         out = x
 
-        out_feature_dict = dict()
-
         for i in range(self.num_stages):
             out = self.layer_dict['conv{}'.format(i)](out, params=param_dict['conv{}'.format(i)], training=training,
                                                       backup_running_statistics=backup_running_statistics,
@@ -971,8 +969,6 @@ class VGGReLUNormNetwork(nn.Module):
 
             if self.args.max_pooling:
                 out = F.max_pool2d(input=out, kernel_size=(2, 2), stride=2, padding=0)
-
-            out_feature_dict['layer_dict.conv{}'.format(i)] = out
 
         if not self.args.max_pooling:
             out = F.avg_pool2d(out, out.shape[2])
@@ -984,9 +980,7 @@ class VGGReLUNormNetwork(nn.Module):
 
         out = self.layer_dict['linear'](out, param_dict['linear'])
 
-        out_feature_dict['layer_dict.linear'] = out
-
-        return out, out_feature_dict
+        return out
 
     def re_init(self):
         # for param in self.parameters():
