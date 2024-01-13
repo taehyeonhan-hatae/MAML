@@ -10,7 +10,6 @@ from meta_neural_network_architectures import VGGReLUNormNetwork,ResNet12, StepA
 from inner_loop_optimizers_GR import GradientDescentLearningRule, LSLRGradientDescentLearningRule
 
 from SAM import SAM
-from GSAM_Scheduler import LinearScheduler, CosineScheduler, ProportionScheduler
 
 from timm.loss import LabelSmoothingCrossEntropy
 from loss import knowledge_distillation_loss
@@ -216,7 +215,6 @@ class MAMLFewShotClassifier(nn.Module):
         losses['loss'] = torch.mean(torch.stack(total_losses))
         losses['accuracy'] = np.mean(total_accuracies)
 
-        # ## cos 값이 0~1일때만 penalty를 줄까?
         # task1_gradient = task_gradients[0]['layer_dict.conv3.conv.weight']
         # task2_gradient = task_gradients[1]['layer_dict.conv3.conv.weight']
         #
@@ -226,14 +224,14 @@ class MAMLFewShotClassifier(nn.Module):
         #
         # cosine_similarity = F.cosine_similarity(task1_gradient, task2_gradient)
         #
-        # # ## 두 벡터의 내적
-        # # # gradient_dot_product = torch.matmul(task1_gradient, task2_gradient)
-        # # # print("두 그래디언트 텐서의 내적:", gradient_dot_product)
+        # ## 두 벡터의 내적
+        # gradient_dot_product = torch.matmul(task1_gradient, task2_gradient)
+        # print("두 그래디언트 텐서의 내적:", gradient_dot_product)
         #
         # if cosine_similarity > 0:
-        #     losses['loss'] = torch.mean(torch.stack(total_losses)) + cosine_similarity
-        # else:
         #     losses['loss'] = torch.mean(torch.stack(total_losses))
+        # else:
+        #     losses['loss'] = torch.mean(torch.stack(total_losses)) + cosine_similarity
         #
         # losses['accuracy'] = np.mean(total_accuracies)
 
@@ -303,7 +301,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         self.num_classes_per_set = ncs
 
-        # task_gradient = []
+        # task_gradients = []
 
         total_losses = []
         total_accuracies = []
@@ -426,7 +424,7 @@ class MAMLFewShotClassifier(nn.Module):
                     # target_loss_grad = torch.autograd.grad(target_loss, names_weights_copy.values(), retain_graph=True)
                     # target_grads_copy = dict(zip(names_weights_copy.keys(), target_loss_grad))
                     #
-                    # task_gradient.append(target_grads_copy)
+                    # task_gradients.append(target_grads_copy)
 
                     task_losses.append(target_loss)
             ## Inner-loop END
@@ -556,7 +554,7 @@ class MAMLFewShotClassifier(nn.Module):
             #     if param.requires_grad:
             #         prev_weight_norm[name] = torch.norm(param.data)
 
-            self.optimizer.second_step(zero_grad=True, balance=0.7)
+            self.optimizer.second_step(zero_grad=True)
 
         # if 'imagenet' in self.args.dataset_name:
         #     for name, param in self.classifier.named_parameters():
