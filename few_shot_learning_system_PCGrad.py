@@ -13,6 +13,7 @@ from SAM import SAM
 
 from timm.loss import LabelSmoothingCrossEntropy
 from loss import knowledge_distillation_loss
+from mtl import PCGrad
 
 
 def set_torch_seed(seed):
@@ -205,35 +206,36 @@ class MAMLFewShotClassifier(nn.Module):
 
         return names_weights_copy
 
-    def get_across_task_loss_metrics(self, total_losses, total_accuracies, task_gradients):
+    def get_across_task_loss_metrics(self, total_losses, total_accuracies):
 
         losses = dict()
 
         # losses['loss'] = torch.mean(torch.stack(total_losses))
-        # losses['accuracy'] = np.mean(total_accuracies)
-
-        task1_gradient = task_gradients[0]['layer_dict.conv3.conv.weight'].detach().clone()
-        task2_gradient = task_gradients[1]['layer_dict.conv3.conv.weight'].detach().clone()
-
-        # # 각 텐서를 벡터로 평탄화(flatten)
-        task1_gradient = task1_gradient.view(task1_gradient.size(0), -1)
-        task2_gradient = task2_gradient.view(task2_gradient.size(0), -1)
-
-        ## 두 그래디언트 cosine 유사도:
-        cosine_similarity = F.cosine_similarity(task1_gradient, task2_gradient)
-
-        ## 두 벡터의 내적
-        gradient_dot_product = torch.dot(task1_gradient.flatten(), task2_gradient.flatten())
-
-        # # print("두 그래디언트 cosine 유사도: ", cosine_similarity)
-        # # print("두 그래디언트 텐서의 내적: ", gradient_dot_product)
-
-        if cosine_similarity > 0:
-            losses['loss'] = torch.mean(torch.stack(total_losses))
-        else:
-            losses['loss'] = torch.mean(torch.stack(total_losses)) + gradient_dot_product
-
+        losses['loss'] = total_losses
         losses['accuracy'] = np.mean(total_accuracies)
+
+        # task1_gradient = task_gradients[0]['layer_dict.conv3.conv.weight'].detach().clone()
+        # task2_gradient = task_gradients[1]['layer_dict.conv3.conv.weight'].detach().clone()
+        #
+        # # # 각 텐서를 벡터로 평탄화(flatten)
+        # task1_gradient = task1_gradient.view(task1_gradient.size(0), -1)
+        # task2_gradient = task2_gradient.view(task2_gradient.size(0), -1)
+        #
+        # ## 두 그래디언트 cosine 유사도:
+        # cosine_similarity = F.cosine_similarity(task1_gradient, task2_gradient)
+        #
+        # ## 두 벡터의 내적
+        # gradient_dot_product = torch.dot(task1_gradient.flatten(), task2_gradient.flatten())
+        #
+        # # # print("두 그래디언트 cosine 유사도: ", cosine_similarity)
+        # # # print("두 그래디언트 텐서의 내적: ", gradient_dot_product)
+        #
+        # if cosine_similarity > 0:
+        #     losses['loss'] = torch.mean(torch.stack(total_losses))
+        # else:
+        #     losses['loss'] = torch.mean(torch.stack(total_losses)) + gradient_dot_product
+        #
+        # losses['accuracy'] = np.mean(total_accuracies)
 
         return losses
 
@@ -420,9 +422,9 @@ class MAMLFewShotClassifier(nn.Module):
                     #
                     # target_loss = target_loss + lambda_diff * classifier_diff
 
-                    target_loss_grad = torch.autograd.grad(target_loss, names_weights_copy.values(), retain_graph=True)
-                    target_grads_copy = dict(zip(names_weights_copy.keys(), target_loss_grad))
-                    task_gradients.append(target_grads_copy)
+                    # target_loss_grad = torch.autograd.grad(target_loss, names_weights_copy.values(), retain_graph=True)
+                    # target_grads_copy = dict(zip(names_weights_copy.keys(), target_loss_grad))
+                    # task_gradients.append(target_grads_copy)
                     # task_gradients.append(target_loss_grad)
 
                     task_losses.append(target_loss)
@@ -444,8 +446,7 @@ class MAMLFewShotClassifier(nn.Module):
                 self.classifier.restore_backup_stats()
 
         losses = self.get_across_task_loss_metrics(total_losses=total_losses,
-                                                   total_accuracies=total_accuracies,
-                                                   task_gradients=task_gradients)
+                                                   total_accuracies=total_accuracies)
 
         for idx, item in enumerate(per_step_loss_importance_vectors):
             losses['loss_importance_vector_{}'.format(idx)] = item.detach().cpu().numpy()
@@ -542,12 +543,70 @@ class MAMLFewShotClassifier(nn.Module):
         # for name, param in self.step_arbiter.named_parameters():
         #     prev_weights[name] = param.data.clone()
 
-        loss.backward()
+        # loss.backward()
 
         if first_step:
+
+            loss[0].backward()
+            task_0_grad = []
+            for name, param in self.named_parameters():
+                if param.requires_grad:
+                    task_0_grad.append(param.grad.detach().data.clone())
+                    param.grad.zero_()
+
+            # param.grad.zero_() 동작확인
+            # for name, param in self.named_parameters():
+            #     if param.requires_grad:
+            #         print(param.grad)
+
+            loss[1].backward()
+            task_1_grad = []
+            for name, param in self.named_parameters():
+                if param.requires_grad:
+                    task_1_grad.append(param.grad.detach().data.clone())
+                    param.grad.zero_()
+
+            shared_grad = PCGrad([task_0_grad, task_1_grad])
+
+            index_shared_grad = 0
+            for name, param in self.named_parameters():
+                if param.requires_grad:
+                    param.grad.data = shared_grad[index_shared_grad]
+                    # print(param.grad)
+                    index_shared_grad += 1
+
             self.optimizer.first_step(zero_grad=True)
         else:
             # balance = epoch / self.args.total_epochs
+
+            loss[0].backward()
+            task_0_grad = []
+            for name, param in self.named_parameters():
+                if param.requires_grad:
+                    task_0_grad.append(param.grad.detach().data.clone())
+                    param.grad.zero_()
+
+            # param.grad.zero_() 동작확인->정상
+            # for name, param in self.named_parameters():
+            #     if param.requires_grad:
+            #         print(param.grad)
+
+            loss[1].backward()
+            task_1_grad = []
+            for name, param in self.named_parameters():
+                if param.requires_grad:
+                    task_1_grad.append(param.grad.detach().data.clone())
+                    param.grad.zero_()
+
+            shared_grad = PCGrad([task_0_grad, task_1_grad])
+
+            index_shared_grad = 0
+            for name, param in self.named_parameters():
+                if param.requires_grad:
+                    param.grad.data = shared_grad[index_shared_grad]
+                    # print(param.grad)
+                    index_shared_grad += 1
+
             self.optimizer.second_step(zero_grad=True)
 
         # if 'imagenet' in self.args.dataset_name:
@@ -597,11 +656,19 @@ class MAMLFewShotClassifier(nn.Module):
 
         losses_1, per_task_target_preds_1 = self.train_forward_prop(data_batch=data_batch, epoch=epoch, current_iter=current_iter)
 
+        # print("losses_1['loss'] == ", losses_1['loss'])
+
         self.meta_update(loss=losses_1['loss'], current_iter=current_iter, first_step=True, epoch=epoch)
+
+        # 추가
+        losses_1['loss'] = torch.mean(torch.stack(losses_1['loss']))
 
         losses, per_task_target_preds = self.train_forward_prop(data_batch=data_batch, epoch=epoch, current_iter=current_iter)
 
         self.meta_update(loss=losses['loss'], current_iter=current_iter, first_step=False, epoch=epoch)
+
+        # 추가
+        losses['loss'] = torch.mean(torch.stack(losses['loss']))
 
         losses['learning_rate'] = self.scheduler.get_lr()[0]
 
@@ -609,7 +676,6 @@ class MAMLFewShotClassifier(nn.Module):
         self.zero_grad()
 
         return losses, per_task_target_preds
-        #return losses_1, per_task_target_preds_1
 
     def run_validation_iter(self, data_batch, current_iter):
         """
@@ -632,6 +698,9 @@ class MAMLFewShotClassifier(nn.Module):
         data_batch = (x_support_set, x_target_set, y_support_set, y_target_set)
 
         losses, per_task_target_preds = self.evaluation_forward_prop(data_batch=data_batch, epoch=self.current_epoch, current_iter=current_iter)
+
+        # 추가
+        losses['loss'] = torch.mean(torch.stack(losses['loss']))
 
         losses['loss'].backward() # uncomment if you get the weird memory error
         self.zero_grad()
