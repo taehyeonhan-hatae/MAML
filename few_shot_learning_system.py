@@ -229,9 +229,9 @@ class MAMLFewShotClassifier(nn.Module):
         # # print("두 그래디언트 텐서의 내적: ", gradient_dot_product)
 
         if cosine_similarity > 0:
-            losses['loss'] = torch.mean(torch.stack(total_losses)) + gradient_dot_product
-        else:
             losses['loss'] = torch.mean(torch.stack(total_losses))
+        else:
+            losses['loss'] = torch.mean(torch.stack(total_losses)) + gradient_dot_product
 
         losses['accuracy'] = np.mean(total_accuracies)
 
