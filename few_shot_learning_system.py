@@ -212,8 +212,13 @@ class MAMLFewShotClassifier(nn.Module):
         # losses['loss'] = torch.mean(torch.stack(total_losses))
         # losses['accuracy'] = np.mean(total_accuracies)
 
-        task1_gradient = task_gradients[0]['layer_dict.conv3.conv.weight'].detach().clone()
-        task2_gradient = task_gradients[1]['layer_dict.conv3.conv.weight'].detach().clone()
+        # detach, clone 둘다?
+        # task1_gradient = task_gradients[0]['layer_dict.conv3.conv.weight'].detach().clone()
+        # task2_gradient = task_gradients[1]['layer_dict.conv3.conv.weight'].detach().clone()
+
+        # clone만?
+        task1_gradient = task_gradients[0]['layer_dict.conv3.conv.weight'].clone()
+        task2_gradient = task_gradients[1]['layer_dict.conv3.conv.weight'].clone()
 
         # # 각 텐서를 벡터로 평탄화(flatten)
         task1_gradient = task1_gradient.view(task1_gradient.size(0), -1)
