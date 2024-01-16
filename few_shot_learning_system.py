@@ -213,12 +213,12 @@ class MAMLFewShotClassifier(nn.Module):
         # losses['accuracy'] = np.mean(total_accuracies)
 
         # detach, clone 둘다?
-        # task1_gradient = task_gradients[0]['layer_dict.conv3.conv.weight'].detach().clone()
-        # task2_gradient = task_gradients[1]['layer_dict.conv3.conv.weight'].detach().clone()
+        task1_gradient = task_gradients[0]['layer_dict.conv3.conv.weight'].detach().clone()
+        task2_gradient = task_gradients[1]['layer_dict.conv3.conv.weight'].detach().clone()
 
         # clone만?
-        task1_gradient = task_gradients[0]['layer_dict.conv3.conv.weight'].clone()
-        task2_gradient = task_gradients[1]['layer_dict.conv3.conv.weight'].clone()
+        # task1_gradient = task_gradients[0]['layer_dict.conv3.conv.weight'].clone()
+        # task2_gradient = task_gradients[1]['layer_dict.conv3.conv.weight'].clone()
 
         # # 각 텐서를 벡터로 평탄화(flatten)
         task1_gradient = task1_gradient.view(task1_gradient.size(0), -1)
@@ -230,14 +230,22 @@ class MAMLFewShotClassifier(nn.Module):
         ## 두 벡터의 내적
         gradient_dot_product = torch.dot(task1_gradient.flatten(), task2_gradient.flatten())
 
-        # # print("두 그래디언트 cosine 유사도: ", cosine_similarity)
-        # # print("두 그래디언트 텐서의 내적: ", gradient_dot_product)
+        # print("두 그래디언트 cosine 유사도: ", cosine_similarity)
+        # print("두 그래디언트 텐서의 내적: ", gradient_dot_product)
 
-        if cosine_similarity > 0:
-            losses['loss'] = torch.mean(torch.stack(total_losses))
-        else:
-            losses['loss'] = torch.mean(torch.stack(total_losses)) + gradient_dot_product
+        # if cosine_similarity > 0:
+        #     losses['loss'] = torch.mean(torch.stack(total_losses))
+        # else:
+        #     losses['loss'] = torch.mean(torch.stack(total_losses)) + gradient_dot_product
+        #     # losses['loss'] = torch.mean(torch.stack(total_losses)) - gradient_dot_product로 해야하는데..
 
+        losses['loss'] = torch.mean(torch.stack(total_losses)) - gradient_dot_product
+        # losses['loss'] = torch.mean(torch.stack(total_losses)) - cosine_similarity
+
+        # cosine_similarity 유사도의 조건문을 버리고 아래와 같이 하는게 어떨까?
+        # LEARNING TO LEARN WITHOUT FORGETTING BY MAXIMIZING TRANSFER AND MINIMIZING INTERFERENCE (MER)
+        # losses['loss'] = torch.mean(torch.stack(total_losses)) - gradient_dot_product
+        # (or) losses['loss'] = torch.mean(torch.stack(total_losses)) + gradient_dot_product 반대로 적용하는게 더 나을 수도 있다
         losses['accuracy'] = np.mean(total_accuracies)
 
         return losses
