@@ -547,65 +547,96 @@ class MAMLFewShotClassifier(nn.Module):
 
         if first_step:
 
-            loss[0].backward()
-            task_0_grad = []
+            loss[0].backward(retain_graph=True)
+            task0_backbone_grad = []
+            task0_arbiter_grad = []
             for name, param in self.named_parameters():
                 if param.requires_grad:
-                    task_0_grad.append(param.grad.detach().data.clone())
+                    if 'classifier' in name:
+                        if not 'linear' in name:    # backbone layer
+                            task0_backbone_grad.append(param.grad.detach().data.clone())
+                    elif 'arbiter' in name:         # arbiter
+                        task0_arbiter_grad.append(param.grad.detach().data.clone())
                     param.grad.zero_()
 
-            # param.grad.zero_() 동작확인
-            # for name, param in self.named_parameters():
-            #     if param.requires_grad:
-            #         print(param.grad)
-
-            loss[1].backward()
-            task_1_grad = []
+            loss[1].backward(retain_graph=True)
+            task1_linear_grad = []
+            task1_backbone_grad = []
+            task1_arbiter_grad = []
             for name, param in self.named_parameters():
                 if param.requires_grad:
-                    task_1_grad.append(param.grad.detach().data.clone())
+                    if 'classifier' in name:
+                        if not 'linear' in name:  # backbone layer
+                            task1_backbone_grad.append(param.grad.detach().data.clone())
+                    elif 'arbiter' in name:  # arbiter
+                        task1_arbiter_grad.append(param.grad.detach().data.clone())
                     param.grad.zero_()
 
-            shared_grad = PCGrad([task_0_grad, task_1_grad])
+            # linear layer에는 PCGrad를 적용하지 않고 Average Gradient로 한다
+            average_loss = torch.mean(torch.stack(loss))
+            average_loss.backward()
 
-            index_shared_grad = 0
+            backbone_grad = PCGrad([task0_backbone_grad, task1_backbone_grad])
+            arbiter_grad =  PCGrad([task0_arbiter_grad, task1_arbiter_grad])
+
+            index_backbone_grad = 0
+            index_arbiter_grad = 0
             for name, param in self.named_parameters():
                 if param.requires_grad:
-                    param.grad.data = shared_grad[index_shared_grad]
-                    # print(param.grad)
-                    index_shared_grad += 1
+                    if 'classifier' in name:
+                        if not 'linear' in name:  # backbone layer
+                            param.grad.data = backbone_grad[index_backbone_grad]
+                            index_backbone_grad += 1
+                    elif 'arbiter' in name:     # arbiter layer
+                        param.grad.data = arbiter_grad[index_arbiter_grad]
+                        index_arbiter_grad += 1
 
             self.optimizer.first_step(zero_grad=True)
         else:
-            # balance = epoch / self.args.total_epochs
 
-            loss[0].backward()
-            task_0_grad = []
+            loss[0].backward(retain_graph=True)
+            task0_backbone_grad = []
+            task0_arbiter_grad = []
             for name, param in self.named_parameters():
                 if param.requires_grad:
-                    task_0_grad.append(param.grad.detach().data.clone())
+                    if 'classifier' in name:
+                        if not 'linear' in name:  # backbone layer
+                            task0_backbone_grad.append(param.grad.detach().data.clone())
+                    elif 'arbiter' in name:  # arbiter
+                        task0_arbiter_grad.append(param.grad.detach().data.clone())
                     param.grad.zero_()
 
-            # param.grad.zero_() 동작확인->정상
-            # for name, param in self.named_parameters():
-            #     if param.requires_grad:
-            #         print(param.grad)
-
-            loss[1].backward()
-            task_1_grad = []
+            loss[1].backward(retain_graph=True)
+            task1_linear_grad = []
+            task1_backbone_grad = []
+            task1_arbiter_grad = []
             for name, param in self.named_parameters():
                 if param.requires_grad:
-                    task_1_grad.append(param.grad.detach().data.clone())
+                    if 'classifier' in name:
+                        if not 'linear' in name:  # backbone layer
+                            task1_backbone_grad.append(param.grad.detach().data.clone())
+                    elif 'arbiter' in name:  # arbiter
+                        task1_arbiter_grad.append(param.grad.detach().data.clone())
                     param.grad.zero_()
 
-            shared_grad = PCGrad([task_0_grad, task_1_grad])
+            # linear layer에는 PCGrad를 적용하지 않는다
+            average_loss = torch.mean(torch.stack(loss))
+            average_loss.backward()
 
-            index_shared_grad = 0
+            backbone_grad = PCGrad([task0_backbone_grad, task1_backbone_grad])
+            arbiter_grad = PCGrad([task0_arbiter_grad, task1_arbiter_grad])
+
+            index_backbone_grad = 0
+            index_arbiter_grad = 0
             for name, param in self.named_parameters():
                 if param.requires_grad:
-                    param.grad.data = shared_grad[index_shared_grad]
-                    # print(param.grad)
-                    index_shared_grad += 1
+                    if 'classifier' in name:
+                        if not 'linear' in name:  # backbone layer
+                            param.grad.data = backbone_grad[index_backbone_grad]
+                            index_backbone_grad += 1
+                    elif 'arbiter' in name:  # arbiter layer
+                        param.grad.data = arbiter_grad[index_arbiter_grad]
+                        index_arbiter_grad += 1
 
             self.optimizer.second_step(zero_grad=True)
 
