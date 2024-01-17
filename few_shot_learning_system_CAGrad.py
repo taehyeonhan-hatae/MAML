@@ -13,7 +13,7 @@ from SAM import SAM
 
 from timm.loss import LabelSmoothingCrossEntropy
 from loss import knowledge_distillation_loss
-from mtl import PCGrad
+from mtl import CAGrad
 
 
 def set_torch_seed(seed):
@@ -548,95 +548,69 @@ class MAMLFewShotClassifier(nn.Module):
         if first_step:
 
             loss[0].backward()
-            task0_backbone_grad = []
-            task0_arbiter_grad = []
+            task_0_grad = []
             for name, param in self.named_parameters():
                 if param.requires_grad:
-                    if 'classifier' in name:
-                        if not 'linear' in name:    # backbone layer
-                            task0_backbone_grad.append(param.grad.detach().data.clone())
-                    elif 'arbiter' in name:         # arbiter
-                        task0_arbiter_grad.append(param.grad.detach().data.clone())
+                    task_0_grad.append(param.grad.detach().data.clone().flatten())
                     param.grad.zero_()
+
+            task_0_grad = torch.cat(task_0_grad, dim=0)
 
             loss[1].backward()
-            task1_linear_grad = []
-            task1_backbone_grad = []
-            task1_arbiter_grad = []
+            task_1_grad = []
             for name, param in self.named_parameters():
                 if param.requires_grad:
-                    if 'classifier' in name:
-                        if not 'linear' in name:  # backbone layer
-                            task1_backbone_grad.append(param.grad.detach().data.clone())
-                    elif 'arbiter' in name:  # arbiter
-                        task1_arbiter_grad.append(param.grad.detach().data.clone())
+                    task_1_grad.append(param.grad.detach().data.clone().flatten())
                     param.grad.zero_()
 
-            # linear layer에는 PCGrad를 적용하지 않고 Average Gradient로 한다
-            # average_loss = torch.mean(torch.stack(loss))
-            # average_loss.backward()
+            task_1_grad = torch.cat(task_1_grad, dim=0)
 
-            backbone_grad = PCGrad([task0_backbone_grad, task1_backbone_grad])
-            arbiter_grad =  PCGrad([task0_arbiter_grad, task1_arbiter_grad])
+            shared_grad = CAGrad(
+                torch.stack([task_0_grad, task_1_grad]), 0.4
+            )
 
-            index_backbone_grad = 0
-            index_arbiter_grad = 0
+            total_length = 0
             for name, param in self.named_parameters():
                 if param.requires_grad:
-                    if 'classifier' in name:
-                        if not 'linear' in name:  # backbone layer
-                            param.grad.data = backbone_grad[index_backbone_grad]
-                            index_backbone_grad += 1
-                    elif 'arbiter' in name:     # arbiter layer
-                        param.grad.data = arbiter_grad[index_arbiter_grad]
-                        index_arbiter_grad += 1
+                    length = param.numel()
+                    param.grad.data = shared_grad[
+                                      total_length: total_length + length
+                                      ].reshape(param.shape)
+                    total_length += length
 
             self.optimizer.first_step(zero_grad=True)
         else:
 
             loss[0].backward()
-            task0_backbone_grad = []
-            task0_arbiter_grad = []
+            task_0_grad = []
             for name, param in self.named_parameters():
                 if param.requires_grad:
-                    if 'classifier' in name:
-                        if not 'linear' in name:  # backbone layer
-                            task0_backbone_grad.append(param.grad.detach().data.clone())
-                    elif 'arbiter' in name:  # arbiter
-                        task0_arbiter_grad.append(param.grad.detach().data.clone())
+                    task_0_grad.append(param.grad.detach().data.clone().flatten())
                     param.grad.zero_()
+
+            task_0_grad = torch.cat(task_0_grad, dim=0)
 
             loss[1].backward()
-            task1_linear_grad = []
-            task1_backbone_grad = []
-            task1_arbiter_grad = []
+            task_1_grad = []
             for name, param in self.named_parameters():
                 if param.requires_grad:
-                    if 'classifier' in name:
-                        if not 'linear' in name:  # backbone layer
-                            task1_backbone_grad.append(param.grad.detach().data.clone())
-                    elif 'arbiter' in name:  # arbiter
-                        task1_arbiter_grad.append(param.grad.detach().data.clone())
+                    task_1_grad.append(param.grad.detach().data.clone().flatten())
                     param.grad.zero_()
 
-            # linear layer에는 PCGrad를 적용하지 않는다
-            # average_loss = torch.mean(torch.stack(loss))
-            # average_loss.backward()
+            task_1_grad = torch.cat(task_1_grad, dim=0)
 
-            backbone_grad = PCGrad([task0_backbone_grad, task1_backbone_grad])
-            arbiter_grad = PCGrad([task0_arbiter_grad, task1_arbiter_grad])
+            shared_grad = CAGrad(
+                torch.stack([task_0_grad, task_1_grad]), 0.4
+            )
 
-            index_backbone_grad = 0
-            index_arbiter_grad = 0
+            total_length = 0
             for name, param in self.named_parameters():
                 if param.requires_grad:
-                    if 'classifier' in name:
-                        if not 'linear' in name:  # backbone layer
-                            param.grad.data = backbone_grad[index_backbone_grad]
-                            index_backbone_grad += 1
-                    elif 'arbiter' in name:  # arbiter layer
-                        param.grad.data = arbiter_grad[index_arbiter_grad]
-                        index_arbiter_grad += 1
+                    length = param.numel()
+                    param.grad.data = shared_grad[
+                                      total_length: total_length + length
+                                      ].reshape(param.shape)
+                    total_length += length
 
             self.optimizer.second_step(zero_grad=True)
 
