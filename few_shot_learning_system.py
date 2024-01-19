@@ -226,7 +226,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         return names_weights_copy
 
-    def get_across_task_loss_metrics(self, total_losses, total_accuracies, task_gradients):
+    def get_across_task_loss_metrics(self, total_losses, total_accuracies):
 
         losses = dict()
 
