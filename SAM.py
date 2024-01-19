@@ -44,6 +44,8 @@ class SAM(torch.optim.Optimizer):
                 sam_grad = self.state[p]['old_g'] * 0.5 - p.grad * 0.5
                 p.grad.data.add_(sam_grad)
 
+                ## 3. Gradient Norm Aware Minimization Seeks First-Order Flatness and Improves Generalization
+
         self.base_optimizer.step()  # do the actual "sharpness-aware" update
 
         if zero_grad: self.zero_grad()
