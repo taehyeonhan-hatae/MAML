@@ -237,8 +237,8 @@ class MAMLFewShotClassifier(nn.Module):
         # task1_gradient = task_gradients[0]['layer_dict.conv3.conv.weight'].detach().clone()
         # task2_gradient = task_gradients[1]['layer_dict.conv3.conv.weight'].detach().clone()
 
-        task1_gradient = task_gradients[0]['layer_dict.linear.weights'].detach().clone()
-        task2_gradient = task_gradients[1]['layer_dict.linear.weights'].detach().clone()
+        # task1_gradient = task_gradients[0]['layer_dict.linear.weights'].detach().clone()
+        # task2_gradient = task_gradients[1]['layer_dict.linear.weights'].detach().clone()
 
         # # # 각 텐서를 벡터로 평탄화(flatten)
         # task1_gradient = task1_gradient.view(task1_gradient.size(0), -1)
@@ -248,9 +248,9 @@ class MAMLFewShotClassifier(nn.Module):
         # cosine_similarity = F.cosine_similarity(task1_gradient, task2_gradient)
 
         ## 두 벡터의 내적
-        gradient_dot_product = torch.dot(task1_gradient.flatten(), task2_gradient.flatten())
-
-        losses['loss'] = torch.mean(torch.stack(total_losses)) + gradient_dot_product
+        # gradient_dot_product = torch.dot(task1_gradient.flatten(), task2_gradient.flatten())
+        #
+        # losses['loss'] = torch.mean(torch.stack(total_losses)) + gradient_dot_product
 
         #
         # # print("두 그래디언트 cosine 유사도: ", cosine_similarity)
@@ -324,7 +324,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         self.num_classes_per_set = ncs
 
-        task_gradients = []
+        # task_gradients = []
 
         total_losses = []
         total_accuracies = []
@@ -436,9 +436,9 @@ class MAMLFewShotClassifier(nn.Module):
                     # diff_weight = self.calculate_weight_difference(meta_learner=self.get_inner_loop_parameter_dict(self.classifier.named_parameters()), base_learner=names_weights_copy)
                     # target_loss = target_loss + diff_weight
 
-                    target_loss_grad = torch.autograd.grad(target_loss, names_weights_copy.values(), retain_graph=True)
-                    target_grads_copy = dict(zip(names_weights_copy.keys(), target_loss_grad))
-                    task_gradients.append(target_grads_copy)
+                    # target_loss_grad = torch.autograd.grad(target_loss, names_weights_copy.values(), retain_graph=True)
+                    # target_grads_copy = dict(zip(names_weights_copy.keys(), target_loss_grad))
+                    # task_gradients.append(target_grads_copy)
                     #task_gradients.append(target_loss_grad)
 
                     task_losses.append(target_loss)
@@ -460,7 +460,7 @@ class MAMLFewShotClassifier(nn.Module):
                 self.classifier.restore_backup_stats()
 
         losses = self.get_across_task_loss_metrics(total_losses=total_losses,
-                                                   total_accuracies=total_accuracies,task_gradients=task_gradients)
+                                                   total_accuracies=total_accuracies)
 
         for idx, item in enumerate(per_step_loss_importance_vectors):
             losses['loss_importance_vector_{}'.format(idx)] = item.detach().cpu().numpy()
