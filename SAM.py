@@ -38,11 +38,11 @@ class SAM(torch.optim.Optimizer):
                 p.data = self.state[p]["old_p"]  # get back to "w" from "w + e(w)"
 
                 ## 1. Penalizing Gradient Norm for Efficiently Improving Generalization in Deep Learning
-                # p.grad = (1 - balance) * self.state[p]["old_g"] + balance * p.grad
+                p.grad = (1 - balance) * self.state[p]["old_g"] + balance * p.grad
 
                 ## 2. Sharpness-Aware Gradient Matching for Domain Generalization (SAGM)
-                sam_grad = self.state[p]['old_g'] * 0.5 - p.grad * 0.5
-                p.grad.data.add_(sam_grad)
+                # sam_grad = self.state[p]['old_g'] * 0.5 - p.grad * 0.5
+                # p.grad.data.add_(sam_grad)
 
                 ## 3. Gradient Norm Aware Minimization Seeks First-Order Flatness and Improves Generalization
 
