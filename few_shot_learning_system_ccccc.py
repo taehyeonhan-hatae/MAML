@@ -335,8 +335,6 @@ class MAMLFewShotClassifier(nn.Module):
                               x_target_set,
                               y_target_set)):
 
-            print("task_id == ", task_id)
-
             task_losses = []
             per_step_loss_importance_vectors = self.get_per_step_loss_importance_vector()
             names_weights_copy = self.get_inner_loop_parameter_dict(self.classifier.named_parameters())
