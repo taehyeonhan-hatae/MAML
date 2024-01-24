@@ -639,14 +639,14 @@ class MAMLFewShotClassifier(nn.Module):
         # First Step
         losses_1, per_task_target_preds_1 = self.train_forward_prop(data_batch=data_batch, epoch=epoch, current_iter=current_iter)
 
-        sharpness_measure.append(losses_1['loss'].detach())
+        sharpness_measure.append(losses_1['loss'].clone())
         losses_1['loss'] = torch.mean(losses_1['loss'])
 
         self.meta_update(loss=losses_1['loss'], current_iter=current_iter, first_step=True, epoch=epoch)
 
         # Second Step
         losses, per_task_target_preds = self.train_forward_prop(data_batch=data_batch, epoch=epoch, current_iter=current_iter) # Perturbed loss
-        sharpness_measure.append(losses['loss'].detach())
+        sharpness_measure.append(losses['loss'].clone())
         weighted_flat = F.softmax(sharpness_measure[1] - sharpness_measure[0])
 
         losses['loss'] = torch.sum(weighted_flat * losses['loss'])
