@@ -224,50 +224,40 @@ class MAMLFewShotClassifier(nn.Module):
 
         return names_weights_copy
 
-    def get_across_task_loss_metrics(self, total_losses, total_accuracies):
+    def get_across_task_loss_metrics(self, total_losses, total_accuracies, task_gradients):
 
         losses = dict()
-
-        losses['loss'] = torch.mean(torch.stack(total_losses))
-        losses['accuracy'] = np.mean(total_accuracies)
-
-        # detach, clone 둘다?
-        # task1_gradient = task_gradients[0]['layer_dict.conv3.conv.weight'].detach().clone()
-        # task2_gradient = task_gradients[1]['layer_dict.conv3.conv.weight'].detach().clone()
-
-        # task1_gradient = task_gradients[0]['layer_dict.linear.weights'].detach().clone()
-        # task2_gradient = task_gradients[1]['layer_dict.linear.weights'].detach().clone()
-
-        # # # 각 텐서를 벡터로 평탄화(flatten)
-        # task1_gradient = task1_gradient.view(task1_gradient.size(0), -1)
-        # task2_gradient = task2_gradient.view(task2_gradient.size(0), -1)
-        #
-        # ## 두 그래디언트 cosine 유사도:
-        # cosine_similarity = F.cosine_similarity(task1_gradient, task2_gradient)
-
-        ## 두 벡터의 내적
-        # gradient_dot_product = torch.dot(task1_gradient.flatten(), task2_gradient.flatten())
-        #
-        # losses['loss'] = torch.mean(torch.stack(total_losses)) + gradient_dot_product
-
-        #
-        # # print("두 그래디언트 cosine 유사도: ", cosine_similarity)
-        # # print("두 그래디언트 텐서의 내적: ", gradient_dot_product)
-        #
-        # # if cosine_similarity > 0:
-        # #     losses['loss'] = torch.mean(torch.stack(total_losses))
-        # # else:
-        # #     losses['loss'] = torch.mean(torch.stack(total_losses)) + gradient_dot_product
-        # #     # losses['loss'] = torch.mean(torch.stack(total_losses)) - gradient_dot_product로 해야하는데..
-        #
-        # losses['loss'] = torch.mean(torch.stack(total_losses)) - gradient_dot_product
-        # # losses['loss'] = torch.mean(torch.stack(total_losses)) - cosine_similarity
-        #
-        # # cosine_similarity 유사도의 조건문을 버리고 아래와 같이 하는게 어떨까?
-        # # LEARNING TO LEARN WITHOUT FORGETTING BY MAXIMIZING TRANSFER AND MINIMIZING INTERFERENCE (MER)
-        # # losses['loss'] = torch.mean(torch.stack(total_losses)) - gradient_dot_product
-        # # (or) losses['loss'] = torch.mean(torch.stack(total_losses)) + gradient_dot_product 반대로 적용하는게 더 나을 수도 있다
+        # losses['loss'] = torch.mean(torch.stack(total_losses))
         # losses['accuracy'] = np.mean(total_accuracies)
+
+        ## Task All Gradient
+        # task1_gradient = task_gradients[0].detach().clone()
+        # task2_gradient = task_gradients[1].detach().clone()
+
+        ## Task backbone Gradient
+        task1_gradient = task_gradients[0][:-1]
+        task2_gradient = task_gradients[1][:-1]
+
+        ## Task Classifer Gradient
+        # task1_gradient = task_gradients[0][-1].detach().clone()
+        # task2_gradient = task_gradients[1][-1].detach().clone()
+
+        # # Gradient의 내적 계산
+        # total_dotproduct = 0.0
+        # for a, b in zip(task1_gradient, task2_gradient):
+        #     total_dotproduct = total_dotproduct + torch.dot(a.contiguous().view(-1), b.contiguous().view(-1))
+
+        ##Gradient의 Cosine 유사도 계산
+        cosine_similarity = F.cosine_similarity(
+            torch.cat([p.view(-1) for p in task1_gradient]).clone(),
+            torch.cat([p.view(-1) for p in task2_gradient]).clone(),
+            dim=0
+        )
+
+        print("cosine_similarity == ", cosine_similarity)
+
+        losses['loss'] = torch.mean(torch.stack(total_losses)) - cosine_similarity
+        losses['accuracy'] = np.mean(total_accuracies)
 
         return losses
 
@@ -322,7 +312,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         self.num_classes_per_set = ncs
 
-        # task_gradients = []
+        task_gradients = []
 
         total_losses = []
         total_accuracies = []
@@ -434,10 +424,10 @@ class MAMLFewShotClassifier(nn.Module):
                     # diff_weight = self.calculate_weight_difference(meta_learner=self.get_inner_loop_parameter_dict(self.classifier.named_parameters()), base_learner=names_weights_copy)
                     # target_loss = target_loss + diff_weight
 
-                    # target_loss_grad = torch.autograd.grad(target_loss, names_weights_copy.values(), retain_graph=True)
+                    target_loss_grad = torch.autograd.grad(target_loss, names_weights_copy.values(), retain_graph=True)
                     # target_grads_copy = dict(zip(names_weights_copy.keys(), target_loss_grad))
                     # task_gradients.append(target_grads_copy)
-                    #task_gradients.append(target_loss_grad)
+                    task_gradients.append(target_loss_grad)
 
                     task_losses.append(target_loss)
             ## Inner-loop END
@@ -458,7 +448,7 @@ class MAMLFewShotClassifier(nn.Module):
                 self.classifier.restore_backup_stats()
 
         losses = self.get_across_task_loss_metrics(total_losses=total_losses,
-                                                   total_accuracies=total_accuracies)
+                                                   total_accuracies=total_accuracies,task_gradients=task_gradients)
 
         for idx, item in enumerate(per_step_loss_importance_vectors):
             losses['loss_importance_vector_{}'.format(idx)] = item.detach().cpu().numpy()
