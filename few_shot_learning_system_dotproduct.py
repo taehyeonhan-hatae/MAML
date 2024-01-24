@@ -228,18 +228,19 @@ class MAMLFewShotClassifier(nn.Module):
         cosine_similarity = F.cosine_similarity(task1_gradient, task2_gradient)
 
         ## 두 벡터의 내적
-        gradient_dot_product = torch.dot(task1_gradient.flatten(), task2_gradient.flatten())
+        # gradient_dot_product = torch.dot(task1_gradient.flatten(), task2_gradient.flatten())
 
         # print("두 그래디언트 cosine 유사도: ", cosine_similarity)
         # print("두 그래디언트 텐서의 내적: ", gradient_dot_product)
 
-        # if cosine_similarity > 0:
-        #     losses['loss'] = torch.mean(torch.stack(total_losses))
-        # else:
-        #     losses['loss'] = torch.mean(torch.stack(total_losses)) + gradient_dot_product
-        #     # losses['loss'] = torch.mean(torch.stack(total_losses)) - gradient_dot_product로 해야하는데..
+        if cosine_similarity > 0:
+            losses['loss'] = torch.mean(torch.stack(total_losses)) + cosine_similarity
+        else:
+            losses['loss'] = torch.mean(torch.stack(total_losses))
+            # losses['loss'] = torch.mean(torch.stack(total_losses)) + gradient_dot_product
+            # losses['loss'] = torch.mean(torch.stack(total_losses)) - gradient_dot_product로 해야하는데..
 
-        losses['loss'] = torch.mean(torch.stack(total_losses)) - gradient_dot_product
+        # losses['loss'] = torch.mean(torch.stack(total_losses)) - gradient_dot_product
         # losses['loss'] = torch.mean(torch.stack(total_losses)) - cosine_similarity
 
         # cosine_similarity 유사도의 조건문을 버리고 아래와 같이 하는게 어떨까?
