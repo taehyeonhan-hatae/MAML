@@ -213,8 +213,8 @@ class MAMLFewShotClassifier(nn.Module):
         # losses['accuracy'] = np.mean(total_accuracies)
 
         # detach, clone 둘다?
-        task1_gradient = task_gradients[0]['layer_dict.conv3.conv.weight'].detach().clone()
-        task2_gradient = task_gradients[1]['layer_dict.conv3.conv.weight'].detach().clone()
+        task1_gradient = task_gradients[0]['layer_dict.conv3.conv.weight'].clone()
+        task2_gradient = task_gradients[1]['layer_dict.conv3.conv.weight'].clone()
 
         # clone만?
         # task1_gradient = task_gradients[0]['layer_dict.conv3.conv.weight'].clone()
