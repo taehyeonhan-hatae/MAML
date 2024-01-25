@@ -22,7 +22,7 @@ class SAM(torch.optim.Optimizer):
                 self.state[p]["old_p"] = p.data.clone()
 
                 # w에 대한 gradient를 저장
-                self.state[p]["old_g"] = p.grad.clone()
+                # self.state[p]["old_g"] = p.grad.clone()
 
                 e_w = (torch.pow(p, 2) if group["adaptive"] else 1.0) * p.grad * scale.to(p)
                 #print('e_w: ', e_w)
