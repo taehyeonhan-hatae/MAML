@@ -82,16 +82,17 @@ class MAMLFewShotClassifier(nn.Module):
             input_dim = num_layers * 2
 
             output_dim = num_layers
-            self.arbiter = nn.Sequential(
-                nn.Linear(input_dim, input_dim),
-                nn.ReLU(inplace=True),
-                nn.Linear(input_dim, output_dim),
-                ## nn.Softplus(beta=2) # GAP
-                nn.Softplus() # CxGrad
-            ).to(device=self.device)
 
-            # self.arbiter = Arbiter(input_dim=input_dim, output_dim=output_dim, M=self.M, args=self.args,
-            #                                 device=self.device)
+            # self.arbiter = nn.Sequential(
+            #     nn.Linear(input_dim, input_dim),
+            #     nn.ReLU(inplace=True),
+            #     nn.Linear(input_dim, output_dim),
+            #     ## nn.Softplus(beta=2) # GAP
+            #     nn.Softplus() # CxGrad
+            # ).to(device=self.device)
+
+            self.arbiter = Arbiter(input_dim=input_dim, output_dim=output_dim, args=self.args,
+                                            device=self.device)
 
             # self.arbiter = StepArbiter(input_dim=input_dim, output_dim=output_dim, args=self.args, device=self.device)
 
@@ -224,43 +225,10 @@ class MAMLFewShotClassifier(nn.Module):
 
         return names_weights_copy
 
-    def get_across_task_loss_metrics(self, total_losses, total_accuracies, task_gradients):
+    def get_across_task_loss_metrics(self, total_losses, total_accuracies):
 
         losses = dict()
-        # losses['loss'] = torch.mean(torch.stack(total_losses))
-        # losses['accuracy'] = np.mean(total_accuracies)
-
-        ## Task All Gradient
-        # task1_gradient = task_gradients[0].detach().clone()
-        # task2_gradient = task_gradients[1].detach().clone()
-
-        ## Task backbone Gradient
-        task1_gradient = task_gradients[0][:-1]
-        task2_gradient = task_gradients[1][:-1]
-
-        ## Task Classifer Gradient
-        # task1_gradient = task_gradients[0][-1].detach().clone()
-        # task2_gradient = task_gradients[1][-1].detach().clone()
-
-        # # Gradient의 내적 계산
-        total_dotproduct = 0.0
-        for a, b in zip(task1_gradient, task2_gradient):
-            total_dotproduct = total_dotproduct + torch.dot(a.contiguous().view(-1), b.contiguous().view(-1))
-
-        ##Gradient의 Cosine 유사도 계산
-        cosine_similarity = F.cosine_similarity(
-            torch.cat([p.view(-1) for p in task1_gradient]).clone(),
-            torch.cat([p.view(-1) for p in task2_gradient]).clone(),
-            dim=0
-        )
-
-
-        if cosine_similarity < 0 :
-            print("cosine_similarity == ", cosine_similarity)
-            losses['loss'] = torch.mean(torch.stack(total_losses)) - cosine_similarity
-        else:
-            losses['loss'] = torch.mean(torch.stack(total_losses))
-
+        losses['loss'] = torch.mean(torch.stack(total_losses))
         losses['accuracy'] = np.mean(total_accuracies)
 
         return losses
@@ -315,8 +283,6 @@ class MAMLFewShotClassifier(nn.Module):
         [b, ncs, spc] = y_support_set.shape
 
         self.num_classes_per_set = ncs
-
-        task_gradients = []
 
         total_losses = []
         total_accuracies = []
@@ -425,14 +391,6 @@ class MAMLFewShotClassifier(nn.Module):
                                                                  epoch=epoch,
                                                                  soft_target=target_soft_preds)
 
-                    # diff_weight = self.calculate_weight_difference(meta_learner=self.get_inner_loop_parameter_dict(self.classifier.named_parameters()), base_learner=names_weights_copy)
-                    # target_loss = target_loss + diff_weight
-
-                    target_loss_grad = torch.autograd.grad(target_loss, names_weights_copy.values(), retain_graph=True)
-                    # target_grads_copy = dict(zip(names_weights_copy.keys(), target_loss_grad))
-                    # task_gradients.append(target_grads_copy)
-                    task_gradients.append(target_loss_grad)
-
                     task_losses.append(target_loss)
             ## Inner-loop END
 
@@ -452,7 +410,7 @@ class MAMLFewShotClassifier(nn.Module):
                 self.classifier.restore_backup_stats()
 
         losses = self.get_across_task_loss_metrics(total_losses=total_losses,
-                                                   total_accuracies=total_accuracies,task_gradients=task_gradients)
+                                                   total_accuracies=total_accuracies)
 
         for idx, item in enumerate(per_step_loss_importance_vectors):
             losses['loss_importance_vector_{}'.format(idx)] = item.detach().cpu().numpy()

@@ -1156,7 +1156,7 @@ class ResNet12(nn.Module):
 
 
 class Arbiter(nn.Module):
-    def __init__(self, input_dim, output_dim, M, args, device):
+    def __init__(self, input_dim, output_dim, args, device):
         super(Arbiter, self).__init__()
 
         self.device = device
@@ -1166,13 +1166,6 @@ class Arbiter(nn.Module):
         self.activation1 = nn.ReLU(inplace=True)
         self.linear2 = nn.Linear(input_dim, output_dim)
         self.activation2 = nn.Softplus()
-
-        self.M = {}
-
-        self.weight  = nn.Parameter(torch.ones(size=(1,1))).to(device)
-
-        for name, shape in M.items():
-            self.M[name] = nn.Parameter(torch.ones(size=shape)).to(device)
 
         print("Arbiter")
         for name, param in self.named_parameters():
@@ -1184,12 +1177,6 @@ class Arbiter(nn.Module):
         out = self.activation1(out)
         out = self.linear2(out)
         out = self.activation2(out)
-
-        # generated_alpha_params={}
-        #
-        # g=0
-        # for key in self.M.keys():
-        #     generated_alpha_params[key] = out[g] * self.M[key]
 
         return out
 
