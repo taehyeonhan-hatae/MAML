@@ -243,9 +243,9 @@ class MAMLFewShotClassifier(nn.Module):
         # task2_gradient = task_gradients[1][-1].detach().clone()
 
         # # Gradient의 내적 계산
-        # total_dotproduct = 0.0
-        # for a, b in zip(task1_gradient, task2_gradient):
-        #     total_dotproduct = total_dotproduct + torch.dot(a.contiguous().view(-1), b.contiguous().view(-1))
+        total_dotproduct = 0.0
+        for a, b in zip(task1_gradient, task2_gradient):
+            total_dotproduct = total_dotproduct + torch.dot(a.contiguous().view(-1), b.contiguous().view(-1))
 
         ##Gradient의 Cosine 유사도 계산
         cosine_similarity = F.cosine_similarity(
@@ -254,9 +254,13 @@ class MAMLFewShotClassifier(nn.Module):
             dim=0
         )
 
-        print("cosine_similarity == ", cosine_similarity)
 
-        losses['loss'] = torch.mean(torch.stack(total_losses)) - cosine_similarity
+        if cosine_similarity < 0 :
+            print("cosine_similarity == ", cosine_similarity)
+            losses['loss'] = torch.mean(torch.stack(total_losses)) - cosine_similarity
+        else:
+            losses['loss'] = torch.mean(torch.stack(total_losses))
+
         losses['accuracy'] = np.mean(total_accuracies)
 
         return losses
