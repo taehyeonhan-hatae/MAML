@@ -91,10 +91,10 @@ class MAMLFewShotClassifier(nn.Module):
             #     nn.Softplus() # CxGrad
             # ).to(device=self.device)
 
-            self.arbiter = Arbiter(input_dim=input_dim, output_dim=output_dim, args=self.args,
-                                            device=self.device)
+            # self.arbiter = Arbiter(input_dim=input_dim, output_dim=output_dim, args=self.args,
+            #                                 device=self.device)
 
-            # self.arbiter = StepArbiter(input_dim=input_dim, output_dim=output_dim, args=self.args, device=self.device)
+            self.arbiter = StepArbiter(input_dim=input_dim, output_dim=output_dim, args=self.args, device=self.device)
 
         print("Inner Loop parameters")
         for key, value in self.inner_loop_optimizer.named_parameters():
@@ -358,10 +358,10 @@ class MAMLFewShotClassifier(nn.Module):
                     per_step_task_embedding = (per_step_task_embedding - per_step_task_embedding.mean()) / (
                                 per_step_task_embedding.std() + 1e-12)
 
-                    generated_gradient_rate = self.arbiter(per_step_task_embedding)
+                    # generated_gradient_rate = self.arbiter(per_step_task_embedding)
 
                     # generated_gradient_rate = self.arbiter(task_state=per_step_task_embedding)
-                    # generated_gradient_rate = self.arbiter(task_state=per_step_task_embedding, num_step=num_step)
+                    generated_gradient_rate = self.arbiter(task_state=per_step_task_embedding, num_step=num_step)
 
                     g = 0
                     for key in names_weights_copy.keys():
