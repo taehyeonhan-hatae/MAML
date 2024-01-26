@@ -538,7 +538,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         return losses, per_task_target_preds
 
-    def meta_update(self, loss, current_iter, first_step, epoch):
+    def meta_update(self, loss):
         """
         Applies an outer loop update on the meta-parameters of the model.
         :param loss: The current crossentropy loss.
