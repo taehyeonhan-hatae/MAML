@@ -567,6 +567,29 @@ class MAMLFewShotClassifier(nn.Module):
             # balance = epoch / self.args.total_epochs
             self.optimizer.second_step(zero_grad=True)
 
+        # # 모델의 전체 weight 가져오기
+        # weights = []
+        # for param in self.classifier.parameters():
+        #     weights.append(param.data.view(-1).cpu().numpy())
+        #
+        # # 전체 weight를 하나의 벡터로 합치기
+        # all_weights = np.concatenate(weights)
+        #
+        # # 특이값 분해 수행
+        # u, s, v = np.linalg.svd(all_weights, full_matrices=False)
+        #
+        # # 특이값 및 특이벡터 출력
+        # print("Singular Values:")
+        # print(s)
+        #
+        # # 특이값 분해를 통해 얻은 u, s, v를 다시 모델의 weight로 설정
+        # with torch.no_grad():
+        #     index = 0
+        #     for param in self.classifier.parameters():
+        #         numel = param.data.numel()
+        #         param.data = torch.from_numpy(u[:, index:index + numel].reshape(param.data.shape)).float()
+        #         index += numel
+
         # if 'imagenet' in self.args.dataset_name:
         #     for name, param in self.classifier.named_parameters():
         #         if param.requires_grad:
