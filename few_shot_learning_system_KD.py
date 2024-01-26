@@ -205,88 +205,46 @@ class MAMLFewShotClassifier(nn.Module):
 
         return names_weights_copy
 
-    def get_across_task_loss_metrics(self, total_losses, total_accuracies, task_gradients):
+    def get_across_task_loss_metrics(self, total_losses, total_accuracies):
 
         losses = dict()
 
-        # losses['loss'] = torch.mean(torch.stack(total_losses))
-        # losses['accuracy'] = np.mean(total_accuracies)
-
-        # detach, clone 둘다?
-        task1_gradient = task_gradients[0]['layer_dict.conv3.conv.weight'].clone()
-        task2_gradient = task_gradients[1]['layer_dict.conv3.conv.weight'].clone()
-
-        # clone만?
-        # task1_gradient = task_gradients[0]['layer_dict.conv3.conv.weight'].clone()
-        # task2_gradient = task_gradients[1]['layer_dict.conv3.conv.weight'].clone()
-
-        # # 각 텐서를 벡터로 평탄화(flatten)
-        task1_gradient = task1_gradient.view(task1_gradient.size(0), -1)
-        task2_gradient = task2_gradient.view(task2_gradient.size(0), -1)
-
-        ## 두 그래디언트 cosine 유사도:
-        cosine_similarity = F.cosine_similarity(task1_gradient, task2_gradient)
-
-        ## 두 벡터의 내적
-        # gradient_dot_product = torch.dot(task1_gradient.flatten(), task2_gradient.flatten())
-
-        # print("두 그래디언트 cosine 유사도: ", cosine_similarity)
-        # print("두 그래디언트 텐서의 내적: ", gradient_dot_product)
-
-        # orthogonal하게
-        # losses['loss'] = torch.mean(torch.stack(total_losses)) + torch.square(cosine_similarity)
-
-        if cosine_similarity >= 0:
-            losses['loss'] = torch.mean(torch.stack(total_losses))
-        else:
-            losses['loss'] = torch.mean(torch.stack(total_losses)) + cosine_similarity
-            # losses['loss'] = torch.mean(torch.stack(total_losses)) + cosine_similarity로 해야하는데..
-            # losses['loss'] = torch.mean(torch.stack(total_losses)) + gradient_dot_product
-            # losses['loss'] = torch.mean(torch.stack(total_losses)) - gradient_dot_product로 해야하는데..
-
-        # losses['loss'] = torch.mean(torch.stack(total_losses)) - gradient_dot_product
-        # losses['loss'] = torch.mean(torch.stack(total_losses)) - cosine_similarity
-
-        # cosine_similarity 유사도의 조건문을 버리고 아래와 같이 하는게 어떨까?
-        # LEARNING TO LEARN WITHOUT FORGETTING BY MAXIMIZING TRANSFER AND MINIMIZING INTERFERENCE (MER)
-        # losses['loss'] = torch.mean(torch.stack(total_losses)) - gradient_dot_product
-        # (or) losses['loss'] = torch.mean(torch.stack(total_losses)) + gradient_dot_product 반대로 적용하는게 더 나을 수도 있다
+        losses['loss'] = torch.mean(torch.stack(total_losses))
         losses['accuracy'] = np.mean(total_accuracies)
 
         return losses
 
-    # def get_soft_label(self, x_support_set_task, y_support_set_task, x_target_set_task, y_target_set_task, names_weights_copy, epoch):
-    def get_soft_label(self, x_target_set_task, y_target_set_task, names_weights_copy, epoch):
+    def get_soft_label(self, x_support_set_task, y_support_set_task, x_target_set_task, y_target_set_task, names_weights_copy, epoch):
         """
         Knowledge Distillation을 위한 soft target 생성
         """
 
         ## Support Set에 대한 Soft target 생성
-        # support_loss, support_preds, out_feature_dict = self.net_forward(
-        #     x=x_support_set_task,
-        #     y=y_support_set_task,
-        #     weights=names_weights_copy,
-        #     backup_running_statistics=True,
-        #     training=True,
-        #     num_step=0,
-        #     training_phase=False, # Cross Entropy Loss를 구하기 위해서 False로 설정한다
-        #     epoch=epoch
-        # )
+        support_loss, support_preds = self.net_forward(
+            x=x_support_set_task,
+            y=y_support_set_task,
+            weights=names_weights_copy,
+            backup_running_statistics=True,
+            training=True,
+            num_step=0,
+            training_phase=True, # Cross Entropy Loss를 구하기 위해서 True로 설정한다
+            epoch=epoch
+        )
 
         ## Query Set에 대한 Soft target 생성
         taget_loss, target_preds = self.net_forward(
             x=x_target_set_task,
             y=y_target_set_task,
             weights=names_weights_copy,
-            backup_running_statistics=True,
+            backup_running_statistics=False,
             training=True,
             num_step=0,
-            training_phase=False, # Cross Entropy Loss를 구하기 위해서 False로 설정한다
+            training_phase=True, # Cross Entropy Loss를 구하기 위해서 True로 설정한다
             epoch=epoch
         )
 
-        return target_preds.detach() # detach하여 역전파 방지
-        # return support_preds.detach(), target_preds.detach() # detach하여 역전파 방지
+        # return target_preds.detach() # detach하여 역전파 방지
+        return support_preds.detach(), target_preds.detach() # detach하여 역전파 방지
 
     def contextual_grad_scaling(self, names_weights_copy ):
 
@@ -317,8 +275,6 @@ class MAMLFewShotClassifier(nn.Module):
         [b, ncs, spc] = y_support_set.shape
 
         self.num_classes_per_set = ncs
-
-        task_gradients = []
 
         total_losses = []
         total_accuracies = []
@@ -351,15 +307,11 @@ class MAMLFewShotClassifier(nn.Module):
             target_soft_preds=None
 
             if self.args.knowledge_distillation:
-                # support_soft_preds, target_soft_preds = self.get_soft_label(x_support_set_task, y_support_set_task,
-                #                                                            x_target_set_task, y_target_set_task,
-                #                                                            names_weights_copy, epoch)
-                target_soft_preds = self.get_soft_label(x_target_set_task, y_target_set_task,
-                                                                            names_weights_copy, epoch)
+                support_soft_preds, target_soft_preds = self.get_soft_label(x_support_set_task, y_support_set_task,
+                                                                           x_target_set_task, y_target_set_task,
+                                                                           names_weights_copy, epoch)
 
             for num_step in range(num_steps):
-
-                # names_weights_copy = self.contextual_grad_scaling(names_weights_copy=names_weights_copy)
 
                 support_loss, support_preds  = self.net_forward(
                     x=x_support_set_task,
@@ -438,9 +390,9 @@ class MAMLFewShotClassifier(nn.Module):
                     #
                     # target_loss = target_loss + lambda_diff * classifier_diff
 
-                    target_loss_grad = torch.autograd.grad(target_loss, names_weights_copy.values(), retain_graph=True)
-                    target_grads_copy = dict(zip(names_weights_copy.keys(), target_loss_grad))
-                    task_gradients.append(target_grads_copy)
+                    # target_loss_grad = torch.autograd.grad(target_loss, names_weights_copy.values(), retain_graph=True)
+                    # target_grads_copy = dict(zip(names_weights_copy.keys(), target_loss_grad))
+                    # task_gradients.append(target_grads_copy)
                     # task_gradients.append(target_loss_grad)
 
                     task_losses.append(target_loss)
@@ -462,8 +414,7 @@ class MAMLFewShotClassifier(nn.Module):
                 self.classifier.restore_backup_stats()
 
         losses = self.get_across_task_loss_metrics(total_losses=total_losses,
-                                                   total_accuracies=total_accuracies,
-                                                   task_gradients=task_gradients)
+                                                   total_accuracies=total_accuracies)
 
         for idx, item in enumerate(per_step_loss_importance_vectors):
             losses['loss_importance_vector_{}'.format(idx)] = item.detach().cpu().numpy()
@@ -496,8 +447,8 @@ class MAMLFewShotClassifier(nn.Module):
                 loss = criterion(preds, y)
             elif self.args.knowledge_distillation:
                 if not soft_target == None:
-                    alpha = 0.1
-                    # alpha = epoch / self.args.total_epochs
+                    # alpha = 0.1
+                    alpha = epoch / self.args.total_epochs
                     loss = knowledge_distillation_loss(student_logit=preds, teacher_logit=soft_target, labels=y,
                                                        label_loss_weight=(1.0 - alpha), soft_label_loss_weight=alpha,
                                                        Temperature=1.0)

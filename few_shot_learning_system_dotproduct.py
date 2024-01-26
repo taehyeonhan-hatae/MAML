@@ -240,6 +240,7 @@ class MAMLFewShotClassifier(nn.Module):
             losses['loss'] = torch.mean(torch.stack(total_losses))
         else:
             losses['loss'] = torch.mean(torch.stack(total_losses)) + cosine_similarity
+            # losses['loss'] = torch.mean(torch.stack(total_losses)) + cosine_similarity로 해야하는데..
             # losses['loss'] = torch.mean(torch.stack(total_losses)) + gradient_dot_product
             # losses['loss'] = torch.mean(torch.stack(total_losses)) - gradient_dot_product로 해야하는데..
 
