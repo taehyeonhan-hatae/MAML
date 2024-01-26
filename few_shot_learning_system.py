@@ -214,38 +214,37 @@ class MAMLFewShotClassifier(nn.Module):
 
         return losses
 
-    # def get_soft_label(self, x_support_set_task, y_support_set_task, x_target_set_task, y_target_set_task, names_weights_copy, epoch):
-    def get_soft_label(self, x_target_set_task, y_target_set_task, names_weights_copy, epoch):
+    def get_soft_label(self, x_support_set_task, y_support_set_task, x_target_set_task, y_target_set_task, names_weights_copy, epoch):
         """
         Knowledge Distillation을 위한 soft target 생성
         """
 
         ## Support Set에 대한 Soft target 생성
-        # support_loss, support_preds, out_feature_dict = self.net_forward(
-        #     x=x_support_set_task,
-        #     y=y_support_set_task,
-        #     weights=names_weights_copy,
-        #     backup_running_statistics=True,
-        #     training=True,
-        #     num_step=0,
-        #     training_phase=False, # Cross Entropy Loss를 구하기 위해서 False로 설정한다
-        #     epoch=epoch
-        # )
+        support_loss, support_preds = self.net_forward(
+            x=x_support_set_task,
+            y=y_support_set_task,
+            weights=names_weights_copy,
+            backup_running_statistics=True,
+            training=True,
+            num_step=0,
+            training_phase=True, # Cross Entropy Loss를 구하기 위해서 True로 설정한다
+            epoch=epoch
+        )
 
         ## Query Set에 대한 Soft target 생성
         taget_loss, target_preds = self.net_forward(
             x=x_target_set_task,
             y=y_target_set_task,
             weights=names_weights_copy,
-            backup_running_statistics=True,
+            backup_running_statistics=False,
             training=True,
             num_step=0,
-            training_phase=False, # Cross Entropy Loss를 구하기 위해서 False로 설정한다
+            training_phase=True, # Cross Entropy Loss를 구하기 위해서 True로 설정한다
             epoch=epoch
         )
 
-        return target_preds.detach() # detach하여 역전파 방지
-        # return support_preds.detach(), target_preds.detach() # detach하여 역전파 방지
+        # return target_preds.detach() # detach하여 역전파 방지
+        return support_preds.detach(), target_preds.detach() # detach하여 역전파 방지
 
     def contextual_grad_scaling(self, names_weights_copy ):
 
@@ -311,12 +310,8 @@ class MAMLFewShotClassifier(nn.Module):
                 support_soft_preds, target_soft_preds = self.get_soft_label(x_support_set_task, y_support_set_task,
                                                                            x_target_set_task, y_target_set_task,
                                                                            names_weights_copy, epoch)
-                target_soft_preds = self.get_soft_label(x_target_set_task, y_target_set_task,
-                                                                            names_weights_copy, epoch)
 
             for num_step in range(num_steps):
-
-                # names_weights_copy = self.contextual_grad_scaling(names_weights_copy=names_weights_copy)
 
                 support_loss, support_preds  = self.net_forward(
                     x=x_support_set_task,
