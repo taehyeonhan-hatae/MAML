@@ -234,14 +234,14 @@ class MAMLFewShotClassifier(nn.Module):
         # print("두 그래디언트 텐서의 내적: ", gradient_dot_product)
 
         # orthogonal하게
-        losses['loss'] = torch.mean(torch.stack(total_losses)) + torch.square(cosine_similarity)
+        # losses['loss'] = torch.mean(torch.stack(total_losses)) + torch.square(cosine_similarity)
 
-        # if cosine_similarity > 0:
-        #     losses['loss'] = torch.mean(torch.stack(total_losses)) + cosine_similarity
-        # else:
-        #     losses['loss'] = torch.mean(torch.stack(total_losses))
-        #     # losses['loss'] = torch.mean(torch.stack(total_losses)) + gradient_dot_product
-        #     # losses['loss'] = torch.mean(torch.stack(total_losses)) - gradient_dot_product로 해야하는데..
+        if cosine_similarity >= 0:
+            losses['loss'] = torch.mean(torch.stack(total_losses))
+        else:
+            losses['loss'] = torch.mean(torch.stack(total_losses)) + cosine_similarity
+            # losses['loss'] = torch.mean(torch.stack(total_losses)) + gradient_dot_product
+            # losses['loss'] = torch.mean(torch.stack(total_losses)) - gradient_dot_product로 해야하는데..
 
         # losses['loss'] = torch.mean(torch.stack(total_losses)) - gradient_dot_product
         # losses['loss'] = torch.mean(torch.stack(total_losses)) - cosine_similarity
