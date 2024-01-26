@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-from meta_neural_network_architectures import VGGReLUNormNetwork,ResNet12, StepArbiter, Arbiter
+from meta_neural_network_architectures_task_embedding import VGGReLUNormNetwork,ResNet12, StepArbiter, Arbiter
 from inner_loop_optimizers_GR import GradientDescentLearningRule, LSLRGradientDescentLearningRule
 
 from SAM import SAM
@@ -59,6 +59,9 @@ class MAMLFewShotClassifier(nn.Module):
 
         self.task_learning_rate = args.init_inner_loop_learning_rate
 
+        self.context_params_learning_rate = args.context_params_learning_rate
+
+
         names_weights_copy = self.get_inner_loop_parameter_dict(self.classifier.named_parameters())
 
         if self.args.learnable_per_layer_per_step_inner_loop_learning_rate:
@@ -76,8 +79,11 @@ class MAMLFewShotClassifier(nn.Module):
         # Gradient Arbiter
         if self.args.arbiter:
             num_layers = len(names_weights_copy)
-            input_dim = num_layers * 2
+            # input_dim = num_layers * 2
+
+            input_dim = self.args.num_context_params
             output_dim = num_layers
+
             self.arbiter = nn.Sequential(
                 nn.Linear(input_dim, input_dim),
                 nn.ReLU(inplace=True),
@@ -175,6 +181,10 @@ class MAMLFewShotClassifier(nn.Module):
         else:
             self.classifier.zero_grad(params=names_weights_copy)
 
+        if self.args.contextual_grad:
+            if self.classifier.context_params.grad is not None:
+                self.classifier.context_params.grad.data.zero_()
+
         grads = torch.autograd.grad(loss, names_weights_copy.values(),
                                     create_graph=use_second_order, allow_unused=True)
 
@@ -212,6 +222,46 @@ class MAMLFewShotClassifier(nn.Module):
         losses['loss'] = torch.mean(torch.stack(total_losses))
         losses['accuracy'] = np.mean(total_accuracies)
 
+        # detach, clone 둘다?
+        # task1_gradient = task_gradients[0]['layer_dict.conv3.conv.weight'].clone()
+        # task2_gradient = task_gradients[1]['layer_dict.conv3.conv.weight'].clone()
+
+        # clone만?
+        # task1_gradient = task_gradients[0]['layer_dict.conv3.conv.weight'].clone()
+        # task2_gradient = task_gradients[1]['layer_dict.conv3.conv.weight'].clone()
+
+        # # 각 텐서를 벡터로 평탄화(flatten)
+        # task1_gradient = task1_gradient.view(task1_gradient.size(0), -1)
+        # task2_gradient = task2_gradient.view(task2_gradient.size(0), -1)
+        #
+        # ## 두 그래디언트 cosine 유사도:
+        # cosine_similarity = F.cosine_similarity(task1_gradient, task2_gradient)
+
+        ## 두 벡터의 내적
+        # gradient_dot_product = torch.dot(task1_gradient.flatten(), task2_gradient.flatten())
+
+        # print("두 그래디언트 cosine 유사도: ", cosine_similarity)
+        # print("두 그래디언트 텐서의 내적: ", gradient_dot_product)
+
+        # orthogonal하게
+        # losses['loss'] = torch.mean(torch.stack(total_losses)) + torch.square(cosine_similarity)
+
+        # if cosine_similarity > 0:
+        #     losses['loss'] = torch.mean(torch.stack(total_losses)) + cosine_similarity
+        # else:
+        #     losses['loss'] = torch.mean(torch.stack(total_losses))
+        #     # losses['loss'] = torch.mean(torch.stack(total_losses)) + gradient_dot_product
+        #     # losses['loss'] = torch.mean(torch.stack(total_losses)) - gradient_dot_product로 해야하는데..
+
+        # losses['loss'] = torch.mean(torch.stack(total_losses)) - gradient_dot_product
+        # losses['loss'] = torch.mean(torch.stack(total_losses)) - cosine_similarity
+
+        # cosine_similarity 유사도의 조건문을 버리고 아래와 같이 하는게 어떨까?
+        # LEARNING TO LEARN WITHOUT FORGETTING BY MAXIMIZING TRANSFER AND MINIMIZING INTERFERENCE (MER)
+        # losses['loss'] = torch.mean(torch.stack(total_losses)) - gradient_dot_product
+        # (or) losses['loss'] = torch.mean(torch.stack(total_losses)) + gradient_dot_product 반대로 적용하는게 더 나을 수도 있다
+        # losses['accuracy'] = np.mean(total_accuracies)
+
         return losses
 
     # def get_soft_label(self, x_support_set_task, y_support_set_task, x_target_set_task, y_target_set_task, names_weights_copy, epoch):
@@ -247,17 +297,6 @@ class MAMLFewShotClassifier(nn.Module):
         return target_preds.detach() # detach하여 역전파 방지
         # return support_preds.detach(), target_preds.detach() # detach하여 역전파 방지
 
-    def contextual_grad_scaling(self, names_weights_copy ):
-
-        updated_names_weights_copy = dict()
-
-        for key in names_weights_copy.keys():
-            if 'linear' in key:
-                updated_names_weights_copy[key] = names_weights_copy[key]
-            else:
-                updated_names_weights_copy[key] = names_weights_copy[key] / (torch.norm(names_weights_copy[key], p=2) + 1e-12)
-
-        return updated_names_weights_copy
 
     def forward(self, data_batch, epoch, use_second_order, use_multi_step_loss_optimization, num_steps, training_phase, current_iter):
         """
@@ -276,6 +315,8 @@ class MAMLFewShotClassifier(nn.Module):
         [b, ncs, spc] = y_support_set.shape
 
         self.num_classes_per_set = ncs
+
+        # task_gradients = []
 
         total_losses = []
         total_accuracies = []
@@ -304,13 +345,16 @@ class MAMLFewShotClassifier(nn.Module):
             x_target_set_task = x_target_set_task.view(-1, c, h, w)
             y_target_set_task = y_target_set_task.view(-1)
 
+            if self.args.contextual_grad:
+                self.classifier.reset_context_params()
+
             support_soft_preds=None
             target_soft_preds=None
 
             if self.args.knowledge_distillation:
-                support_soft_preds, target_soft_preds = self.get_soft_label(x_support_set_task, y_support_set_task,
-                                                                           x_target_set_task, y_target_set_task,
-                                                                           names_weights_copy, epoch)
+                # support_soft_preds, target_soft_preds = self.get_soft_label(x_support_set_task, y_support_set_task,
+                #                                                            x_target_set_task, y_target_set_task,
+                #                                                            names_weights_copy, epoch)
                 target_soft_preds = self.get_soft_label(x_target_set_task, y_target_set_task,
                                                                             names_weights_copy, epoch)
 
@@ -333,34 +377,13 @@ class MAMLFewShotClassifier(nn.Module):
                 generated_alpha_params = {}
 
                 if self.args.arbiter:
-                    support_loss_grad = torch.autograd.grad(support_loss, names_weights_copy.values(),
-                                                            retain_graph=True)
 
-                    names_grads_copy = dict(zip(names_weights_copy.keys(), support_loss_grad))
-
-                    per_step_task_embedding = []
-
-                    for key, weight in names_weights_copy.items():
-                        weight_norm = torch.norm(weight, p=2)
-                        per_step_task_embedding.append(weight_norm)
-
-                    for key, grad in names_grads_copy.items():
-                        gradient_l2norm = torch.norm(grad, p=2)
-                        per_step_task_embedding.append(gradient_l2norm)
-
-                    per_step_task_embedding = torch.stack(per_step_task_embedding)
-
-                    ## Standardization
-                    per_step_task_embedding = (per_step_task_embedding - per_step_task_embedding.mean()) / (
-                                per_step_task_embedding.std() + 1e-12)
-
-                    generated_gradient_rate = self.arbiter(per_step_task_embedding)
-                    # generated_gradient_rate = self.arbiter(task_state=per_step_task_embedding, num_step=num_step)
+                    print("self.classifier.context_params == ", self.classifier.context_params)
+                    generated_gradient_rate = self.arbiter(self.classifier.context_params)
 
                     g = 0
                     for key in names_weights_copy.keys():
                         generated_alpha_params[key] = generated_gradient_rate[g]
-                        # generated_beta_params[key] = generated_gradient_rate[g+1]
                         g += 1
 
                 names_weights_copy = self.apply_inner_loop_update(loss=support_loss,
