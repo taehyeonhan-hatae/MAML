@@ -496,8 +496,6 @@ class MAMLFewShotClassifier(nn.Module):
 
         return loss, preds
 
-        return loss, preds
-
 
     def trainable_parameters(self):
             """
