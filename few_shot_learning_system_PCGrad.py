@@ -548,49 +548,43 @@ class MAMLFewShotClassifier(nn.Module):
 
         self.optimizer.zero_grad()
 
+        # loss[0].backward()
+        # task0_backbone_grad = []
+        # task0_linear_grad = []
+        # task0_arbiter_grad = []
+        # for name, param in self.named_parameters():
+        #     if param.requires_grad:
+        #         if 'classifier' in name:
+        #             if not 'linear' in name:  # backbone layer
+        #                 task0_backbone_grad.append(param.grad.data.clone())
+        #             else:
+        #                 task0_linear_grad.append(param.grad.data.clone())
+        #         elif 'arbiter' in name:  # arbiter
+        #             task0_arbiter_grad.append(param.grad.data.clone())
+        #         param.grad.zero_()
+
         loss[0].backward()
-        task0_backbone_grad = []
-        task0_arbiter_grad = []
+        task_0_grad = []
         for name, param in self.named_parameters():
             if param.requires_grad:
-                if 'classifier' in name:
-                    if not 'linear' in name:  # backbone layer
-                        task0_backbone_grad.append(param.grad.detach().data.clone())
-                elif 'arbiter' in name:  # arbiter
-                    task0_arbiter_grad.append(param.grad.detach().data.clone())
+                print(name)
+                task_0_grad.append(param.grad.data.clone())
                 param.grad.zero_()
 
         loss[1].backward()
-        task1_linear_grad = []
-        task1_backbone_grad = []
-        task1_arbiter_grad = []
+        task_1_grad = []
         for name, param in self.named_parameters():
             if param.requires_grad:
-                if 'classifier' in name:
-                    if not 'linear' in name:  # backbone layer
-                        task1_backbone_grad.append(param.grad.detach().data.clone())
-                elif 'arbiter' in name:  # arbiter
-                    task1_arbiter_grad.append(param.grad.detach().data.clone())
+                task_1_grad.append(param.grad.data.clone())
                 param.grad.zero_()
 
-        # linear layer에는 PCGrad를 적용하지 않고 Average Gradient로 한다
-        # average_loss = torch.mean(torch.stack(loss))
-        # average_loss.backward()
+        gard = PCGrad([task_0_grad,task_1_grad])
 
-        backbone_grad = PCGrad([task0_backbone_grad, task1_backbone_grad])
-        arbiter_grad = PCGrad([task0_arbiter_grad, task1_arbiter_grad])
-
-        index_backbone_grad = 0
-        index_arbiter_grad = 0
+        index_grad = 0
         for name, param in self.named_parameters():
             if param.requires_grad:
-                if 'classifier' in name:
-                    if not 'linear' in name:  # backbone layer
-                        param.grad.data = backbone_grad[index_backbone_grad]
-                        index_backbone_grad += 1
-                elif 'arbiter' in name:  # arbiter layer
-                    param.grad.data = arbiter_grad[index_arbiter_grad]
-                    index_arbiter_grad += 1
+                param.grad.data = gard[index_grad]
+                index_grad += 1
 
         # if 'imagenet' in self.args.dataset_name:
         #     for name, param in self.classifier.named_parameters():
@@ -642,8 +636,8 @@ class MAMLFewShotClassifier(nn.Module):
         self.meta_update(loss=losses['loss'])
 
         losses['loss'] = torch.mean(torch.stack(losses['loss']))
-
         losses['learning_rate'] = self.scheduler.get_lr()[0]
+
         self.optimizer.zero_grad()
         self.zero_grad()
 
