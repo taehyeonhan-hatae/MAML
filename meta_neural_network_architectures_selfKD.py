@@ -921,6 +921,10 @@ class VGGReLUNormNetwork(nn.Module):
             if self.args.max_pooling:
                 out = F.max_pool2d(input=out, kernel_size=(2, 2), stride=2, padding=0)
 
+            ## self-distillation
+            self.layer_dict['fc{}'.format(i)] = MetaLinearLayer(input_shape=(out.shape[0], np.prod(out.shape[1:])),
+                                                    num_filters=self.num_output_classes, use_bias=True)
+
 
         if not self.args.max_pooling:
             out = F.avg_pool2d(out, out.shape[2])
