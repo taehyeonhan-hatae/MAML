@@ -9,8 +9,6 @@ import torch.optim as optim
 from meta_neural_network_architectures import VGGReLUNormNetwork,ResNet12, StepArbiter, Arbiter
 from inner_loop_optimizers_GR import GradientDescentLearningRule, LSLRGradientDescentLearningRule
 
-from SAM import SAM
-
 from timm.loss import LabelSmoothingCrossEntropy
 from loss import knowledge_distillation_loss
 
