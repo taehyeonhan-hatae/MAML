@@ -640,6 +640,9 @@ class MAMLFewShotClassifier(nn.Module):
         losses, per_task_target_preds = self.train_forward_prop(data_batch=data_batch, epoch=epoch, current_iter=current_iter)
 
         self.meta_update(loss=losses['loss'])
+
+        losses['loss'] = torch.mean(torch.stack(losses['loss']))
+
         losses['learning_rate'] = self.scheduler.get_lr()[0]
         self.optimizer.zero_grad()
         self.zero_grad()
