@@ -568,14 +568,14 @@ class MAMLFewShotClassifier(nn.Module):
         for name, param in self.named_parameters():
             if param.requires_grad:
                 print(name)
-                task_0_grad.append(param.grad.data.clone())
+                task_0_grad.append(param.grad.detach().data.clone())
                 param.grad.zero_()
 
         loss[1].backward()
         task_1_grad = []
         for name, param in self.named_parameters():
             if param.requires_grad:
-                task_1_grad.append(param.grad.data.clone())
+                task_1_grad.append(param.grad.detach().data.clone())
                 param.grad.zero_()
 
         gard = PCGrad([task_0_grad,task_1_grad])

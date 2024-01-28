@@ -9,8 +9,6 @@ import torch.optim as optim
 from meta_neural_network_architectures import VGGReLUNormNetwork,ResNet12, StepArbiter, Arbiter
 from inner_loop_optimizers_GR import GradientDescentLearningRule, LSLRGradientDescentLearningRule
 
-from SAM import SAM
-
 from timm.loss import LabelSmoothingCrossEntropy
 from loss import knowledge_distillation_loss
 from mtl import IMTL
@@ -105,9 +103,7 @@ class MAMLFewShotClassifier(nn.Module):
             if param.requires_grad:
                 print(name, param.shape, param.device, param.requires_grad)
 
-        base_optimizer = optim.Adam
-        self.optimizer = SAM(self.trainable_parameters(), base_optimizer, lr=args.meta_learning_rate)
-
+        self.optimizer = optim.Adam(self.trainable_parameters(), lr=args.meta_learning_rate, amsgrad=False)
         self.scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer, T_max=self.args.total_epochs,
                                                               eta_min=self.args.min_learning_rate)
 
@@ -214,8 +210,13 @@ class MAMLFewShotClassifier(nn.Module):
         losses['loss'] = total_losses
         losses['accuracy'] = np.mean(total_accuracies)
 
+        # # detach, clone 둘다?
         # task1_gradient = task_gradients[0]['layer_dict.conv3.conv.weight'].detach().clone()
         # task2_gradient = task_gradients[1]['layer_dict.conv3.conv.weight'].detach().clone()
+        #
+        # # clone만?
+        # # task1_gradient = task_gradients[0]['layer_dict.conv3.conv.weight'].clone()
+        # # task2_gradient = task_gradients[1]['layer_dict.conv3.conv.weight'].clone()
         #
         # # # 각 텐서를 벡터로 평탄화(flatten)
         # task1_gradient = task1_gradient.view(task1_gradient.size(0), -1)
@@ -227,50 +228,58 @@ class MAMLFewShotClassifier(nn.Module):
         # ## 두 벡터의 내적
         # gradient_dot_product = torch.dot(task1_gradient.flatten(), task2_gradient.flatten())
         #
-        # # # print("두 그래디언트 cosine 유사도: ", cosine_similarity)
-        # # # print("두 그래디언트 텐서의 내적: ", gradient_dot_product)
+        # # print("두 그래디언트 cosine 유사도: ", cosine_similarity)
+        # # print("두 그래디언트 텐서의 내적: ", gradient_dot_product)
         #
-        # if cosine_similarity > 0:
-        #     losses['loss'] = torch.mean(torch.stack(total_losses))
-        # else:
-        #     losses['loss'] = torch.mean(torch.stack(total_losses)) + gradient_dot_product
+        # # if cosine_similarity > 0:
+        # #     losses['loss'] = torch.mean(torch.stack(total_losses))
+        # # else:
+        # #     losses['loss'] = torch.mean(torch.stack(total_losses)) + gradient_dot_product
+        # #     # losses['loss'] = torch.mean(torch.stack(total_losses)) - gradient_dot_product로 해야하는데..
         #
+        # losses['loss'] = torch.mean(torch.stack(total_losses)) - gradient_dot_product
+        # # losses['loss'] = torch.mean(torch.stack(total_losses)) - cosine_similarity
+        #
+        # # cosine_similarity 유사도의 조건문을 버리고 아래와 같이 하는게 어떨까?
+        # # LEARNING TO LEARN WITHOUT FORGETTING BY MAXIMIZING TRANSFER AND MINIMIZING INTERFERENCE (MER)
+        # # losses['loss'] = torch.mean(torch.stack(total_losses)) - gradient_dot_product
+        # # (or) losses['loss'] = torch.mean(torch.stack(total_losses)) + gradient_dot_product 반대로 적용하는게 더 나을 수도 있다
         # losses['accuracy'] = np.mean(total_accuracies)
 
         return losses
 
-    # def get_soft_label(self, x_support_set_task, y_support_set_task, x_target_set_task, y_target_set_task, names_weights_copy, epoch):
-    def get_soft_label(self, x_target_set_task, y_target_set_task, names_weights_copy, epoch):
+    def get_soft_label(self, x_support_set_task, y_support_set_task, x_target_set_task, y_target_set_task,
+                       names_weights_copy, epoch):
         """
         Knowledge Distillation을 위한 soft target 생성
         """
 
         ## Support Set에 대한 Soft target 생성
-        # support_loss, support_preds, out_feature_dict = self.net_forward(
-        #     x=x_support_set_task,
-        #     y=y_support_set_task,
-        #     weights=names_weights_copy,
-        #     backup_running_statistics=True,
-        #     training=True,
-        #     num_step=0,
-        #     training_phase=False, # Cross Entropy Loss를 구하기 위해서 False로 설정한다
-        #     epoch=epoch
-        # )
+        support_loss, support_preds = self.net_forward(
+            x=x_support_set_task,
+            y=y_support_set_task,
+            weights=names_weights_copy,
+            backup_running_statistics=True,
+            training=True,
+            num_step=0,
+            training_phase=True,  # Cross Entropy Loss를 구하기 위해서 True로 설정한다
+            epoch=epoch
+        )
 
         ## Query Set에 대한 Soft target 생성
         taget_loss, target_preds = self.net_forward(
             x=x_target_set_task,
             y=y_target_set_task,
             weights=names_weights_copy,
-            backup_running_statistics=True,
+            backup_running_statistics=False,
             training=True,
             num_step=0,
-            training_phase=False, # Cross Entropy Loss를 구하기 위해서 False로 설정한다
+            training_phase=True,  # Cross Entropy Loss를 구하기 위해서 True로 설정한다
             epoch=epoch
         )
 
-        return target_preds.detach() # detach하여 역전파 방지
-        # return support_preds.detach(), target_preds.detach() # detach하여 역전파 방지
+        # return target_preds.detach() # detach하여 역전파 방지
+        return support_preds.detach(), target_preds.detach()  # detach하여 역전파 방지
 
     def contextual_grad_scaling(self, names_weights_copy ):
 
@@ -302,7 +311,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         self.num_classes_per_set = ncs
 
-        task_gradients = []
+        # task_gradients = []
 
         total_losses = []
         total_accuracies = []
@@ -335,15 +344,10 @@ class MAMLFewShotClassifier(nn.Module):
             target_soft_preds=None
 
             if self.args.knowledge_distillation:
-                # support_soft_preds, target_soft_preds = self.get_soft_label(x_support_set_task, y_support_set_task,
-                #                                                            x_target_set_task, y_target_set_task,
-                #                                                            names_weights_copy, epoch)
-                target_soft_preds = self.get_soft_label(x_target_set_task, y_target_set_task,
+                support_soft_preds, target_soft_preds = self.get_soft_label(x_support_set_task, y_support_set_task,
+                                                                            x_target_set_task, y_target_set_task,
                                                                             names_weights_copy, epoch)
-
             for num_step in range(num_steps):
-
-                # names_weights_copy = self.contextual_grad_scaling(names_weights_copy=names_weights_copy)
 
                 support_loss, support_preds  = self.net_forward(
                     x=x_support_set_task,
@@ -472,15 +476,14 @@ class MAMLFewShotClassifier(nn.Module):
         preds = self.classifier.forward(x=x, params=weights,
                                         training=training,
                                         backup_running_statistics=backup_running_statistics, num_step=num_step)
-
         if training_phase:
             if self.args.smoothing:
                 criterion = LabelSmoothingCrossEntropy(smoothing=0.1)
                 loss = criterion(preds, y)
             elif self.args.knowledge_distillation:
                 if not soft_target == None:
-                    alpha = 0.1
-                    # alpha = epoch / self.args.total_epochs
+                    # alpha = 0.1
+                    alpha = epoch / self.args.total_epochs
                     loss = knowledge_distillation_loss(student_logit=preds, teacher_logit=soft_target, labels=y,
                                                        label_loss_weight=(1.0 - alpha), soft_label_loss_weight=alpha,
                                                        Temperature=1.0)
@@ -494,12 +497,12 @@ class MAMLFewShotClassifier(nn.Module):
         return loss, preds
 
     def trainable_parameters(self):
-        """
-        Returns an iterator over the trainable parameters of the model.
-        """
-        for param in self.parameters():
-            if param.requires_grad:
-                yield param
+            """
+            Returns an iterator over the trainable parameters of the model.
+            """
+            for param in self.parameters():
+                if param.requires_grad:
+                    yield param
 
     def train_forward_prop(self, data_batch, epoch, current_iter):
         """
@@ -532,7 +535,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         return losses, per_task_target_preds
 
-    def meta_update(self, loss, current_iter, first_step, epoch):
+    def meta_update(self, loss):
         """
         Applies an outer loop update on the meta-parameters of the model.
         :param loss: The current crossentropy loss.
@@ -543,72 +546,36 @@ class MAMLFewShotClassifier(nn.Module):
         # for name, param in self.step_arbiter.named_parameters():
         #     prev_weights[name] = param.data.clone()
 
-        # loss.backward()
+        self.optimizer.zero_grad()
 
-        if first_step:
+        loss[0].backward()
+        task_0_grad = []
+        for name, param in self.named_parameters():
+            if param.requires_grad:
+                task_0_grad.append(param.grad.detach().data.clone().flatten())
+                param.grad.zero_()
 
-            loss[0].backward()
-            task_0_grad = []
-            for name, param in self.named_parameters():
-                if param.requires_grad:
-                    task_0_grad.append(param.grad.detach().data.clone().flatten())
-                    param.grad.zero_()
+        task_0_grad = torch.cat(task_0_grad, dim=0)
 
-            task_0_grad = torch.cat(task_0_grad, dim=0)
+        loss[1].backward()
+        task_1_grad = []
+        for name, param in self.named_parameters():
+            if param.requires_grad:
+                task_1_grad.append(param.grad.detach().data.clone().flatten())
+                param.grad.zero_()
 
-            loss[1].backward()
-            task_1_grad = []
-            for name, param in self.named_parameters():
-                if param.requires_grad:
-                    task_1_grad.append(param.grad.detach().data.clone().flatten())
-                    param.grad.zero_()
+        task_1_grad = torch.cat(task_1_grad, dim=0)
 
-            task_1_grad = torch.cat(task_1_grad, dim=0)
+        shared_grad = IMTL([task_0_grad, task_1_grad])
 
-            shared_grad = IMTL([task_0_grad, task_1_grad])
-
-            total_length = 0
-            for name, param in self.named_parameters():
-                if param.requires_grad:
-                    length = param.numel()
-                    param.grad.data = shared_grad[
-                                      total_length: total_length + length
-                                      ].reshape(param.shape)
-                    total_length += length
-
-            self.optimizer.first_step(zero_grad=True)
-        else:
-
-            loss[0].backward()
-            task_0_grad = []
-            for name, param in self.named_parameters():
-                if param.requires_grad:
-                    task_0_grad.append(param.grad.detach().data.clone().flatten())
-                    param.grad.zero_()
-
-            task_0_grad = torch.cat(task_0_grad, dim=0)
-
-            loss[1].backward()
-            task_1_grad = []
-            for name, param in self.named_parameters():
-                if param.requires_grad:
-                    task_1_grad.append(param.grad.detach().data.clone().flatten())
-                    param.grad.zero_()
-
-            task_1_grad = torch.cat(task_1_grad, dim=0)
-
-            shared_grad = IMTL([task_0_grad, task_1_grad])
-
-            total_length = 0
-            for name, param in self.named_parameters():
-                if param.requires_grad:
-                    length = param.numel()
-                    param.grad.data = shared_grad[
-                                      total_length: total_length + length
-                                      ].reshape(param.shape)
-                    total_length += length
-
-            self.optimizer.second_step(zero_grad=True)
+        total_length = 0
+        for name, param in self.named_parameters():
+            if param.requires_grad:
+                length = param.numel()
+                param.grad.data = shared_grad[
+                                  total_length: total_length + length
+                                  ].reshape(param.shape)
+                total_length += length
 
         # if 'imagenet' in self.args.dataset_name:
         #     for name, param in self.classifier.named_parameters():
@@ -621,7 +588,7 @@ class MAMLFewShotClassifier(nn.Module):
         #         if param.requires_grad:
         #             param.grad = param.grad / torch.norm(param.grad, p=2)
 
-        #self.optimizer.step()
+        self.optimizer.step()
 
         # 가중치 업데이트 확인
         # for name, param in self.step_arbiter.named_parameters():
@@ -655,22 +622,11 @@ class MAMLFewShotClassifier(nn.Module):
 
         data_batch = (x_support_set, x_target_set, y_support_set, y_target_set)
 
-        losses_1, per_task_target_preds_1 = self.train_forward_prop(data_batch=data_batch, epoch=epoch, current_iter=current_iter)
-
-        # print("losses_1['loss'] == ", losses_1['loss'])
-
-        self.meta_update(loss=losses_1['loss'], current_iter=current_iter, first_step=True, epoch=epoch)
-
-        # 추가
-        losses_1['loss'] = torch.mean(torch.stack(losses_1['loss']))
-
         losses, per_task_target_preds = self.train_forward_prop(data_batch=data_batch, epoch=epoch, current_iter=current_iter)
 
-        self.meta_update(loss=losses['loss'], current_iter=current_iter, first_step=False, epoch=epoch)
+        self.meta_update(loss=losses['loss'])
 
-        # 추가
         losses['loss'] = torch.mean(torch.stack(losses['loss']))
-
         losses['learning_rate'] = self.scheduler.get_lr()[0]
 
         self.optimizer.zero_grad()
@@ -699,9 +655,6 @@ class MAMLFewShotClassifier(nn.Module):
         data_batch = (x_support_set, x_target_set, y_support_set, y_target_set)
 
         losses, per_task_target_preds = self.evaluation_forward_prop(data_batch=data_batch, epoch=self.current_epoch, current_iter=current_iter)
-
-        # 추가
-        losses['loss'] = torch.mean(torch.stack(losses['loss']))
 
         losses['loss'].backward() # uncomment if you get the weird memory error
         self.zero_grad()
