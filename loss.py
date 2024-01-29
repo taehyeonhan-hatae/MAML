@@ -42,6 +42,15 @@ def knowledge_distillation_loss(student_logit, teacher_logit, labels, label_loss
 
     return loss
 
+
+def KL_divergence(student_logit, teacher_logit, Temperature):
+
+    soft_teacher_outputs = nn.functional.softmax(teacher_logit / Temperature, dim=1)
+    soft_student_outputs = nn.functional.log_softmax(student_logit / Temperature, dim=1)
+    distillation_loss = nn.KLDivLoss()(soft_student_outputs, soft_teacher_outputs) * (Temperature * Temperature)
+
+    return distillation_loss
+
 class LabelSmoothingCrossEntropy(nn.Module):
     """
     Cross Entropy w/ smoothing or soft targets
