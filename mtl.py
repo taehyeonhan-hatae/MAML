@@ -8,36 +8,6 @@ import torch
 
 # https://github.com/anonymous-user00/FS-MTL
 
-def extract_gradient(loss, param_list):
-
-    loss.backward()
-
-    task_linear_grad = []
-    task_backbone_grad = []
-    task_arbiter_grad = []
-
-    for name, param in param_list.named_parameters():
-        if param.requires_grad:
-            if 'classifier' in name:
-                if 'linear' in name:  # classifier layer
-                    task_linear_grad.append(param.grad.detach().data.clone())
-                else:  # backbone layer
-                    task_backbone_grad.append(param.grad.detach().data.clone())
-            elif 'arbiter' in name:  # arbiter
-                task_arbiter_grad.append(param.grad.detach().data.clone())
-            param.grad.zero_()
-
-
-    return task_linear_grad, task_backbone_grad, task_arbiter_grad
-
-def manipulate_gradient(loss_list, param_list):
-
-    for i in range(len(loss_list)):
-
-        task_linear_grad, task_backbone_grad, task_arbiter_grad = extract_gradient(loss=loss_list[i], param_list=param_list)
-
-    pass
-
 def PCGrad(grads: List[Tuple[torch.Tensor]], reduction: str = "sum") -> torch.Tensor:
     pc_grad = copy.deepcopy(grads)
     for g_i in pc_grad:
