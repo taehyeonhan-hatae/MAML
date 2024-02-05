@@ -77,16 +77,17 @@ class MAMLFewShotClassifier(nn.Module):
             num_layers = len(names_weights_copy)
             input_dim = num_layers * 2
             output_dim = num_layers
-            self.arbiter = nn.Sequential(
-                nn.Linear(input_dim, input_dim),
-                nn.ReLU(inplace=True),
-                nn.Linear(input_dim, output_dim),
-                ## nn.Softplus(beta=2) # GAP
-                nn.Softplus() # CxGrad
-            ).to(device=self.device)
 
-            # self.arbiter = Arbiter(input_dim=input_dim, output_dim=output_dim, args=self.args,
-            #                                 device=self.device)
+            # self.arbiter = nn.Sequential(
+            #     nn.Linear(input_dim, input_dim),
+            #     nn.ReLU(inplace=True),
+            #     nn.Linear(input_dim, output_dim),
+            #     ## nn.Softplus(beta=2) # GAP
+            #     nn.Softplus() # CxGrad
+            # ).to(device=self.device)
+
+            self.arbiter = Arbiter(input_dim=input_dim, output_dim=output_dim, args=self.args,
+                                            device=self.device)
 
             # self.arbiter = StepArbiter(input_dim=input_dim, output_dim=output_dim, args=self.args, device=self.device)
 
@@ -209,42 +210,6 @@ class MAMLFewShotClassifier(nn.Module):
         # losses['loss'] = torch.mean(torch.stack(total_losses))
         losses['loss'] = total_losses
         losses['accuracy'] = np.mean(total_accuracies)
-
-        # # detach, clone 둘다?
-        # task1_gradient = task_gradients[0]['layer_dict.conv3.conv.weight'].detach().clone()
-        # task2_gradient = task_gradients[1]['layer_dict.conv3.conv.weight'].detach().clone()
-        #
-        # # clone만?
-        # # task1_gradient = task_gradients[0]['layer_dict.conv3.conv.weight'].clone()
-        # # task2_gradient = task_gradients[1]['layer_dict.conv3.conv.weight'].clone()
-        #
-        # # # 각 텐서를 벡터로 평탄화(flatten)
-        # task1_gradient = task1_gradient.view(task1_gradient.size(0), -1)
-        # task2_gradient = task2_gradient.view(task2_gradient.size(0), -1)
-        #
-        # ## 두 그래디언트 cosine 유사도:
-        # cosine_similarity = F.cosine_similarity(task1_gradient, task2_gradient)
-        #
-        # ## 두 벡터의 내적
-        # gradient_dot_product = torch.dot(task1_gradient.flatten(), task2_gradient.flatten())
-        #
-        # # print("두 그래디언트 cosine 유사도: ", cosine_similarity)
-        # # print("두 그래디언트 텐서의 내적: ", gradient_dot_product)
-        #
-        # # if cosine_similarity > 0:
-        # #     losses['loss'] = torch.mean(torch.stack(total_losses))
-        # # else:
-        # #     losses['loss'] = torch.mean(torch.stack(total_losses)) + gradient_dot_product
-        # #     # losses['loss'] = torch.mean(torch.stack(total_losses)) - gradient_dot_product로 해야하는데..
-        #
-        # losses['loss'] = torch.mean(torch.stack(total_losses)) - gradient_dot_product
-        # # losses['loss'] = torch.mean(torch.stack(total_losses)) - cosine_similarity
-        #
-        # # cosine_similarity 유사도의 조건문을 버리고 아래와 같이 하는게 어떨까?
-        # # LEARNING TO LEARN WITHOUT FORGETTING BY MAXIMIZING TRANSFER AND MINIMIZING INTERFERENCE (MER)
-        # # losses['loss'] = torch.mean(torch.stack(total_losses)) - gradient_dot_product
-        # # (or) losses['loss'] = torch.mean(torch.stack(total_losses)) + gradient_dot_product 반대로 적용하는게 더 나을 수도 있다
-        # losses['accuracy'] = np.mean(total_accuracies)
 
         return losses
 
@@ -391,7 +356,6 @@ class MAMLFewShotClassifier(nn.Module):
                     g = 0
                     for key in names_weights_copy.keys():
                         generated_alpha_params[key] = generated_gradient_rate[g]
-                        # generated_beta_params[key] = generated_gradient_rate[g+1]
                         g += 1
 
                 names_weights_copy = self.apply_inner_loop_update(loss=support_loss,
@@ -416,20 +380,6 @@ class MAMLFewShotClassifier(nn.Module):
                                                                  num_step=num_step, training_phase=training_phase,
                                                                  epoch=epoch,
                                                                  soft_target=target_soft_preds)
-
-                    # lambda_diff = torch.tensor(1.0)
-                    # metalearner_classifier = self.classifier.layer_dict.linear.weights.detach()
-                    # tasklearner_classifier = names_weights_copy['layer_dict.linear.weights'].squeeze() # Detach를 하는게 맞을까?
-                    #
-                    # #classifier_diff = F.mse_loss(tasklearner_classifier,metalearner_classifier, reduction='sum')
-                    # classifier_diff= F.l1_loss(tasklearner_classifier,metalearner_classifier, reduction='mean')
-                    #
-                    # target_loss = target_loss + lambda_diff * classifier_diff
-
-                    # target_loss_grad = torch.autograd.grad(target_loss, names_weights_copy.values(), retain_graph=True)
-                    # target_grads_copy = dict(zip(names_weights_copy.keys(), target_loss_grad))
-                    # task_gradients.append(target_grads_copy)
-                    # task_gradients.append(target_loss_grad)
 
                     task_losses.append(target_loss)
             ## Inner-loop END
