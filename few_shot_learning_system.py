@@ -206,10 +206,7 @@ class MAMLFewShotClassifier(nn.Module):
 
         losses = dict()
 
-        total_losses = torch.stack(total_losses)
-        loss_weight = F.softmax(total_losses, dim=0)
-
-        losses['loss'] = torch.sum(loss_weight * total_losses)
+        losses['loss'] = torch.mean(torch.stack(total_losses))
         losses['accuracy'] = np.mean(total_accuracies)
 
         return losses
