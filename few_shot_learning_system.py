@@ -77,16 +77,16 @@ class MAMLFewShotClassifier(nn.Module):
             input_dim = num_layers * 2
             output_dim = num_layers
 
-            # self.arbiter = nn.Sequential(
-            #     nn.Linear(input_dim, input_dim),
-            #     nn.ReLU(inplace=True),
-            #     nn.Linear(input_dim, output_dim),
-            #     ## nn.Softplus(beta=2) # GAP
-            #     nn.Softplus() # CxGrad
-            # ).to(device=self.device)
+            self.arbiter = nn.Sequential(
+                nn.Linear(input_dim, input_dim),
+                nn.ReLU(inplace=True),
+                nn.Linear(input_dim, output_dim),
+                ## nn.Softplus(beta=2) # GAP
+                nn.Softplus() # CxGrad
+            ).to(device=self.device)
 
-            self.arbiter = Arbiter(input_dim=input_dim, output_dim=output_dim, args=self.args,
-                                            device=self.device)
+            # self.arbiter = Arbiter(input_dim=input_dim, output_dim=output_dim, args=self.args,
+            #                                 device=self.device)
 
             # self.arbiter = StepArbiter(input_dim=input_dim, output_dim=output_dim, args=self.args, device=self.device)
 
