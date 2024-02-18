@@ -19,7 +19,7 @@ from multiprocessing import freeze_support
 # 1) mini imagenet
 ## python train_maml_system.py --name_of_args_json_file experiment_config/MAML+Arbiter_5way_1shot.json --gpu_to_use 0
 ## python train_maml_system.py --name_of_args_json_file experiment_config/MAML+Arbiter_5way_5shot.json --gpu_to_use 0
-## python train_maml_system.py --name_of_args_json_file experiment_config/MAML+Arbiter_5way_5shot_filter48 --gpu_to_use 0
+## python train_maml_system.py --name_of_args_json_file experiment_config/MAML+Arbiter_5way_5shot_filter48.json --gpu_to_use 0
 # 2) tiered imagenet
 ## python train_maml_system.py --name_of_args_json_file experiment_config/MAML+Arbiter_tiered_imagenet_5way_1shot.json --gpu_to_use 0
 ## python train_maml_system.py --name_of_args_json_file experiment_config/MAML+Arbiter_tiered_imagenet_5way_5shot.json --gpu_to_use 0
