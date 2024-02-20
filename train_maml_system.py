@@ -8,7 +8,7 @@ from utils.dataset_tools import maybe_unzip_dataset
 
 from multiprocessing import freeze_support
 
-## python train_maml_system.py --name_of_args_json_file experiment_config/MAML.json --gpu_to_use 0
+## python train_maml_system.py --name_of_args_json_file experiment_config/MAML_filter128.json --gpu_to_use 0
 
 ''' Resnet experiment'''
 # 1) mini imagenet
