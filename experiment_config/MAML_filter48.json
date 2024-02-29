@@ -56,5 +56,6 @@
   "backbone": "4-CONV",
   "arbiter": false,
   "SWA": false,
-  "use_bias": true
+  "use_bias": true,
+  "knowledge_distillation": false
 }
