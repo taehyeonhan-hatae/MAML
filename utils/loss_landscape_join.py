@@ -132,7 +132,7 @@ class landscape(nn.Module):
         # 축 범위 지정
         plt.ylim([0, 8])
 
-        plt.title('Loss landscape perturbed based on top Hessian eigenvector')
+        # plt.title('Loss landscape perturbed based on top Hessian eigenvector')
 
         directory = self.args.experiment_name.replace('../', '')
         directory = 'landscape_image/' + directory + "/2d/"
