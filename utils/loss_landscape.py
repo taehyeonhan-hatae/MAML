@@ -55,6 +55,7 @@ class landscape(nn.Module):
 
         plt.savefig(directory + title + '.png')
 
+
     def show(self, inputs, targets, title):
 
         model = self.model.cuda()
@@ -83,7 +84,7 @@ class landscape(nn.Module):
             for lam2 in lams2:
                 model_perb1 = self.get_params(model, model_perb1, top_eigenvector[0], lam1)
                 model_perb2 = self.get_params(model_perb1, model_perb2, top_eigenvector[1], lam2)
-                preds, out_feature_dict = model_perb2.forward(x=inputs, num_step=5)
+                preds = model_perb2.forward(x=inputs, num_step=5)
                 loss = F.cross_entropy(input=preds, target=targets)
 
                 loss_list.append((lam1, lam2, loss.item()))
@@ -137,6 +138,9 @@ class landscape(nn.Module):
             loss_list.append(loss.item())
 
         self.save_landscape_2dimage(lams, loss_list, title)
+
+
+
 
 
 

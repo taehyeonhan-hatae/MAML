@@ -71,7 +71,7 @@ class my_hessian():
 
             # if we only compute the Hessian information for a single batch data, we can re-use the gradients.
             #outputs = self.model(self.inputs)
-            preds, out_feature_dict = self.model(self.inputs, num_step=5)
+            preds = self.model(self.inputs, num_step=5)
 
             #loss = self.criterion(outputs, self.targets)
             loss = F.cross_entropy(input=preds, target=self.targets)
