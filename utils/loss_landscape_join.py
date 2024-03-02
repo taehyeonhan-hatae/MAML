@@ -125,7 +125,7 @@ class landscape(nn.Module):
     def save_landscape_2dimage(self, lams, loss_list, loss_list2, title):
 
         fig, ax = plt.subplots()
-        plt.plot(lams, loss_list, lams, loss_list2, 'r-')
+        plt.plot(lams, loss_list, lams, loss_list2, 'r-', lw=3)
         plt.ylabel('Loss')
         plt.xlabel('Perturbation')
 
