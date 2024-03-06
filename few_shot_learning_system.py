@@ -337,10 +337,12 @@ class MAMLFewShotClassifier(nn.Module):
                     for key, weight in names_weights_copy.items():
                         weight_norm = torch.norm(weight, p=2)
                         per_step_task_embedding.append(weight_norm)
+                        # per_step_task_embedding.append(weight.mean())
 
                     for key, grad in names_grads_copy.items():
                         gradient_l2norm = torch.norm(grad, p=2)
                         per_step_task_embedding.append(gradient_l2norm)
+                        #per_step_task_embedding.append(grad.mean())
 
                     per_step_task_embedding = torch.stack(per_step_task_embedding)
 
