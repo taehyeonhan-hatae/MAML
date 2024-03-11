@@ -17,6 +17,9 @@ from multiprocessing import freeze_support
 ## python train_maml_system.py --name_of_args_json_file experiment_config/resnet/miniimagenet/MAML+Arbiter_5way_1shot_resnet.json --gpu_to_use 0
 ## python train_maml_system.py --name_of_args_json_file experiment_config/resnet/miniimagenet/MAML+Arbiter_5way_5shot_resnet.json --gpu_to_use 0
 # 2) tiered imagenet
+## python train_maml_system.py --name_of_args_json_file experiment_config/resnet/miniimagenet/MAML+Arbiter_tiered_imagenet_5way_1shot_resnet.json --gpu_to_use 0
+## python train_maml_system.py --name_of_args_json_file experiment_config/resnet/miniimagenet/MAML+Arbiter_tiered_imagenet_5way_5shot_resnet.json --gpu_to_use 0
+
 
 ''' VGG experiment'''
 # 1) mini imagenet
