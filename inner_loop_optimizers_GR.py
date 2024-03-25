@@ -57,7 +57,15 @@ class GradientDescentLearningRule(nn.Module):
 
         updated_names_weights_dict = dict()
 
-        self.norm_information['current_iter'] = current_iter
+        #### 추가 ####
+        if current_iter == 'test':
+            try:
+                self.norm_information['current_iter'] = os.environ["TEST_DATASET"]
+            except:
+                self.norm_information['current_iter'] = self.args.dataset_name
+        else:
+            self.norm_information['current_iter'] = current_iter
+        ########
 
         if training_phase:
             self.norm_information["phase"] = "train"
