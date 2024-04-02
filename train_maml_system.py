@@ -8,6 +8,9 @@ from utils.dataset_tools import maybe_unzip_dataset
 
 from multiprocessing import freeze_support
 
+''' Prompter experiment'''
+## python train_maml_system.py --name_of_args_json_file experiment_config/prompt_config/MAML+Arbiter_5way_5shot_filter48.json --gpu_to_use 0
+
 ''' MAML experiment'''
 ## python train_maml_system.py --name_of_args_json_file experiment_config/MAML_filter48.json --gpu_to_use 0
 ## python train_maml_system.py --name_of_args_json_file experiment_config/MAML_filter64.json --gpu_to_use 0

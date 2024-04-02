@@ -2,80 +2,27 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-from meta_neural_network_architectures import extract_top_level_dict
 
 class PadPrompter(nn.Module):
-    def __init__(self, args, prompt_size, image_size):
+    def __init__(self, args):
         super(PadPrompter, self).__init__()
+        pad_size = args.prompt_size
+        image_size = args.image_size
 
-        self.pad_size = prompt_size
-        b, c, self.h, self.w = image_size
+        self.base_size = image_size - pad_size*2
+        self.pad_up = nn.Parameter(torch.randn([1, 3, pad_size, image_size]))
+        self.pad_down = nn.Parameter(torch.randn([1, 3, pad_size, image_size]))
+        self.pad_left = nn.Parameter(torch.randn([1, 3, image_size - pad_size*2, pad_size]))
+        self.pad_right = nn.Parameter(torch.randn([1, 3, image_size - pad_size*2, pad_size]))
 
-        self.base_size = self.w - self.pad_size * 2
-        self.pad_dict = nn.ParameterDict()
-
-        self.build_network()
-
-    def build_network(self):
-
-        self.pad_dict['pad_up'] = nn.Parameter(torch.randn([3, self.pad_size, self.w]))
-        self.pad_dict['pad_down'] = nn.Parameter(torch.randn([3, self.pad_size, self.w]))
-        self.pad_dict['pad_left'] = nn.Parameter(torch.randn([3, self.w - self.pad_size * 2, self.pad_size]))
-        self.pad_dict['pad_right'] = nn.Parameter(torch.randn([3, self.w - self.pad_size * 2, self.pad_size]))
-
-        # for name, param in self.named_parameters():
-        #     print("param.shape == ", param.shape)
-
-        # 추가하면 안됨
-        # for name, param in self.named_parameters():
-        #     print("build_network == ", name)
-        #     nn.init.xavier_uniform_(param)
-
-    def forward(self, x, params=None):
-
-        # print("x.shape == ", x.shape)
-
-        if params is not None:
-            # param이 지정될 경우 (inner-loop)
-
-            param_dict = extract_top_level_dict(current_dict=params)
-
-            pad_up = param_dict['pad_up']
-            pad_down = param_dict['pad_down']
-            pad_left = param_dict['pad_left']
-            pad_right = param_dict['pad_right']
-
-        else:
-
-            pad_up = self.pad_dict['pad_up']
-            pad_down = self.pad_dict['pad_down']
-            pad_left = self.pad_dict['pad_left']
-            pad_right = self.pad_dict['pad_right']
-
+    def forward(self, x):
         base = torch.zeros(1, 3, self.base_size, self.base_size).cuda()
-        prompt = torch.cat([pad_left, base, pad_right], dim=3)
-        prompt = torch.cat([pad_up, prompt, pad_down], dim=2)
-
+        prompt = torch.cat([self.pad_left, base, self.pad_right], dim=3)
+        prompt = torch.cat([self.pad_up, prompt, self.pad_down], dim=2)
         prompt = torch.cat(x.size(0) * [prompt])
 
         return x + prompt
 
-    def zero_grad(self, params=None):
-        if params is None:
-            for param in self.parameters():
-                if param.requires_grad == True:
-                    if param.grad is not None:
-                        if torch.sum(param.grad) > 0:
-                            #print(param.grad)
-                            param.grad.zero_()
-        else:
-            for name, param in params.items():
-                if param.requires_grad == True:
-                    if param.grad is not None:
-                        if torch.sum(param.grad) > 0:
-                            #print(param.grad)
-                            param.grad.zero_()
-                            params[name].grad = None
 
 class FixedPatchPrompter(nn.Module):
     def __init__(self, args):
@@ -108,8 +55,8 @@ class RandomPatchPrompter(nn.Module):
         return x + prompt
 
 
-def padding(args, prompt_size, image_size):
-    return PadPrompter(args, prompt_size, image_size)
+def padding(args):
+    return PadPrompter(args)
 
 
 def fixed_patch(args):

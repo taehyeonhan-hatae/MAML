@@ -8,7 +8,7 @@ import torch.optim as optim
 
 from meta_neural_network_architectures import VGGReLUNormNetwork,ResNet12, Arbiter
 from inner_loop_optimizers_GR import GradientDescentLearningRule, LSLRGradientDescentLearningRule
-
+import prompters
 
 def set_torch_seed(seed):
     """
@@ -67,6 +67,13 @@ class MAMLFewShotClassifier(nn.Module):
             self.inner_loop_optimizer = GradientDescentLearningRule(device=device,
                                                                     args=self.args,
                                                                     learning_rate=self.task_learning_rate)
+
+
+        # Prompter
+        if self.args.prompter:
+            # choices=['padding', 'random_patch', 'fixed_patch'],
+            method = 'padding'
+            self.prompter = prompters.__dict__[method](self.args).to(device)
 
         # Gradient Arbiter
         if self.args.arbiter:
@@ -255,8 +262,11 @@ class MAMLFewShotClassifier(nn.Module):
             x_target_set_task = x_target_set_task.view(-1, c, h, w)
             y_target_set_task = y_target_set_task.view(-1)
 
-            for num_step in range(num_steps):
+            if self.args.prompter:
+                # prompted_images = self.prompter(x_support_set_task)
+                x_support_set_task = self.prompter(x_support_set_task)
 
+            for num_step in range(num_steps):
                 support_loss, support_preds  = self.net_forward(
                     x=x_support_set_task,
                     y=y_support_set_task,
