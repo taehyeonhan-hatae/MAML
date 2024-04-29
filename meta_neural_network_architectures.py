@@ -16,8 +16,6 @@ def extract_top_level_dict(current_dict):
     :return: A dictionary graph of the params already added to the graph.
     """
 
-    # print("current_dict == ", current_dict)
-
     output_dict = dict()
     for key in current_dict.keys():
         name = key.replace("layer_dict.", "")
@@ -39,12 +37,6 @@ def extract_top_level_dict(current_dict):
             new_item = {key: value for key, value in output_dict[top_level].items()}
             new_item[sub_level] = current_dict[key]
             output_dict[top_level] = new_item
-
-    # print("extract_top_level_dict === ", current_dict.keys(), output_dict.keys())
-
-    # current_dict = {"layer_dict.step3.linear1.weights'" : 1, 'layer_dict.step3.linear1.bias': 2}
-    # output_dict = {'step3': {"linear1.weights'": 1, 'linear1.bias': 2}}
-    # step1, step2.. 등등으로 나누는데.. 이걸 왜 하는 걸까..?
 
     return output_dict
 
